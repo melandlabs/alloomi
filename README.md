@@ -1,18 +1,76 @@
 # Alloomi
 
-**Proactive AI workspace** — understands your intent, orchestrates execution, and gets things done.
+> **Proactive AI workspace** — understands your intent, orchestrates execution, and gets things done.
 
-Alloomi monitors business signals, orchestrates tasks autonomously, and tracks/validates results end-to-end.
+Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive digital partner** that watches, learns, remembers, and acts on your behalf.
 
 ## Features
 
-- **📡 Proactive Awareness** — monitors Slack, Email, Calendar, Documents and alerts you before issues escalate
-- **🧠 Long-Term Memory** — persistent knowledge graphs of people, projects, and decisions
-- **🎯 95% Noise Filtering** — hundreds of daily messages refined into focused action items
-- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports end-to-end
-- **💬 Natural Chat** — assign tasks in plain language
-- **📱 Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu integrations
-- **🔒 Enterprise Security** — SOC 2 compliant, end-to-end encryption, SSO/SAML support
+### Core Capabilities
+
+- **📡 Proactive Awareness** — monitors signals across Slack, Email, Calendar, Documents and alerts you proactively before issues escalate
+- **🧠 Long-Term Memory (Context Atlas)** — persistent knowledge graphs of people, projects, and decisions; remembers context even months later
+- **🎯 95% Noise Filtering** — hundreds of daily messages refined into one focused panel; tells you what you should act on
+- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end
+- **💬 Natural Chat** — assign tasks in plain language; no complex commands to learn
+
+### Multi-Platform Access
+
+- **Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu integrations
+- **Desktop Apps** — Native apps for Windows, macOS, and Linux with keyboard shortcuts and system tray
+- **Web App** — Always accessible in your browser
+
+### Enterprise-Grade Security
+
+- AES-256 end-to-end encryption
+- Hardware-isolated processing environments (no public gateways)
+- Zero training commitments — your data never trains public AI models
+- Local-first architecture
+
+## What Makes Alloomi Different?
+
+Most AI assistants are **workflow tools**—you give commands, they execute tasks, with no knowledge of
+who you are. Sometimes they surprise you in ways you didn't expect. But usually, most of the time, they
+frustrate you, filled with uncertainty, and accompanied by issues of context, memory, cost, and security.
+
+Alloomi is different: it's a **proactive digital partner** that watches, learns, remembers, and acts on
+your behalf. The difference is architectural.
+
+When you connect your messaging platforms and integrations to Alloomi, you don't just chat with it through
+Telegram, WhatsApp, and other apps—you also sync everything with your permission: raw messages, meetings,
+emails, tweets, calendar events, voice calls, and any notes or ideas you've captured. All of this—including
+your conversations with Alloomi itself—becomes the **single source of truth** for Alloomi's brain.
+
+Behind the scenes, Alloomi runs a background agent on a continuous sync loop, actively gathering information
+from all your connected sources. An agent without this loop can only respond based on stale context. With it,
+every conversation—and every moment—makes Alloomi smarter and more aligned with you. When you create a custom
+agent role in Alloomi to handle one-off or scheduled tasks, this brain acts as the orchestrator, dramatically
+improving execution quality.
+
+Alloomi implements a complete **"Receive → Process → Remember → Understand → Serve"** loop:
+
+| Layer | What It Does |
+|-------|--------------|
+| **📡 Receive** | Multi-platform, multi-modal ingestion — IM, email, documents, files, web data, voice calls |
+| **⚙️ Process** | Noise reduction at scale — deduplication, OCR, ASR, intent extraction, semantic clustering |
+| **🧠 Remember** | Persistent knowledge graph — people, projects, decisions — survives conversations and months of time |
+| **🎯 Understand** | Deep semantic intent, cross-modal understanding, emotional tone, contextual relevance |
+| **🚀 Serve** | Proactive delivery — smart summaries, auto-replies, scheduled reports, personalized alerts |
+
+### Layered Memory Architecture
+
+- **Raw information** — original messages, files, transcripts
+- **Information insights** — extracted entities, decisions, key events, timeline, execution diff
+- **Contextual memory** — recent conversation state, temporary context
+- **Knowledge-base memory** — long-term people/projects/preferences knowledge graph
+
+## Use Cases
+
+- **🌍 Global Managers** — Filter time zone and language noise, capture high-value opportunities 24/7
+- **🧑‍💻 Engineers & Product Teams** — Team memory that never decays, auto-generate weekly reports, eliminate context rot
+- **🚀 Founders & Salespeople** — Maintain hundreds of client relationships, auto follow-ups, personalized proposals at scale
+- **🧑‍💻 Engineering Teams** — Automated dev reports, issue triaging, GitHub-Linear sync
+- **📱 Social Media Managers** — Autopilot X (Twitter) account with approval workflow
 
 ## Screenshots
 
