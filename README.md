@@ -49,13 +49,13 @@ improving execution quality.
 
 Alloomi implements a complete **"Receive → Process → Remember → Understand → Serve"** loop:
 
-| Layer | What It Does |
-|-------|--------------|
-| **📡 Receive** | Multi-platform, multi-modal ingestion — IM, email, documents, files, web data, voice calls |
-| **⚙️ Process** | Noise reduction at scale — deduplication, OCR, ASR, intent extraction, semantic clustering |
-| **🧠 Remember** | Persistent knowledge graph — people, projects, decisions — survives conversations and months of time |
-| **🎯 Understand** | Deep semantic intent, cross-modal understanding, emotional tone, contextual relevance |
-| **🚀 Serve** | Proactive delivery — smart summaries, auto-replies, scheduled reports, personalized alerts |
+| Layer             | What It Does                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| **📡 Receive**    | Multi-platform, multi-modal ingestion — IM, email, documents, files, web data, voice calls           |
+| **⚙️ Process**    | Noise reduction at scale — deduplication, OCR, ASR, intent extraction, semantic clustering           |
+| **🧠 Remember**   | Persistent knowledge graph — people, projects, decisions — survives conversations and months of time |
+| **🎯 Understand** | Deep semantic intent, cross-modal understanding, emotional tone, contextual relevance                |
+| **🚀 Serve**      | Proactive delivery — smart summaries, auto-replies, scheduled reports, personalized alerts           |
 
 ### Layered Memory Architecture
 

@@ -13,44 +13,36 @@ type OptionGroup = {
 const IMPORTANCE_GROUPS: OptionGroup[] = [
   {
     key: "high",
-    aliases: ["high", "important", "重要"],
-    labelPriority: ["High", "Important", "重要"],
+    aliases: ["high", "important"],
+    labelPriority: ["High", "Important"],
   },
   {
     key: "medium",
-    aliases: ["medium", "general", "一般"],
-    labelPriority: ["Medium", "General", "一般"],
+    aliases: ["medium", "general"],
+    labelPriority: ["Medium", "General"],
   },
   {
     key: "low",
-    aliases: ["low", "not important", "不重要"],
-    labelPriority: ["Low", "Not Important", "不重要"],
+    aliases: ["low", "not important"],
+    labelPriority: ["Low", "Not Important"],
   },
 ];
 
 const URGENCY_GROUPS: OptionGroup[] = [
   {
     key: "immediate",
-    aliases: [
-      "immediate",
-      "urgent",
-      "asap",
-      "as soon as possible",
-      "紧急",
-      "尽快",
-      "尽快处理",
-    ],
-    labelPriority: ["Immediate", "As soon as possible", "紧急", "尽快"],
+    aliases: ["immediate", "urgent", "asap", "as soon as possible"],
+    labelPriority: ["Immediate", "As soon as possible"],
   },
   {
     key: "within_24h",
-    aliases: ["24小时内", "within 24 hours", "24h", "24 hours"],
-    labelPriority: ["Within 24 hours", "24小时内"],
+    aliases: ["within 24 hours", "24h", "24 hours"],
+    labelPriority: ["Within 24 hours"],
   },
   {
     key: "not_urgent",
-    aliases: ["not urgent", "不紧急"],
-    labelPriority: ["Not urgent", "不紧急"],
+    aliases: ["not urgent"],
+    labelPriority: ["Not urgent"],
   },
 ];
 

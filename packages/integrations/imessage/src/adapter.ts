@@ -863,7 +863,6 @@ end tell`;
         const isPermissionError =
           errorMessage.includes("permission") ||
           errorMessage.includes("access") ||
-          errorMessage.includes("授权") ||
           errorMessage.includes("Full Disk Access") ||
           errorMessage.includes("SQLITE_CANTOPEN") ||
           errorMessage.includes("unable to open database file");

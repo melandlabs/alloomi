@@ -3094,6 +3094,7 @@ const zhHans = {
     referralCardSubtitle: "获得额外奖励",
     personalization: "个性化",
     onboardingGuide: "新手引导",
+    devTools: "开发工具",
     devComponents: "组件-dev",
     character: "工作台",
     mates: "伙伴",
@@ -3103,6 +3104,45 @@ const zhHans = {
     configuration: "配置",
   },
   sidebar: {
+    onboardingGuide: {
+      title: "开始使用",
+      dialogTitle: "新手引导",
+      heading: "认识 Alloomi",
+      subheading: "完成剩余步骤即可完成初始化设置。",
+      resumeHint: "点击这里，探索 Alloomi 的更多可能。",
+      resumeHintImageAlt: "入门引导",
+      openMandatoryDebug: "onboarding",
+      collectInfo: {
+        title: "让 Alloomi 更了解你的世界",
+        messagingAppsTitle: "连接消息平台",
+        telegram: "Telegram",
+        whatsapp: "WhatsApp",
+        imessage: "iMessage",
+        qq: "QQ",
+        feishu: "Feishu",
+        linkPlatform: "连接你的平台",
+        addSubscription: "添加订阅源",
+        uploadFile: "上传文件",
+        tooltip: {
+          iconLabel: "任务说明",
+          openDocButton: "了解更多",
+          connectTelegram:
+            "连接 Telegram 后，你可以直接在 Telegram 里和 Alloomi 对话。",
+          connectWhatsApp:
+            "连接 WhatsApp 后，你可以直接在 WhatsApp 里和 Alloomi 对话。",
+          connectIMessage:
+            "连接 iMessage 后，你可以直接在 iMessage 里和 Alloomi 对话。",
+          connectQQ: "连接 QQ 后，你可以直接在 QQ 里和 Alloomi 对话。",
+          connectFeishu: "连接飞书后，你可以直接在飞书里和 Alloomi 对话。",
+          linkPlatform:
+            "连接 Slack、Gmail、Telegram 等平台。Alloomi 会读取你的对话，主动识别哪些事情需要跟进——不需要你反复查看。",
+          addSubscription:
+            "添加 Newsletter、RSS 或行业资讯源。Alloomi 持续追踪，只把真正和你相关的内容推送给你。",
+          uploadFile:
+            "上传文档、报告或参考资料。Alloomi 会把它们作为背景知识，让回答更准确、更贴近你的实际情况。",
+        },
+      },
+    },
     hint: {
       creditsEmptyTitle: "积分已耗尽",
       upgradeSubtitle: "升级套餐",
@@ -3132,6 +3172,7 @@ const zhHans = {
     source: "来源",
     addSource: "添加来源",
     newCharacter: "新建角色",
+    createMate: "新建伙伴",
     enable: "启用",
     disable: "暂停",
     latestResult: "输出",
@@ -3292,6 +3333,64 @@ const zhHans = {
     allCharacters: "所有角色",
     notificationChannels: "通知渠道",
     selectChannels: "选择通知渠道...",
+  },
+  templateCharacter: {
+    aiProductIntelligence: {
+      name: "AI 产品日报",
+      description:
+        "每天早上 9 点：抓取 X/Twitter、Reddit 和 Product Hunt 上的 AI 产品新闻，整理成简报，并使用前端设计技能更新 HTML 仪表盘。",
+      insightTitle: "AI 产品日报",
+      insightDescription: "每日 AI 产品新闻简报",
+    },
+    dailyFocus: {
+      name: "每日聚焦",
+      description:
+        "收集我今天来自 Telegram、Slack 和 Gmail 的所有信息，同时分析并输出我自己的行动项，按高、中、低优先级分类。每项以两行格式输出，所有不同项目组成一个大表格：\n\n [主题内容] ^[洞察 ID 引用]^    [时间]",
+      insightTitle: "个人日报摘要",
+      insightDescription: "今日信息摘要与优先行动项",
+    },
+    emailMonitor: {
+      name: "邮件监控",
+      description:
+        "监控来自指定发件人（如 xyz@example.com）的来信，评估邮件内容和情感，并在满足预设条件时触发自动回复。",
+      insightTitle: "邮件监控",
+      insightDescription: "监控邮件并在条件满足时触发自动回复",
+    },
+    contextAtlas: {
+      name: "上下文图谱",
+      description:
+        "持续分析收集的内容和事件，自动提取人物、公司、主题等实体及其关系，构建可视化知识图谱。帮助用户发现信息之间的隐藏关联，支持基于 GraphRAG 的上下文检索。使用前端设计技能构建交互式看板，将所有图谱数据嵌入单个 HTML 文件中，无需额外文件。",
+      insightTitle: "上下文图谱",
+      insightDescription: "带实体关系的知识图谱看板",
+    },
+    xAutomation: {
+      name: "X 自动化",
+      description:
+        "帮助建立跟踪账号并管理您在 X 上的社交媒体账号。目标：1) 实现稳定的月度粉丝增长并提高阅读量。2) 人设：分享前沿 AI 技术、产品和用户指南，以及技术思考。3) 每 4 小时执行操作：转发、 repost、点赞、回复和发帖。4) 内容必须主题相关 — 仅限 AI，不涉及政治、恐怖主义、暴力或色情内容。5) 提前准备帖子，发布前需审批。6) 每天晚上回顾，为明天做准备并优化策略。7) 初期尽量减少广告；先专注于粉丝，有了相当粉丝基础后再分享想法和做广告。",
+      insightTitle: "X 账号增长追踪",
+      insightDescription: "追踪 X 账号增长和互动情况",
+    },
+    pdDailySync: {
+      name: "产品每日同步",
+      description:
+        "1) 获取您 GitHub 仓库（如 melandlabs/alloomi）的所有提交。2) 整理结构化每日开发报告。3) 将报告邮件发给团队。4) 获取当天创建的所有 issues。5) 重写每个 issue 的完整细节。6) 将重写后的 issues 同步到 Linear。",
+      insightTitle: "产品每日同步",
+      insightDescription: "每日开发报告：提交、issues 和 Linear 同步",
+    },
+    salesPipelineAutomation: {
+      name: "销售管道自动化",
+      description:
+        "您是一个销售管道自动化代理，负责从头到尾完成从潜在客户到交易的全流程：在 alloomi.ai 上搜索符合条件的目标客户，丰富并创建或更新这些联系人（适当设置生命周期阶段、负责人和交易详情），在指定的 Slack 频道通知销售团队并提供简洁的潜在客户摘要，并通过 Slack 消息向代表发送 Calendly 预约链接给潜在客户。优先保证准确性 — 创建记录前验证联系人数据。在创建新联系人前与现有联系人去重。记录每一步操作，并清晰展示任何错误或缺失数据以便人工审核。",
+      insightTitle: "销售管道自动化",
+      insightDescription: "通过 Slack 和 Calendly 实现潜客到成交的自动化",
+    },
+    contractRiskEvaluator: {
+      name: "合同风险评估",
+      description:
+        "您是一个专注于帮助创始人和创业者的合同风险评估助手。\n\n核心能力：\n1. 合同分类 — 自动识别合同类型（雇佣/租赁/服务/投资/保密/采购），提取关键信息：当事人、金额、期限、终止条款\n2. 风险扫描 — 基于严重程度的风险等级（严重/高/中），识别陷阱如过度罚款、无限制责任、竞业禁止条款、不利管辖权\n3. 有利条款识别 — 挖掘创始人友好的谈判筹码条款\n4. 评估报告生成 — 结构化输出：合同摘要 + 风险清单 + 谈判建议 + 律师咨询清单\n5. 合同提醒 — 追踪付款日期、终止日期、续期周期并发送自动提醒\n\n⚠️ 明确边界：\n- ✅ 可以做：识别明显风险、解释条款含义、生成谈判要点、准备律师咨询清单\n- ❌ 不能做：出具法律意见、代表创始人谈判、承担法律责任、保证合同无风险\n\n支持：中英文合同（可输出双语版本）",
+      insightTitle: "合同风险报告",
+      insightDescription: "合同风险筛查与谈判建议",
+    },
   },
   about: {
     title: "关于",
@@ -4718,6 +4817,33 @@ const zhHans = {
       description1: "你的主动式 AI 工作空间。",
       description2: "感知信号、协调任务、追踪结果。",
       continueButton: "进入专注",
+    },
+    mandatory: {
+      dialogTitle: "新手引导",
+      stepCounter: "第 {{current}} / 2 步",
+      finish: "完成 onboarding",
+      oneClickRecruit: "一键招募",
+      preWelcome: {
+        eyebrow: "你的 AI 工作台",
+        title: "欢迎来到 Alloomi",
+        description: "读懂工作。追踪要事。每件事画上句号。",
+        startButton: "开始使用 →",
+        privacy: "你的数据始终私密，不会用于任何模型训练。",
+        languageButton: "语言",
+      },
+      profile: {
+        title: "帮助 Alloomi 认识你",
+      },
+      mate: {
+        title: "招募你的第一个 AI Mate",
+        description:
+          "根据你填写的信息，我们已经帮你预选了几位伙伴。你可以直接招募，也可以手动调整。",
+        marketplaceHint: "已为你默认勾选 3 位伙伴，你也可以自由调整。",
+        checking: "正在检查 Mate...",
+        exists: "你已经有至少一个 Mate。",
+        notExists: "还没有 Mate，请先创建。",
+        createButton: "创建 Mate",
+      },
     },
     identity: {
       statementPrefix: "我是来自",

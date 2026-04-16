@@ -231,6 +231,8 @@ export interface AgentOptions {
   cwd?: string;
   /** Allowed tools */
   allowedTools?: string[];
+  /** Tools to exclude from the allowed list */
+  excludeTools?: string[];
   /** Task ID for tracking */
   taskId?: string;
   /** Abort controller for cancellation */
