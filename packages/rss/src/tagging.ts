@@ -108,47 +108,17 @@ const SOURCE_TYPE_RULES: Record<
 const COMMON_KEYWORD_RULES: KeywordRule[] = [
   // Technology R&D category
   {
-    keywords: [
-      "launch",
-      "release",
-      "update",
-      "feature",
-      "beta",
-      "version",
-      "发布",
-      "更新",
-      "版本",
-      "功能",
-    ],
+    keywords: ["launch", "release", "update", "feature", "beta", "version"],
     category: "Product",
     importance: "medium",
   },
   {
-    keywords: [
-      "API",
-      "SDK",
-      "framework",
-      "library",
-      "open source",
-      "github",
-      "代码",
-      "开源",
-      "框架",
-    ],
+    keywords: ["API", "SDK", "framework", "library", "open source", "github"],
     category: "R&D",
     importance: "medium",
   },
   {
-    keywords: [
-      "vulnerability",
-      "security",
-      "patch",
-      "CVE",
-      "exploit",
-      "漏洞",
-      "安全",
-      "补丁",
-    ],
+    keywords: ["vulnerability", "security", "patch", "CVE", "exploit"],
     category: "Security",
     importance: "high",
     urgency: "24h",
@@ -164,9 +134,6 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
       "Series A",
       "Series B",
       "VC",
-      "融资",
-      "投资",
-      "轮融资",
     ],
     category: "Funding",
     importance: "medium",
@@ -181,10 +148,6 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
       "merger",
       "deal",
       "strategic",
-      "合作",
-      "收购",
-      "并购",
-      "战略合作",
     ],
     category: "Partnerships",
     importance: "medium",
@@ -192,16 +155,7 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
 
   // User growth
   {
-    keywords: [
-      "user growth",
-      "milestone",
-      "million users",
-      "MAU",
-      "DAU",
-      "用户增长",
-      "里程碑",
-      "万用户",
-    ],
+    keywords: ["user growth", "milestone", "million users", "MAU", "DAU"],
     category: "User Growth",
     importance: "medium",
   },
@@ -215,10 +169,6 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
       "position",
       "role",
       "join our team",
-      "招聘",
-      "职位",
-      "加入我们",
-      "诚聘",
     ],
     category: "HR & Recruiting",
     importance: "low",
@@ -233,10 +183,6 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
       "workshop",
       "meetup",
       "event",
-      "会议",
-      "峰会",
-      "研讨会",
-      "活动",
     ],
     category: "Meetings",
     importance: "low",
@@ -244,32 +190,14 @@ const COMMON_KEYWORD_RULES: KeywordRule[] = [
 
   // Marketing and promotion
   {
-    keywords: [
-      "campaign",
-      "marketing",
-      "promotion",
-      "advertisement",
-      "市场",
-      "营销",
-      "推广",
-      "活动",
-    ],
+    keywords: ["campaign", "marketing", "promotion", "advertisement"],
     category: "Marketing",
     importance: "low",
   },
 
   // Branding and press
   {
-    keywords: [
-      "award",
-      "recognition",
-      "press release",
-      "announcement",
-      "奖项",
-      "荣誉",
-      "新闻稿",
-      "公告",
-    ],
+    keywords: ["award", "recognition", "press release", "announcement"],
     category: "Branding",
     importance: "medium",
   },
@@ -350,37 +278,23 @@ function mapRssCategoryToSystem(rssCategory: string): RssCategory | null {
   if (
     normalized.includes("tech") ||
     normalized.includes("developer") ||
-    normalized.includes("engineering") ||
-    normalized.includes("技术")
+    normalized.includes("engineering")
   ) {
     return "R&D";
   }
 
   // Product
-  if (
-    normalized.includes("product") ||
-    normalized.includes("release") ||
-    normalized.includes("产品")
-  ) {
+  if (normalized.includes("product") || normalized.includes("release")) {
     return "Product";
   }
 
   // Security
-  if (
-    normalized.includes("security") ||
-    normalized.includes("vulnerability") ||
-    normalized.includes("安全")
-  ) {
+  if (normalized.includes("security") || normalized.includes("vulnerability")) {
     return "Security";
   }
 
   // Funding
-  if (
-    normalized.includes("funding") ||
-    normalized.includes("investment") ||
-    normalized.includes("融资") ||
-    normalized.includes("投资")
-  ) {
+  if (normalized.includes("funding") || normalized.includes("investment")) {
     return "Funding";
   }
 
@@ -388,14 +302,13 @@ function mapRssCategoryToSystem(rssCategory: string): RssCategory | null {
   if (
     normalized.includes("jobs") ||
     normalized.includes("careers") ||
-    normalized.includes("hiring") ||
-    normalized.includes("招聘")
+    normalized.includes("hiring")
   ) {
     return "HR & Recruiting";
   }
 
   // News
-  if (normalized.includes("news") || normalized.includes("新闻")) {
+  if (normalized.includes("news")) {
     return "News";
   }
 

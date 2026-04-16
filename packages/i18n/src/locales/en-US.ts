@@ -3307,6 +3307,7 @@ const enUS = {
     referralCardSubtitle: "Get Extra Rewards",
     personalization: "Personalization",
     onboardingGuide: "Onboarding Guide",
+    devTools: "Dev Tools",
     devComponents: "Component-dev",
     character: "Board",
     mates: "Mates",
@@ -3316,6 +3317,46 @@ const enUS = {
     configuration: "Configuration",
   },
   sidebar: {
+    onboardingGuide: {
+      title: "Get started",
+      dialogTitle: "Newcomer guide",
+      heading: "Meet Alloomi",
+      subheading: "Finish the remaining tasks to complete your setup.",
+      resumeHint: "Click here to explore everything Alloomi can do for you.",
+      resumeHintImageAlt: "Onboarding hint",
+      openMandatoryDebug: "Open new onboarding modal",
+      collectInfo: {
+        title: "Give Alloomi context to work with",
+        messagingAppsTitle: "Connect messaging apps",
+        telegram: "Telegram",
+        whatsapp: "WhatsApp",
+        imessage: "iMessage",
+        qq: "QQ",
+        feishu: "Feishu",
+        linkPlatform: "Link a platform",
+        addSubscription: "Add a subscription source",
+        uploadFile: "Upload a file",
+        tooltip: {
+          iconLabel: "Task details",
+          openDocButton: "learn more",
+          connectTelegram:
+            "Connect Telegram so you can chat with Alloomi directly in Telegram.",
+          connectWhatsApp:
+            "Connect WhatsApp so you can chat with Alloomi directly in WhatsApp.",
+          connectIMessage:
+            "Connect iMessage so you can chat with Alloomi directly in iMessage.",
+          connectQQ: "Connect QQ so you can chat with Alloomi directly in QQ.",
+          connectFeishu:
+            "Connect Feishu so you can chat with Alloomi directly in Feishu.",
+          linkPlatform:
+            "Connect Slack, Gmail, Telegram and more. Alloomi reads your conversations and surfaces what needs follow-up — before you have to ask.",
+          addSubscription:
+            "Add newsletters, RSS feeds, or research sources. Alloomi monitors them continuously and brings you only what's relevant to your work.",
+          uploadFile:
+            "Upload docs, reports, or reference materials. Alloomi uses them as context so it can give you more accurate, grounded responses.",
+        },
+      },
+    },
     hint: {
       creditsEmptyTitle: "Credits exhausted",
       upgradeSubtitle: "Upgrade plan",
@@ -3345,6 +3386,7 @@ const enUS = {
     source: "Source",
     addSource: "Add Source",
     newCharacter: "New Character",
+    createMate: "Create Mate",
     enable: "Enable",
     disable: "Pause",
     latestResult: "Output",
@@ -3512,6 +3554,65 @@ const enUS = {
     allCharacters: "All characters",
     notificationChannels: "Notification Channels",
     selectChannels: "Select notification channels...",
+  },
+  templateCharacter: {
+    aiProductIntelligence: {
+      name: "AI Product Daily Digest",
+      description:
+        "Every morning at 9 AM: scrape X/Twitter, Reddit, and Product Hunt for AI product news, summarize into a briefing, and update an HTML dashboard using the frontend-design skill.",
+      insightTitle: "AI Product Daily Digest",
+      insightDescription: "Daily AI product news briefing",
+    },
+    dailyFocus: {
+      name: "Daily Focus",
+      description:
+        "Collect all my today's information from Telegram, Slack, and Gmail, while analyzing and outputting my own Action items categorized by High, Medium, and Low priority. Each item outputs in a two-line format, with all different items composing a large table: \n\n [Topic Content] ^[Insight ID Reference]^    [Time]",
+      insightTitle: "Personal Daily Digest",
+      insightDescription: "Today's info summary with prioritized action items",
+    },
+    emailMonitor: {
+      name: "Email Monitor",
+      description:
+        "Monitor incoming emails from specified sender (e.g., xyz@example.com), evaluate email content and sentiment, and trigger automated replies when defined conditions are met.",
+      insightTitle: "Email Monitor",
+      insightDescription:
+        "Monitor emails and trigger auto-replies on conditions",
+    },
+    contextAtlas: {
+      name: "Context Atlas",
+      description:
+        "Continuously analyze collected content and events, automatically extracting entities such as people, companies, topics, and their relationships to build a visualized knowledge graph. Help users discover hidden connections between information and support GraphRAG-based contextual retrieval. Use the frontend-design skill to build an interactive kanban board, embedding all graph data within a single HTML file without any additional files.",
+      insightTitle: "Context Atlas",
+      insightDescription: "Knowledge graph board with entity relationships",
+    },
+    xAutomation: {
+      name: "X Automation",
+      description:
+        "Help set up a tracking account and manage your social media account on X. Objectives: 1) Achieve stable monthly follower growth and increase readership. 2) Persona: Sharing cutting-edge AI technologies, products, and user guides, along with thoughts on technology. 3) Perform operations every 4 hours: retweet, repost, like, reply, and post. 4) Content must stay on-topic — AI only, no politics, terrorism, violence, or pornography. 5) Prepare posts in advance, require approval before publishing. 6) Review daily in the evening to prepare tomorrow and optimize strategy. 7) Initially minimize ads; focus on followers first, share thoughts and advertise once you have a decent following.",
+      insightTitle: "X Account Growth Tracker",
+      insightDescription: "Track X account growth and engagement",
+    },
+    pdDailySync: {
+      name: "PD Daily Sync",
+      description:
+        "1) Fetch all commits from your GitHub repo (e.g. melandlabs/alloomi). 2) Compile a structured daily dev report. 3) Email the report to your team. 4) Fetch all issues created that day. 5) Rewrite each issue with full detail. 6) Sync rewritten issues to Linear.",
+      insightTitle: "PD Daily Sync",
+      insightDescription: "Daily dev report: commits, issues, and Linear sync",
+    },
+    salesPipelineAutomation: {
+      name: "Sales Pipeline Automation",
+      description:
+        "You are a sales pipeline automation agent. Your job is to run the full lead-to-deal handoff end to end: search alloomi.ai for prospects matching given criteria, enrich and create or update those contacts in the created excel (setting lifecycle stage, owner, and deal details as appropriate), notify the sales team in a designated Slack channel with a concise prospect summary, and send a Calendly booking link to the prospect via a Slack message to the rep. Prioritize accuracy — verify contact data before creating records. Deduplicate against existing contacts before creating new ones. Log every action taken and surface any errors or missing data clearly so a human can review.",
+      insightTitle: "Sales Pipeline Automation",
+      insightDescription: "Lead-to-deal automation with Slack and Calendly",
+    },
+    contractRiskEvaluator: {
+      name: "Contract Risk Evaluator",
+      description:
+        "You are a contract risk evaluation assistant focused on helping founders and startup operators.\n\nCore Capabilities:\n1. Contract Classification — Auto-identify contract type (employment/lease/service/investment/NDA/procurement), extract key info: parties, amount, term, termination clauses\n2. Risk Scanning — Severity-based risk levels (critical/high/medium), identify traps like excessive penalties, unlimited liability, non-compete clauses, unfavorable jurisdiction\n3. Favorable Clause Identification — Surface founder-friendly terms for negotiation leverage\n4. Evaluation Report Generation — Structured output: contract summary + risk inventory + negotiation suggestions + lawyer consultation checklist\n5. Contract Reminders — Track payment dates, termination dates, renewal periods with automated alerts\n\n⚠️ Clear Boundaries:\n- ✅ CAN DO: Identify obvious risks, explain clause implications, generate negotiation talking points, prepare lawyer consultation checklist\n- ❌ CANNOT DO: Issue legal opinions, negotiate on behalf of the founder, assume legal liability, guarantee contract is risk-free\n\nSupported: Chinese and English contracts (bilingual output available)",
+      insightTitle: "Contract Risk Report",
+      insightDescription: "Contract risk screening with negotiation tips",
+    },
   },
   configuration: {
     name: "Agent Name",
@@ -5010,6 +5111,34 @@ const enUS = {
       description2: "Senses signals, orchestrates tasks, tracks results.",
       continueButton: "Start My Focus Mode",
     },
+    mandatory: {
+      dialogTitle: "Onboarding",
+      stepCounter: "Step {{current}} of 2",
+      finish: "Finish onboarding",
+      oneClickRecruit: "One-click recruit",
+      preWelcome: {
+        eyebrow: "Your AI Workspace",
+        title: "Welcome to Alloomi",
+        description: "Reads your work. Tracks what matters. Closes every loop.",
+        startButton: "Get started →",
+        privacy: "Your data is always private and never used for training.",
+        languageButton: "Language",
+      },
+      profile: {
+        title: "Help Alloomi understand you",
+      },
+      mate: {
+        title: "Recruit your first AI Mate",
+        description:
+          "Based on what you shared, we've pre-selected a few Mates to get you started. Feel free to adjust.",
+        marketplaceHint:
+          "We've pre-selected 3 Mates for you. You can freely adjust your selection.",
+        checking: "Checking Mate...",
+        exists: "You already have at least one Mate.",
+        notExists: "No Mate found yet. Create one first.",
+        createButton: "Create Mate",
+      },
+    },
     identity: {
       statementPrefix: "I'm in",
       statementConnector: ", as a",
@@ -5337,16 +5466,6 @@ const enUS = {
           desc: "The more you share, the better Alloomi understands what truly matters to you",
           guideTitle: "Help Alloomi Know You",
         },
-        configureAlloomiPersonality: {
-          title: "Give Alloomi Its Soul",
-          desc: "Shape Alloomi's personality and how it works — so it feels like yours, not just anyone's assistant.",
-          guideTitle: "Configure your Alloomi personality",
-          bullet1:
-            "Adjust Alloomi's tone and style in personalization settings",
-          bullet2:
-            "Choose more professional, concise, or detailed reply styles",
-          bullet3: "Settings can be updated anytime as you use Alloomi",
-        },
         createFirstEvent: {
           title: "Create your first tracking",
           desc: "Add or sync an update so Alloomi can start organizing for you",
@@ -5368,13 +5487,6 @@ const enUS = {
             "Chat or upload a file, and Alloomi will turn it into a Tracking",
           createTrackingPrompt:
             "Use the alloomi-event-creator skill to create a tracking that reminds me to drink water every hour",
-        },
-        trackingByContext: {
-          title: "Categorize your trackings by context",
-          desc: "Choose contexts to follow; Alloomi will auto-categorize events so you can switch focus easily",
-          subtitle:
-            "Choose contexts to follow; Alloomi will auto-categorize events so you can switch focus easily",
-          actionButton: "Done",
         },
         alloomiFirstTask: {
           title: "Let Alloomi do your first task",
@@ -5438,17 +5550,6 @@ const enUS = {
             "Archive: move handled events out of the list to stay focused",
           bullet2: "Save: mark important events for later lookup",
           bullet3: "Status syncs to your workspace for review and management",
-        },
-        letAlloomiKnowYouCare: {
-          title: "Let Alloomi Know What You Care About",
-          desc: "Tell Alloomi about the people, topics, and things that matter most to you",
-          guideTitle: "Let Alloomi Know What You Care About",
-          bullet1:
-            "Add the people, topics, or projects you want Alloomi to keep an eye on",
-          bullet2:
-            "Alloomi will prioritize and surface updates related to what you care about",
-          bullet3:
-            "You can update your care list anytime as your priorities change",
         },
         firstChat: {
           title: "Chat with Alloomi via messaging apps",

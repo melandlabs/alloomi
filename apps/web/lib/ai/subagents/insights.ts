@@ -1,11 +1,12 @@
 import { generateText, type ModelMessage } from "ai";
-import { modelProvider } from "@/lib/ai";
+import { getModelProvider } from "@/lib/ai";
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import type { Platform } from "@alloomi/integrations/channels/sources/types";
 import { writeFileSync } from "node:fs";
 import { isDevelopmentEnvironment } from "@/lib/constants";
 import { extractJsonFromMarkdown } from "@alloomi/ai";
+import { isTauriMode } from "@/lib/env";
 
 const maxConversationRounds = 5;
 const maxInputChunkLength = 40000;
@@ -48,13 +49,11 @@ export function buildCategoriesPrompt(
     )
     .join("\n");
 
-  return `### Custom Categories Configuration
-
-The following categories are available for classification. Each category includes a natural language description that defines what content should be classified into this category:
+  return `### Categories (for tagging insights):
 
 ${categoriesList}
 
-When classifying insights, carefully read each category's description and determine the most appropriate category based on the content and context of the insight. If an insight matches multiple categories, list ALL of them with the MOST DOMINANT/PRIMARY category first. If no category matches, leave the categories field empty or do not include it.`;
+Classify by primary category only. Leave empty if none match.`;
 }
 
 /**
@@ -73,8 +72,8 @@ You are a professional multi-platform message aggregation engine responsible for
     - OR user was explicitly @mentioned by someone in the conversation
   - **No Participation = Third-Party Observation**: If the user has NOT sent any messages AND was NOT @mentioned:
     - The conversation is a **third-party observation**, NOT a personal interaction
-    - **Strictly forbid** using first-person references in title/description (e.g., "向你的...", "请求你的...", "与你相关")
-    - Use objective third-person language (e.g., "Janesh 请求 6xiaowu9 的钱包地址" NOT "Janesh 请求你的钱包地址")
+    - **Strictly forbid** using first-person references in title/description (e.g., "Requesting your...", "Asking for...", "Related to you")
+    - Use objective third-person language (e.g., "Alice requests Bob's address" NOT "Alice requests your address")
     - **Strictly forbid** generating any \`myTasks\` - the user is not involved
     - Only generate the insight if it's truly important (use \`importance: "high"\`), but mark as \`urgency: "not_urgent"\`
   - **Evidence Check**: Look at the \`details\` array - if the user's name/identifier does NOT appear in any \`person\` field AND no \`content\` contains @mention of the user, then the user did NOT participate.
@@ -90,12 +89,12 @@ You are a professional multi-platform message aggregation engine responsible for
   - **Name Normalization Rules**: When extracting people names from messages, ALWAYS normalize to avoid duplicates:
     - **Case Insensitive**: Treat "H8h8ge8", "HH 8GE8", "hh8ge8" as the SAME person
     - **Space Normalization**: Remove extra spaces, treat "John Doe" and "John  Doe" as the same person
-    - **Special Characters**: Standardize formats (e.g., "Timi" vs "TITimi" may be the same person - use context to determine)
+    - **Special Characters**: Standardize formats (e.g., "Tim" vs "TITim" may be the same person - use context to determine)
     - **Display Name vs Username**: If someone appears as both "John Smith" and "johnsmith", treat as one person
   - **Context-Based Similarity Detection**:
     - **String Similarity**: Names with ≥85% similarity (character-level) are likely the same person
       - Example: "H8h8ge8" vs "HH 8GE8" (high similarity) → Same person
-      - Example: "TITimi" vs "qiuyang" (low similarity) → Different people
+      - Example: "TITim" vs "Yang" (low similarity) → Different people
     - **Context Validation** (CRITICAL - Use message context to verify):
       - **Platform Overlap**: If similar names appear on the SAME platform, they're likely the same person
       - **Mutual Exclusivity**: If two similar names NEVER appear together in the same conversation thread, they might be the same person using different formats
@@ -118,7 +117,7 @@ You are a professional multi-platform message aggregation engine responsible for
     - Output ONLY canonical names in the \`people\` array
   - **Examples**:
     - ["H8h8ge8", "HH 8GE8"] + same platform → Output: ["HH 8GE8"] (merged, pick formal version)
-    - ["TITimi", "qiuyang"] + low similarity → Output: ["TITimi", "qiuyang"] (different people)
+    - ["TITim", "Yang"] + low similarity → Output: ["TITim", "Yang"] (different people)
     - ["john", "John", "JOHN"] + same Slack channel → Output: ["John"] (merged, use proper capitalization)
     - ["Mike Johnson", "mike.j"] + Discord messages → Output: ["Mike Johnson"] (merged, display name preferred)
     - ["Alice", "alice@company.com"] + Email context → Output: ["Alice"] (extract display name)
@@ -134,7 +133,7 @@ You are a professional multi-platform message aggregation engine responsible for
     - Focus on "who said what to whom" in an entirely neutral way
     - Extract all participants' names, roles, and actions without any assumption about who the user is
     - Treat every message as a third-party observation initially
-    - Example: Instead of jumping to "you", first recognize "Janesh asked 6xiaowu9 for wallet address"
+    - Example: Instead of jumping to "you", first recognize "Alice asked Bob for address"
 
   - **Step 2: User Identity Matching (After Objective Analysis)**:
     - **User Identity**: The user (me) is: {{userInfo}}
@@ -274,9 +273,9 @@ You are a professional multi-platform message aggregation engine responsible for
   - **Step 2: User Action Item Matching (After Objective Analysis)**:
     - After completing the objective extraction, NOW match action items to the user (me) based on {{userInfo}}
     - Only after confirming the user's identity in the task, assign to myTasks or waitingForOthers
-    - **myTasks**: Matters that the user (me) needs to follow up on personally (e.g., I'm Timi and Timi said that "I will reissue the report")
+    - **myTasks**: Matters that the user (me) needs to follow up on personally (e.g., I'm Tim and Tim said that "I will reissue the report")
     - **waitingForOthers**: Commitments made by others to the user (e.g., "Julie will fix the account before the weekend")
-  - myTasks: Matters that the I needs to follow up on personally (e.g., I'm Timi and Timi said that "I will reissue the report").
+  - myTasks: Matters that the I needs to follow up on personally (e.g., I'm Tim and Tim said that "I will reissue the report").
     - **Request = My Task**: If I (the user) actively make a request to someone else (e.g., "Can you share X?", "Please send me Y"), I need to follow up on getting their response. This IS a myTask, NOT waitingForOthers.
     - **Promise = Waiting**: waitingForOthers is ONLY for when someone else INITIATIVELY makes a commitment to me (e.g., "I'll send it to you", "Let me handle that"). If they are just RESPONDING to my request, do NOT mark as waitingForOthers.
     - **Importance != Task**: Even if the message is critical (e.g., "System Down"), if I am not assigned and does not claim it, do **NOT** generate \`myTasks\`. Reflect this via Insight's \`importance: "high"\` instead of creating a fake task.
@@ -287,18 +286,18 @@ You are a professional multi-platform message aggregation engine responsible for
     - **Task Completion Detection (CRITICAL - Auto-Close Completed Tasks)**:
       - **Step 1: Objective Completion Detection**:
         - First, objectively identify if an existing task has been completed based on new messages
-        - Look for explicit completion indicators: "完成" (completed), "已经确定" (confirmed), "已经完成" (finished), "搞定" (done), "没问题" (no problem), "好了" (ready/OK), "可以了" (can stop/it's done), "约好了" (meeting scheduled), etc.
-        - Look for confirmation messages that indicate task is done: "确定晚上8点见面" (confirmed meeting at 8pm), "已经完成约会" (appointment completed), "已经发了" (already sent), etc.
+        - Look for explicit completion indicators: "completed", "confirmed", "finished", "done", "no problem", "ready", "OK", "it's done", "meeting scheduled", etc.
+        - Look for confirmation messages that indicate task is done: "confirmed meeting at 8pm", "appointment completed", "already sent", etc.
         - Example scenarios:
-          * Task: "9号与qiuyang约会见面" → Completion: "10号确定晚上8点见面" → Mark task as completed
-          * Task: "发送文件给B" → Completion: "已经发给B了" → Mark task as completed
-          * Task: "安排会议" → Completion: "会议已经约好了" → Mark task as completed
+          * Task: "Meeting with Yang on 9th" → Completion: "Confirmed meeting at 8pm on 10th" → Mark task as completed
+          * Task: "Send file to B" → Completion: "Already sent to B" → Mark task as completed
+          * Task: "Arrange meeting" → Completion: "Meeting is already scheduled" → Mark task as completed
       - **Step 2: Update Task Status**:
         - After detecting objective completion evidence, NOW check if the task belongs to user (me) based on {{userInfo}}
         - Only if user's identity is involved in the completion, mark their task as "completed"
         - Remove completed tasks from myTasks/waitingForOthers arrays
       - **Completion Confidence**:
-        - If completion is confirmed by the task owner themselves (e.g., "我已经完成了"), mark as completed with high confidence
+        - If completion is confirmed by the task owner themselves (e.g., "I have completed it"), mark as completed with high confidence
         - If completion is confirmed by a third party, still mark as completed but note the verification source
       - **DO NOT** keep completed tasks as "pending" - this creates clutter and confusion    - **Provider Exemption**: If I **provide** information, documents, or links (e.g., "Here is the doc"), I have not completed the action. **Absolutely do NOT** generate a task for me to "Review provided materials" or "Check the link". Phrases like "Feel free to take a look" are invitations to others, not self-assignments.
     - **Mention Others Filter**: If a message explicitly @mentions specific people (e.g., @A, @B), and I'm **NOT** among them, **strictly forbid** generating a task for me. This is a task for the mentioned people, irrelevant to me.
@@ -309,7 +308,7 @@ You are a professional multi-platform message aggregation engine responsible for
       - If a message contains a request like "Send me", "DM me", "and me", the "me" refers to the **SENDER**, not me, unless I am explicitly @mentioned or replied to, **strictly forbid** generating a task.
     - **Booking Link Provider**: If others send their own booking link (e.g., Calendly/Cal.com), it means they are **waiting for others** to book. **Strictly forbid** generating a "Schedule meeting" task for me.
     - **False Mention Prevention**: Generic terms in groups (e.g., "Team", "Everyone", "Builders") do **NOT** constitute a mention of me. Only explicit @mentions (e.g., @Jacky) or direct replies count.
-    - **Subject-Object Clarity**: When generating Event Description, accurately identify "Who requested Whom". The sender is the "Requester", and the @mentioned people are the "Requested". **Strictly forbid** reversing the relationship (e.g., writing "A requested B" as "B asked A"). If uncertain about the user's involvement, do NOT force the user (Jacky D/Ethan, etc.) into the summary.
+    - **Subject-Object Clarity**: When generating Event Description, accurately identify "Who requested Whom". The sender is the "Requester", and the @mentioned people are the "Requested". **Strictly forbid** reversing the relationship (e.g., writing "A requested B" as "B asked A"). If uncertain about the user's involvement, do NOT force the user (Jacky, etc.) into the summary.
     - Be careful to distinguish between group chats and private chats; don't assume that messages in a group chat are messages sent directly to me.
     - If someone mentions me directly in the group chat, assign me the corresponding task.
     - **Contextual Reference Rule**: If a message contains "you" without an @mention and follows another person's message, you **MUST** assume "you" refers to the **sender of the previous message**, NOT me.
@@ -417,7 +416,7 @@ Output one of the following values:
 
 **immediate**:
 - **Only when I needs to take action or it directly affects me**
-- Contains explicit urgency keywords: "urgent", "immediately", "ASAP", "right now", "紧急", "立即", "马上"
+- Contains explicit urgency keywords: "urgent", "immediately", "ASAP", "right now", "emergency", "immediately", "right away"
 - Or has explicit short-term deadline: "within 1 hour", "today", "EOD"
 - Or describes severe consequences: "customer complaint", "blocking work"
 - **Exception**: If a critical failure is being handled by someone else and does not require user assistance, it is NOT "immediate" for me.
@@ -445,7 +444,7 @@ Output one of the following values:
 Judge based on impact scope and business value, output one of the following values:
 
 **high**:
-- Contains explicit importance keywords: "important", "critical", "key", "重要", "关键"
+- Contains explicit importance keywords: "important", "critical", "key", "essential"
 - Or involves core business: product launch, major decisions, key projects
 - Or involves important stakeholders: important customers, senior leadership, core team
 - Or has wide impact: multiple teams, entire department, company-wide
@@ -714,7 +713,7 @@ Judge based on impact scope and business value, output one of the following valu
 
 ### Translation Example (Multi-language Support)
 
-**Scenario**: User's preferred language is English (中文用户), but messages are in Chinese
+**Scenario**: User's preferred language is English, but messages are in Chinese
 
 **Input Message (Chinese)**:
 "请在明天之前完成代码审查，我们需要在周五发布新版本。"
@@ -730,7 +729,7 @@ Judge based on impact scope and business value, output one of the following valu
 - \`originalContent\`: ALWAYS the original message language (Chinese in this case)
 - Both fields MUST be included when languages differ
 - Translation must be accurate and natural, not word-for-word
-- Preserve technical terms (like "代码审查" -> "code review", not "code check")
+- Preserve technical terms (like "code review" stays as "code review", not "code check")
 
 ### Cumulative Update Examples (MANDATORY - Follow These Patterns)
 
@@ -1298,6 +1297,7 @@ const multiRoundCompletion = async (
   let outputTokens = 0;
 
   // Initial generation - fixed messages being empty issue
+  const modelProvider = getModelProvider(isTauriMode());
   const response = await generateText({
     model: modelProvider.languageModel("chat-model"),
     messages: conversation,
@@ -1334,21 +1334,23 @@ const multiRoundCompletion = async (
   // Multi-round fixing - maintain context coherence
   while (retries < maxConversationRounds) {
     retries++;
-    console.log(`[Insights] 第${retries}轮修复，保持完整上下文`);
+    console.log(
+      `[Insights] Round ${retries} repair, maintaining complete context`,
+    );
     if (isDevelopmentEnvironment) {
       writeFileSync(`.insight/error.${retries}.json`, currentJson);
     }
 
     const repairPrompt = `
-1. 请仅输出缺失的JSON片段，使整体拼接后为完整有效的JSON。比如，上一轮对话输出到
+1. Please only output the missing JSON fragment so that the overall拼接后 is complete and valid JSON. For example, the previous round output up to
 {
     "insights": [
         {
-            "taskLabel": "系统离线警报",
-            "title": "系统离线后恢复正常",
-            "description": "触发警报",
-            "importance": "重要",
-            "urgency": "尽快",
+            "taskLabel": "System Offline Alert",
+            "title": "System Offline Restored to Normal",
+            "description": "Alert triggered",
+            "importance": "Important",
+            "urgency": "ASAP",
             "platform": "Telegram",
             "account": "global",
             "groups": ["Alerts"],
@@ -1361,7 +1363,7 @@ const multiRoundCompletion = async (
                     "channel": "Alerts",
                     "content": "Offline Severity"
                 }
-这一次请继续输出剩下所有的部分，记得使得它们拼接起来是一个完整的 Insight 输出 JSON, 不要破坏性开始输出, 如
+This time please continue outputting all remaining parts, making sure they form a complete Insight output JSON when concatenated, do not start outputting destructively, like
                 ,
                 {
                     "time": 1762139540,
@@ -1370,25 +1372,25 @@ const multiRoundCompletion = async (
                     "channel": "Community",
                     "content": ""
                 },
-它们连接起来是一个符合要求的 JSON 输出，不要遗漏任何字段
-2. 先分析上一轮输出的JSON断点和错误，确认未闭合的结构（数组/对象），仅补充缺失的闭合内容和后续片段
-   - 上一轮JSON输出断点（仅用于拼接，无需重复）：${currentJson.slice(Math.max(0, currentJson.length - 50))}
-   - 再分析上一轮 JSON 解析错误:\`${lastError}\
-3. 输出要求：
-   - 仅输出承接断点的JSON片段，不重复已有的 "insights" 数组开头、字段名或已闭合的内容
-   - 确保拼接后：所有 { } 成对、[ ] 闭合、逗号使用规范（同级最后一项无逗号）
-   - 示例：若上一轮停在 "impactLevel"low", 则本轮直接输出 ", "resolutionHint": "...", ... } ] }" 完成闭合
-4. **CRITICAL: 字符串字段中的引号必须转义**
-   - 如果 content 字段包含引号、代码片段、URL参数或嵌套JSON，所有内部引号必须转义为 \"
-   - 正确示例: "content": "Error: {\\\"status\\\": \\\"failed\\\"}"
-   - 错误示例: "content": "Error: {"status": "failed"}"
-   - 检查你的输出，确保所有字符串值内的引号都已正确转义
-5. 绝对禁止：
-   - 从 "{ "insights": [" 或任何已存在的开头重新输出
-   - 新增无关的 "attachments": [] 或未提及的字段
-   - 破坏前文已有的字段结构（如删除、修改上一轮的内容）
-   - 新增逗号导致JSON语法错误（如对象最后一个字段后加逗号）
-   - 输出 } 完之后，本来应该继续输出 , 但是连续输出了 },`;
+When connected together, they form a JSON output that meets the requirements, do not omit any fields
+2. First analyze the JSON breakpoint and error from the previous round, confirm unclosed structures (arrays/objects), only supplement missing closing content and subsequent fragments
+   - Previous round JSON output breakpoint (only for concatenation, no need to repeat): ${currentJson.slice(Math.max(0, currentJson.length - 50))}
+   - Then analyze previous round JSON parsing error:\`${lastError}\
+3. Output requirements:
+   - Only output JSON fragment that continues from the breakpoint, do not repeat existing "insights" array opening, field names, or already closed content
+   - After concatenation: ensure all { } are paired, [ ] are closed, comma usage is standardized (no comma after last item at same level)
+   - Example: if previous round stopped at "impactLevel"low", then this round directly output ", "resolutionHint": "...", ... } ] }" to complete closure
+4. **CRITICAL: Quotes in string fields must be escaped**
+   - If content field contains quotes, code snippets, URL parameters, or nested JSON, all internal quotes must be escaped as \"
+   - Correct example: "content": "Error: {\\\"status\\\": \\\"failed\\\"}"
+   - Wrong example: "content": "Error: {"status": "failed"}"
+   - Check your output, ensure all quotes within string values are properly escaped
+5. Absolutely prohibited:
+   - Restarting output from "{ "insights": [" or any existing beginning
+   - Adding unrelated "attachments": [] or unmentioned fields
+   - Damaging existing field structure from previous content (like deleting or modifying previous round's content)
+   - Adding commas causing JSON syntax errors (like adding comma after last field in object)
+   - After outputting }, if the output should continue with , but instead consecutively outputs },`;
 
     // Add user fix request to conversation history
     conversation.push({ role: "user", content: repairPrompt });
@@ -1541,7 +1543,7 @@ export const generateProjectInsights = async (
     // Process each chunk with API connection error retry mechanism
     for (const [index, chunk] of chunks.entries()) {
       console.log(
-        `[Insights] 处理分块 ${index + 1}/${chunks?.length} ${chunk?.length}`,
+        `[Insights] Processing chunk ${index + 1}/${chunks?.length} ${chunk?.length}`,
       );
 
       // Build prompt for current chunk
@@ -1598,7 +1600,7 @@ Please output the complete JSON structure.
           chunkAttempts++;
           totalRetries++; // Accumulate total retry count
           console.warn(
-            `[Insights] 分块 ${index + 1} 处理失败（第 ${chunkAttempts} 次重试）:`,
+            `[Insights] Chunk ${index + 1} processing failed (retry ${chunkAttempts}):`,
             lastError.message,
           );
 
@@ -1647,7 +1649,7 @@ Please output the complete JSON structure.
       previousInsightsString = JSON.stringify(chunkResult.data.insights || []);
 
       console.log(
-        `[Insights] 分块 ${index + 1} 处理完成 - 总重试: ${totalRetries} | 输入Token: ${chunkResult.inputTokens} | 输出Token: ${chunkResult.outputTokens} | Insight数量 ${chunkResult.data.insights?.length}`,
+        `[Insights] Chunk ${index + 1} processing complete - Total retries: ${totalRetries} | Input tokens: ${chunkResult.inputTokens} | Output tokens: ${chunkResult.outputTokens} | Insight count ${chunkResult.data.insights?.length}`,
       );
     }
 
@@ -1710,7 +1712,7 @@ Please output the complete JSON structure.
     });
 
     console.log(
-      `[Insights] 合并完成 - 原始分块数: ${batches.length}, 合并后 Insight 数: ${mergedInsights.length}`,
+      `[Insights] Merge complete - Original chunks: ${batches.length}, Merged insight count: ${mergedInsights.length}`,
     );
 
     return {

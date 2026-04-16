@@ -33,7 +33,6 @@ export const insightIsImport = (insight: {
   hasActions?: boolean;
 }) => {
   return (
-    insight.importance === "重要" ||
     insight.importance === "Important" ||
     insight.importance === "important" ||
     insight.importance === "High" ||
@@ -48,9 +47,6 @@ export const insightIsUrgent = (insight: {
   hasActions?: boolean;
 }) => {
   return (
-    insight.urgency === "尽快处理" ||
-    insight.urgency === "尽快" ||
-    insight.urgency === "紧急" ||
     insight.urgency === "Urgent" ||
     insight.urgency === "urgent" ||
     insight.urgency === "As soon as possible" ||
@@ -74,8 +70,8 @@ export const insightIsImportOrUrgent = (insight: {
  * Extract corresponding tags based on Insight properties for subsequent classification
  *
  * Tag types:
- * - "important": when importance is "重要", "Important" or "important"
- * - "urgent": when urgency is "尽快处理", "As soon as possible" or "as soon as possible"
+ * - "important": when importance is "Important" or "important"
+ * - "urgent": when urgency is "As soon as possible" or "as soon as possible"
  * - "mentions-me": when hasMyNickname is true
  * - "action-items": when hasActions is true
  *
