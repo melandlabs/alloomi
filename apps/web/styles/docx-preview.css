@@ -1,0 +1,74 @@
+/**
+ * Word 预览（Mammoth HTML）：表格边框与可读版式；Mammoth 不保留 Word 原样边框，由此处统一补齐。
+ */
+.mammoth-docx-preview {
+  color: hsl(var(--foreground));
+  font-size: 15px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.mammoth-docx-preview p {
+  margin: 0 0 0.75em;
+}
+
+.mammoth-docx-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.mammoth-docx-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.75em 0;
+  font-size: inherit;
+}
+
+.mammoth-docx-preview th,
+.mammoth-docx-preview td {
+  border: 1px solid hsl(var(--border));
+  padding: 8px 12px;
+  vertical-align: top;
+  text-align: start;
+}
+
+.mammoth-docx-preview th {
+  background: hsl(var(--muted) / 0.45);
+  font-weight: 600;
+}
+
+.mammoth-docx-preview ul,
+.mammoth-docx-preview ol {
+  margin: 0.5em 0 0.75em 1.25em;
+  padding: 0;
+}
+
+.mammoth-docx-preview h1,
+.mammoth-docx-preview h2,
+.mammoth-docx-preview h3 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+}
+
+.mammoth-docx-preview h1 {
+  font-size: 1.5rem;
+}
+
+.mammoth-docx-preview h2 {
+  font-size: 1.25rem;
+}
+
+.mammoth-docx-preview h3 {
+  font-size: 1.1rem;
+}
+
+.mammoth-docx-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.mammoth-docx-preview a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
