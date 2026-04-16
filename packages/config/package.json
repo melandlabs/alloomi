@@ -1,7 +1,7 @@
 {
   "name": "@alloomi/config",
   "version": "0.4.1",
-  "private": true,
+  "private": false,
   "type": "module",
   "files": [
     "src"
