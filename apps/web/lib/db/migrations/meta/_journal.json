@@ -561,6 +561,20 @@
       "when": 1772200000000,
       "tag": "0088_add_characters_table",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1772350000000,
+      "tag": "0091_drop_soul_from_characters",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1772500000000,
+      "tag": "0092_add_notification_channels_to_characters",
+      "breakpoints": true
     }
   ]
 }
