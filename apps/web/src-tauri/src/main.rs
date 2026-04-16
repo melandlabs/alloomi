@@ -12,6 +12,7 @@ use tauri::{Emitter, Listener};
 
 mod menu;
 mod node;
+mod notify;
 mod storage;
 mod system;
 mod update;
@@ -243,6 +244,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             // Storage
@@ -277,6 +279,8 @@ fn main() {
             // Telegram
             telegram::desktop::detect_telegram_desktop,
             telegram::desktop::check_custom_telegram_path,
+            // Notifications
+            notify::send_notification,
         ])
         .setup(|app| {
             // Deliver AppHandle to the background server thread immediately
