@@ -1,5 +1,6 @@
 /**
- * Word 预览（Mammoth HTML）：表格边框与可读版式；Mammoth 不保留 Word 原样边框，由此处统一补齐。
+ * Word Preview (Mammoth HTML): table borders and readable layout.
+ * Mammoth doesn't preserve Word's original borders, so they're uniformly supplemented here.
  */
 .mammoth-docx-preview {
   color: hsl(var(--foreground));
