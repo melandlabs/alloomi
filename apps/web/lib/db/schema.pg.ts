@@ -1975,8 +1975,6 @@ export const characters = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 50 }).notNull(),
-    description: text("description"),
-    soul: text("soul").notNull(),
     avatarConfig: jsonb("avatar_config")
       .$type<Record<string, unknown>>()
       .default({}),
@@ -1995,6 +1993,10 @@ export const characters = pgTable(
       .$type<Array<{ type: "file" | "channel"; name: string; id?: string }>>()
       .default([]),
     topics: jsonb("topics").$type<string[]>().default([]).notNull(),
+    notificationChannels: jsonb("notification_channels")
+      .$type<string[]>()
+      .default([])
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

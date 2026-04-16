@@ -2167,8 +2167,6 @@ export const characters = sqliteTable("characters", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  description: text("description"),
-  soul: text("soul").notNull(),
   avatarConfig: text("avatar_config").default(JSON.stringify({})),
   jobId: text("job_id")
     .notNull()
@@ -2183,6 +2181,9 @@ export const characters = sqliteTable("characters", {
   lastExecutionStatus: text("last_execution_status"),
   sources: text("sources").default(JSON.stringify([])),
   topics: text("topics").default(JSON.stringify([])),
+  notificationChannels: text("notification_channels").default(
+    JSON.stringify([]),
+  ),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
