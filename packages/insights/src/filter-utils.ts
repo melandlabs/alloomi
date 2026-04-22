@@ -110,9 +110,22 @@ function collectKeywordFields(insight: InsightBase, fields: string[]) {
         }
         break;
       case "insight_keywords":
-        if (Array.isArray(insight.topKeywords)) {
-          for (const keyword of insight.topKeywords) {
+        const keywords = insight.topKeywords;
+        if (Array.isArray(keywords)) {
+          for (const keyword of keywords) {
             if (keyword) collected.push(normalizeText(keyword));
+          }
+        } else if (typeof keywords === "string" && keywords) {
+          // Handle case where topKeywords is stored as a JSON string
+          try {
+            const parsed = JSON.parse(keywords);
+            if (Array.isArray(parsed)) {
+              for (const keyword of parsed) {
+                if (keyword) collected.push(normalizeText(keyword));
+              }
+            }
+          } catch {
+            // Not a JSON string, skip
           }
         }
         break;
