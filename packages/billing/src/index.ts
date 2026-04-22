@@ -35,7 +35,6 @@ export type {
 } from "./entitlements";
 
 export {
-  getApplicationBaseUrl,
   setBaseUrlFactory,
   isSubscriptionStatusActive,
   stripeTimestampToDate,

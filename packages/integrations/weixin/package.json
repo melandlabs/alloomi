@@ -1,0 +1,27 @@
+{
+  "name": "@alloomi/integrations-weixin",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ws-listener": "./src/ws-listener.ts",
+    "./conversation-store": "./src/conversation-store.ts",
+    "./ilink-client": "./src/ilink-client.ts",
+    "./cdn/aes-ecb": "./src/cdn/aes-ecb.ts",
+    "./cdn/cdn-upload": "./src/cdn/cdn-upload.ts",
+    "./cdn/cdn-url": "./src/cdn/cdn-url.ts",
+    "./cdn/pic-decrypt": "./src/cdn/pic-decrypt.ts",
+    "./qr-login": "./src/qr-login.ts"
+  },
+  "dependencies": {
+    "@tencent-weixin/openclaw-weixin": "^2.1.9"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

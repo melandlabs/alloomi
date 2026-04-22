@@ -42,21 +42,6 @@ async function updateIntegrationAccount(
 }
 
 // ---------------------------------------------------------------------------
-// Inlined stubs for @/lib/url
-// ---------------------------------------------------------------------------
-
-function getApplicationBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return (
-    process.env.APP_BASE_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "http://localhost:3000"
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Google Calendar adapter
 // ---------------------------------------------------------------------------
 
@@ -135,9 +120,7 @@ export class GoogleCalendarAdapter {
       );
     }
 
-    const redirectUri =
-      process.env.GOOGLE_CALENDAR_REDIRECT_URI ??
-      `${getApplicationBaseUrl()}/api/google-calendar/callback`;
+    const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI ?? "";
 
     this.oauth2Client = new google.auth.OAuth2({
       clientId,

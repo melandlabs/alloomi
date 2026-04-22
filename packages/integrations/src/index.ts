@@ -1,0 +1,25 @@
+/**
+ * @alloomi/integrations - Unified package for alloomi integration packages
+ *
+ * This is the main entry point that re-exports core interfaces and types.
+ * Individual platform adapters are available via subpaths:
+ * - @alloomi/integrations/whatsapp
+ * - @alloomi/integrations/weixin
+ * - @alloomi/integrations/telegram
+ * etc.
+ */
+
+// Re-export core interfaces
+export type {
+  IntegrationContext,
+  CredentialStore,
+  AuthProvider,
+  SessionStore,
+  FileIngester,
+  ConfigProvider,
+  ClientRegistry,
+  BaileysAuthStateProvider,
+  InboundMessageHandler,
+} from "./core/index.js";
+
+export type { AIHandler, AIHandlerOptions } from "./core/ai-handler.js";

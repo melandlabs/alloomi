@@ -2,7 +2,8 @@
 name: alloomi-x-twitter-api
 description: "Use X (Twitter) APIs via Alloomi cloud. Call this when the user wants to post tweets, search, reply, retweet, like, get timeline, notifications, or profile. Triggers: post tweet, search tweets, retweet, like, timeline, notifications, X operation"
 metadata:
-  version: 0.4.0
+  version: 0.4.2
+allowed-tools: Bash(node $SKILL_DIR/scripts/alloomi-x.cjs *)
 ---
 
 # Alloomi X (Twitter) API Skill
@@ -21,9 +22,9 @@ When you log in via the Alloomi desktop app, the token is automatically saved to
 If no token is found, the CLI will prompt for email and password, or you can login manually:
 
 ```bash
-node alloomi-x.cjs login <email> <password>
+node $SKILL_DIR/scripts/alloomi-x.cjs login <email> <password>
 # e.g.
-node alloomi-x.cjs login user@example.com mypassword
+node $SKILL_DIR/scripts/alloomi-x.cjs login user@example.com mypassword
 ```
 
 Run `chmod +x` on the script to make it directly executable.
@@ -54,37 +55,37 @@ chmod +x skills/alloomi-x-twitter-api/alloomi-x.cjs
 
 ```bash
 # First time — login
-node alloomi-x.cjs login user@example.com mypassword
+node $SKILL_DIR/scripts/alloomi-x.cjs login user@example.com mypassword
 
 # Post a tweet
-node alloomi-x.cjs postTweet "Hello from Alloomi!"
+node $SKILL_DIR/scripts/alloomi-x.cjs postTweet "Hello from Alloomi!"
 
 # Search tweets
-node alloomi-x.cjs searchTweets "AI news"
+node $SKILL_DIR/scripts/alloomi-x.cjs searchTweets "AI news"
 
 # Reply
-node alloomi-x.cjs replyTo 1234567890 "Great post!"
+node $SKILL_DIR/scripts/alloomi-x.cjs replyTo 1234567890 "Great post!"
 
 # Retweet
-node alloomi-x.cjs retweet 1234567890
+node $SKILL_DIR/scripts/alloomi-x.cjs retweet 1234567890
 
 # Like
-node alloomi-x.cjs likeTweet 1234567890
+node $SKILL_DIR/scripts/alloomi-x.cjs likeTweet 1234567890
 
 # Get timeline
-node alloomi-x.cjs getTimeline 20
+node $SKILL_DIR/scripts/alloomi-x.cjs getTimeline 20
 
 # Get profile
-node alloomi-x.cjs getProfile
+node $SKILL_DIR/scripts/alloomi-x.cjs getProfile
 
 # Get notifications
-node alloomi-x.cjs getNotifications 20
+node $SKILL_DIR/scripts/alloomi-x.cjs getNotifications 20
 ```
 
 Run with `--help` for full usage:
 
 ```bash
-node alloomi-x.cjs --help
+node $SKILL_DIR/scripts/alloomi-x.cjs --help
 ```
 
 ---
@@ -180,7 +181,7 @@ curl -s -X POST https://app.alloomi.ai/api/x \
 | 400 | `X_NOT_CONNECTED` | X not linked in Settings | "Please connect X in Settings > Integrations first." |
 | 401 | `X_TOKEN_EXPIRED` | X OAuth token expired | "X access token expired. Please reconnect X in Settings > Integrations." |
 | 403 | `INSUFFICIENT_CREDITS` | Not enough credits | "Insufficient credits. Please top up at alloomi.ai." |
-| 401 | — | Alloomi token expired | "Token expired. Please login again: node alloomi-x.cjs login <email> <password>" |
+| 401 | — | Alloomi token expired | "Token expired. Please login again: node $SKILL_DIR/scripts/alloomi-x.cjs login <email> <password>" |
 | 429 | — | Rate limit | "Too many requests. Wait a moment and try again." |
 | 500 | — | API error | "X API error: {message}. Try again later." |
 
@@ -191,7 +192,7 @@ curl -s -X POST https://app.alloomi.ai/api/x \
 When a user asks for an X operation:
 
 1. **Identify** the operation and required params
-2. **Run** using the Bash tool: `node skills/alloomi-x-twitter-api/alloomi-x.cjs <operation> [args...]`
+2. **Run** using the Bash tool: `node $SKILL_DIR/scripts/alloomi-x.cjs <operation> [args...]`
    - If not logged in, the CLI will prompt for email/password automatically
 3. **Report result** naturally:
    - postTweet success → "Tweet posted! Used 150 credits. https://x.com/..."

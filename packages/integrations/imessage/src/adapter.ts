@@ -73,7 +73,7 @@ type IMessageSDKType = InstanceType<
  * Check if running in Tauri mode
  */
 function isTauriMode(): boolean {
-  return process.env.IS_TAURI === "true";
+  return process.env.TAURI_MODE === "tauri" || process.env.IS_TAURI === "true";
 }
 
 /**

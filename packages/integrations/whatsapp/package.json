@@ -1,0 +1,23 @@
+{
+  "name": "@alloomi/integrations-whatsapp",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./conversation-store": "./src/conversation-store.ts",
+    "./markdown": "./src/markdown.ts",
+    "./client-registry": "./src/client-registry.ts"
+  },
+  "dependencies": {
+    "@alloomi/ai": "workspace:*",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

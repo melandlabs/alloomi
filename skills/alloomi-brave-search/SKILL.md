@@ -2,7 +2,8 @@
 name: alloomi-brave-search
 description: "Automatically use when the user asks about real-time information, latest news, web search, current prices, competitor info, current events, weather, stock prices, or tech trends. No need to say 'use search' — triggers by intent. Supports web search and news search with automatic credit deduction."
 metadata:
-  version: 0.4.0
+  version: 0.4.2
+allowed-tools: Bash(node $SKILL_DIR/scripts/alloomi-search.cjs *)
 ---
 
 # Alloomi Brave Search Skill
@@ -21,7 +22,7 @@ When you log in via the Alloomi desktop app, the token is automatically saved to
 If no token is found, the CLI will prompt for email and password:
 
 ```bash
-node skills/alloomi-brave-search/alloomi-search.cjs login <email> <password>
+node $SKILL_DIR/scripts/alloomi-search.cjs login <email> <password>
 ```
 
 ## Credit Costs
@@ -45,19 +46,19 @@ chmod +x skills/alloomi-brave-search/alloomi-search.cjs
 
 ```bash
 # First time — login
-node skills/alloomi-brave-search/alloomi-search.cjs login user@example.com mypassword
+node $SKILL_DIR/scripts/alloomi-search.cjs login user@example.com mypassword
 
 # Web search (default, 10 results)
-node skills/alloomi-brave-search/alloomi-search.cjs search "latest AI news"
+node $SKILL_DIR/scripts/alloomi-search.cjs search "latest AI news"
 
 # Web search with custom count
-node skills/alloomi-brave-search/alloomi-search.cjs search "AI news" --count 5
+node $SKILL_DIR/scripts/alloomi-search.cjs search "AI news" --count 5
 
 # News search
-node skills/alloomi-brave-search/alloomi-search.cjs search "AI news" --type news
+node $SKILL_DIR/scripts/alloomi-search.cjs search "AI news" --type news
 
 # News search with custom count
-node skills/alloomi-brave-search/alloomi-search.cjs search "AI news" --type news --count 5
+node $SKILL_DIR/scripts/alloomi-search.cjs search "AI news" --type news --count 5
 ```
 
 ---
@@ -111,7 +112,7 @@ When a user asks something that requires real-time or web-based information:
 4. **Run** using the Bash tool:
 
    ```bash
-   node skills/alloomi-brave-search/alloomi-search.cjs search "user query" --type web --count 10
+   node $SKILL_DIR/scripts/alloomi-search.cjs search "user query" --type web --count 10
    ```
 
 5. **Report result** naturally in the user's language:
