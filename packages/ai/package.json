@@ -1,15 +1,33 @@
 {
   "name": "@alloomi/ai",
-  "version": "0.1.0",
-  "private": false,
+  "version": "0.4.2",
+  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
     "./memory": "./src/memory/index.ts",
-    "./store": "./src/store/index.ts"
+    "./store": "./src/store/index.ts",
+    "./audio": "./src/audio/index.ts",
+    "./agent": "./src/agent/index.ts",
+    "./agent/sandbox": "./src/agent/sandbox/index.ts",
+    "./agent/sandbox/types": "./src/agent/sandbox/types.ts",
+    "./agent/sandbox/plugin": "./src/agent/sandbox/plugin.ts",
+    "./agent/sandbox/registry": "./src/agent/sandbox/registry.ts",
+    "./agent/sandbox/providers/native": "./src/agent/sandbox/providers/native.ts",
+    "./agent/sandbox/providers/claude": "./src/agent/sandbox/providers/claude.ts",
+    "./agent/sandbox/providers/vercel": "./src/agent/sandbox/providers/vercel.ts",
+    "./agent/ai": "./src/agent/index.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "openai": "^4.0.0",
+    "nanoid": "^5.1.3",
+    "zod": "^4.3.6",
+    "@vercel/sandbox": "^1.7.1",
+    "ai": "5.0.0-beta.6",
+    "@ai-sdk/openai-compatible": "^1.0.0",
+    "@alloomi/shared": "workspace:*"
+  },
   "peerDependencies": {},
   "devDependencies": {
     "@alloomi/config": "workspace:*",

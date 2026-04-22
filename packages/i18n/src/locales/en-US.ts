@@ -53,6 +53,7 @@ const enUS = {
     downvoteResponse: "Dislike",
     sources: "Sources",
     noSources: "No citation sources",
+    temporary: "Temporary",
     previewImage: "Preview Image",
     preview: "Preview",
     pin: "Pin",
@@ -78,6 +79,8 @@ const enUS = {
     end: "End",
     loginAccount: "Log In to Your Account",
     signOut: "Sign Out",
+    logoutConfirmTitle: "Sign out?",
+    logoutConfirmDescription: "You'll need to sign in again to continue.",
     unauthenticatedError: "You're not authenticated. Please log in first.",
     operationFailed: "Operation Failed",
     backHome: "Return to Homepage",
@@ -1880,6 +1883,18 @@ const enUS = {
       "Refresh this page so the Feishu listener and integration state can take full effect",
     feishuConnectRestartConfirm: "OK",
     feishuAppIdSecretRequired: "Please enter App ID and App Secret",
+    feishuScanDescription:
+      "Scan the QR code with Feishu or Lark on your phone and confirm the prompt.",
+    feishuScanPreparing: "Requesting QR code from Feishu…",
+    feishuScanWaiting: "Waiting for confirmation in Feishu…",
+    feishuScanDenied: "Authorization was denied in Feishu.",
+    feishuScanExpired: "The scan session expired. Close and try again.",
+    feishuScanSessionLost: "Session is no longer valid. Close and start again.",
+    feishuScanUnavailable:
+      "Scan-to-create is not available in this environment (Feishu may not expose client_secret device registration, or the request failed). You can expand manual entry.",
+    feishuUserCodeHint: "If you are asked for a code:",
+    feishuManualEntryTitle: "Enter credentials manually",
+    feishuHideManual: "Hide manual entry",
     feishuBotDescription: "Chat with Alloomi via Feishu",
     feishuStepsLink: "Setup steps",
     feishuStepsSection1Title: "1. Create Feishu app and get credentials",
@@ -2788,6 +2803,17 @@ const enUS = {
       "Successfully synced {{count}} topics to Strategic Memory",
     syncTopicsFailed: "Failed to sync to Strategic Memory",
   },
+  passwordInput: {
+    title: "SUDO PASSWORD REQUIRED",
+    instructions: "Enter password below (input is hidden), or:",
+    optionSkip: "Press Enter to skip (command fails gracefully)",
+    optionTimeout: "Wait {countdown}s to auto-skip",
+    passwordLabel: "Password (hidden):",
+    placeholder: "Enter password...",
+    cancel: "Cancel",
+    submit: "Submit",
+    command: "Command:",
+  },
   securityPrompt: {
     title: "Connect Telegram",
     description:
@@ -3172,6 +3198,7 @@ const enUS = {
     newConversation: "New Conversation",
     prompt: "What kind of assistant do you want to create?",
     askEverything: "Ask everything...",
+    sendMessageFailed: "Message send failed, please retry later",
   },
   files: {
     title: "Saved Files",
@@ -3554,12 +3581,15 @@ const enUS = {
     allCharacters: "All characters",
     notificationChannels: "Notification Channels",
     selectChannels: "Select notification channels...",
+    systemNotification: "System Notification",
+    systemNotificationDescription:
+      "Show desktop notifications when tasks complete",
   },
   templateCharacter: {
     aiProductIntelligence: {
       name: "AI Product Daily Digest",
       description:
-        "Every morning at 9 AM: scrape X/Twitter, Reddit, and Product Hunt for AI product news, summarize into a briefing, and update an HTML dashboard using the frontend-design skill.",
+        "Scrape X/Twitter, Reddit, and Product Hunt for AI product news, summarize into a briefing, and update an HTML dashboard using the frontend-design skill.",
       insightTitle: "AI Product Daily Digest",
       insightDescription: "Daily AI product news briefing",
     },
@@ -3579,18 +3609,20 @@ const enUS = {
         "Monitor emails and trigger auto-replies on conditions",
     },
     contextAtlas: {
-      name: "Context Atlas",
+      name: "Relationship Discovery",
       description:
-        "Continuously analyze collected content and events, automatically extracting entities such as people, companies, topics, and their relationships to build a visualized knowledge graph. Help users discover hidden connections between information and support GraphRAG-based contextual retrieval. Use the frontend-design skill to build an interactive kanban board, embedding all graph data within a single HTML file without any additional files.",
-      insightTitle: "Context Atlas",
-      insightDescription: "Knowledge graph board with entity relationships",
+        "Continuously analyze collected my content and events, automatically extracting entities such as people, companies, topics, and their relationships to build a visualized knowledge graph. Help users discover hidden connections between information and support GraphRAG-based contextual retrieval. Use the frontend-design skill to build an interactive kanban board, embedding all graph data within a single HTML file without any additional files.",
+      insightTitle: "Relationship Discovery",
+      insightDescription:
+        "Extract people, companies, and topic relationships from your information and generate a visual relationship network",
     },
     xAutomation: {
-      name: "X Automation",
+      name: "X Account Assistant",
       description:
         "Help set up a tracking account and manage your social media account on X. Objectives: 1) Achieve stable monthly follower growth and increase readership. 2) Persona: Sharing cutting-edge AI technologies, products, and user guides, along with thoughts on technology. 3) Perform operations every 4 hours: retweet, repost, like, reply, and post. 4) Content must stay on-topic — AI only, no politics, terrorism, violence, or pornography. 5) Prepare posts in advance, require approval before publishing. 6) Review daily in the evening to prepare tomorrow and optimize strategy. 7) Initially minimize ads; focus on followers first, share thoughts and advertise once you have a decent following.",
-      insightTitle: "X Account Growth Tracker",
-      insightDescription: "Track X account growth and engagement",
+      insightTitle: "X Account Assistant",
+      insightDescription:
+        "Track follower growth, engagement metrics, readership, and account health",
     },
     pdDailySync: {
       name: "PD Daily Sync",

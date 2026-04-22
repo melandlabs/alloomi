@@ -1,0 +1,20 @@
+{
+  "name": "@alloomi/integrations-x",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@alloomi/shared": "workspace:*",
+    "@xdevplatform/xdk": "^0.5.0"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

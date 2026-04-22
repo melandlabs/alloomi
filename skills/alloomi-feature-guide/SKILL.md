@@ -2,7 +2,7 @@
 name: alloomi-feature-guide
 description: "Use this when users ask about Alloomi features, capabilities, or how to use it. Examples: 'Alloomi 怎么用', '你能做什么', 'What can you do?', 'How does Alloomi work?', 'Tell me about Alloomi features', 'What platforms does Alloomi support?', 'How do I use scheduled tasks?', 'What is Insights system?', 'How do I connect Telegram?', 'How to create automation?', '什么是 Alloomi 事件?'
 metadata:
-  version: 0.4.0
+  version: 0.4.2
 ---
 
 # Alloomi Product Features

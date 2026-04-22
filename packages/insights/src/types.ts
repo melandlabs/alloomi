@@ -14,6 +14,7 @@ export interface InsightBase {
   people: string[] | null;
   time: Date | string | number;
   details: InsightDetail[] | null;
+  timeline: InsightTimelineEvent[] | null;
   taskLabel: string;
   categories: string[] | null;
   topKeywords: string[] | null;
@@ -21,10 +22,33 @@ export interface InsightBase {
   myTasks: InsightTaskItem[] | null;
   waitingForMe: InsightTaskItem[] | null;
   waitingForOthers: InsightTaskItem[] | null;
+  nextActions: InsightAction[] | null;
+  followUps: InsightFollowUp[] | null;
   dueDate?: string | null;
   dedupeKey?: string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
+}
+
+export interface InsightTimelineEvent {
+  time?: number | string | null;
+  person?: string | null;
+  platform?: string | null;
+  channel?: string | null;
+  content?: string | null;
+  attachments?: InsightAttachment[] | null;
+}
+
+export interface InsightAction {
+  action?: string | null;
+  reason?: string | null;
+  confidence?: number | null;
+}
+
+export interface InsightFollowUp {
+  action?: string | null;
+  reason?: string | null;
+  confidence?: number | null;
 }
 
 export interface InsightDetail {
@@ -65,5 +89,13 @@ export interface InsightTaskItem {
   deadline?: string | null;
   rawDeadline?: string | null;
   followUpAt?: string | null;
+  followUpNote?: string | null;
+  lastFollowUpAt?: string | null;
+  acknowledgedAt?: string | null;
+  priority?: string | null;
+  confidence?: number | null;
+  labels?: string[] | null;
+  sourceDetailIds?: string[] | null;
+  watchers?: string[] | null;
   [key: string]: unknown;
 }
