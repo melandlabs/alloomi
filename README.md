@@ -1,11 +1,13 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/images/logo-dark-light.svg">
   <img src="apps/web/public/images/logo-full-light.svg" alt="Alloomi Logo">
-</picture> 
+</picture>
+
+</br>
 
 [![Node.js Version](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](https://nodejs.org) [![Tauri](https://img.shields.io/badge/Tauri-Desktop-24C8D5?logo=tauri)](https://tauri.app) [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-4B4B4B?logo=linux&logoColor=white)](https://alloomi.ai) [![License](https://img.shields.io/badge/License-Apache%202.0-F8D52A?logo=apache)](https://www.apache.org/licenses/LICENSE-2.0) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv)
 
-#### *Proactive AI workspace — understands your intent, orchestrates execution, and gets things done.*
+#### _Proactive AI workspace — understands your intent, orchestrates execution, and gets things done._
 
 Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
 
@@ -40,12 +42,12 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 ### Agent Runtime Integrations
 
-- **Claude Code** — Anthropic's coding agent *(Default)*
-- **Codex** — OpenAI's code generation agent *(Coming Soon)*
-- **Gemmi** — General-purpose AI agent *(Coming Soon)*
-- **Pi** — Inflection AI's personal agent *(Coming Soon)*
-- **OpenClaw** — Open agent protocol & ecosystem *(Coming Soon)*
-- **Hermes Agent** — NousResearch's agent framework *(Coming Soon)*
+- **Claude Code** — Anthropic's coding agent _(Default)_
+- **Codex** — OpenAI's code generation agent _(Coming Soon)_
+- **Gemmi** — General-purpose AI agent _(Coming Soon)_
+- **Pi** — Inflection AI's personal agent _(Coming Soon)_
+- **OpenClaw** — Open agent protocol & ecosystem _(Coming Soon)_
+- **Hermes Agent** — NousResearch's agent framework _(Coming Soon)_
 
 ## What Makes Alloomi Different?
 

@@ -16,16 +16,28 @@ export function ChatSkeleton() {
           <div className="flex gap-3">
             <div className="shrink-0 size-8 rounded-full bg-muted/60 animate-pulse" />
             <div className="flex-1 min-w-0 space-y-2">
-              <div className="h-4 bg-muted/60 rounded animate-pulse" style={{ width: "60%" }} />
-              <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: "80%" }} />
-              <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: "40%" }} />
+              <div
+                className="h-4 bg-muted/60 rounded animate-pulse"
+                style={{ width: "60%" }}
+              />
+              <div
+                className="h-4 bg-muted/40 rounded animate-pulse"
+                style={{ width: "80%" }}
+              />
+              <div
+                className="h-4 bg-muted/40 rounded animate-pulse"
+                style={{ width: "40%" }}
+              />
             </div>
           </div>
 
           {/* User message bubble */}
           <div className="flex gap-3 justify-end">
             <div className="flex-1 min-w-0 space-y-2 flex flex-col items-end">
-              <div className="h-10 bg-muted/60 rounded-2xl animate-pulse" style={{ width: "50%" }} />
+              <div
+                className="h-10 bg-muted/60 rounded-2xl animate-pulse"
+                style={{ width: "50%" }}
+              />
             </div>
           </div>
 
@@ -33,8 +45,14 @@ export function ChatSkeleton() {
           <div className="flex gap-3">
             <div className="shrink-0 size-8 rounded-full bg-muted/60 animate-pulse" />
             <div className="flex-1 min-w-0 space-y-2">
-              <div className="h-4 bg-muted/60 rounded animate-pulse" style={{ width: "70%" }} />
-              <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: "50%" }} />
+              <div
+                className="h-4 bg-muted/60 rounded animate-pulse"
+                style={{ width: "70%" }}
+              />
+              <div
+                className="h-4 bg-muted/40 rounded animate-pulse"
+                style={{ width: "50%" }}
+              />
             </div>
           </div>
 
