@@ -189,8 +189,8 @@ export function initSqliteDb(dbPath: string): DrizzleDB {
     // Set busy timeout to 30 seconds to handle concurrent access
     sqlite.pragma("busy_timeout = 30000");
 
-    // Disable synchronous for better performance (Tauri local mode only)
-    sqlite.pragma("synchronous = NORMAL");
+    // Use FULL to maximize durability under sudden power loss.
+    sqlite.pragma("synchronous = FULL");
 
     // Automatically apply all pending migrations
     console.log(`   Applying migrations...`);

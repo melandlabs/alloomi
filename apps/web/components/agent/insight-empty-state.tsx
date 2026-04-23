@@ -306,7 +306,7 @@ export function InsightRefreshingState({
         }
         if (
           refreshStatus?.includes(
-            "Understanding information and distilling key points",
+            "Understanding information and extracting insights",
           )
         ) {
           // First entry - generating understanding state
@@ -315,14 +315,13 @@ export function InsightRefreshingState({
             "Converting to Insight events, please wait - {{progress}}%",
             { progress },
           );
-        } else {
-          // First entry - default state (with progress)
-          return t(
-            "insight.refreshingSubtitle.firstLanding.default",
-            "Preparing event view - {{progress}}%",
-            { progress },
-          );
         }
+        // First entry - default state (with progress)
+        return t(
+          "insight.refreshingSubtitle.firstLanding.default",
+          "Preparing event view - {{progress}}%",
+          { progress },
+        );
       }
 
       // Normal flow for non-first entry
@@ -334,21 +333,21 @@ export function InsightRefreshingState({
           "Syncing latest changes - {{progress}}%",
           { progress },
         );
-      } else if (refreshStatus?.includes("Understanding new information")) {
+      }
+      if (refreshStatus?.includes("Understanding new")) {
         // Generating understanding state
         return t(
           "insight.refreshingSubtitle.summarizing",
           "Integrating new changes, updating Insight events - {{progress}}%",
           { progress },
         );
-      } else {
-        // Default state (with progress)
-        return t(
-          "insight.refreshingSubtitle.default",
-          "Updating Insight events - {{progress}}%",
-          { progress },
-        );
       }
+      // Default state (with progress)
+      return t(
+        "insight.refreshingSubtitle.default",
+        "Updating Insight events - {{progress}}%",
+        { progress },
+      );
     }
 
     // When there's no progress, show default subtitle

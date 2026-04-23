@@ -4,12 +4,24 @@ import { useState, useEffect } from "react";
 import { RemixIcon } from "@/components/remix-icon";
 import { ErrorBoundary } from "./error-boundary";
 import { useTranslation } from "react-i18next";
-import { IMAGE_FILE_EXTENSIONS } from "@/lib/utils/file-icons";
+import { IMAGE_FILE_EXTENSIONS } from "@/components/file-icons";
 import { revealItemInDir, openPathCustom } from "@/lib/tauri";
 import {
   isAppleDocumentFile,
   extractApplePreviewPdf,
 } from "@/lib/files/apple-preview";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  usePdfPreview,
+  PdfPreviewHeaderToolbar,
+  PdfPreviewScrollBody,
+} from "@/components/artifacts/pdf-preview";
 
 // Helper function: converts Uint8Array to Base64 string (performance optimized)
 function uint8ToBase64(uint8Array: Uint8Array): string {
@@ -37,6 +49,8 @@ interface FilePreviewPanelProps {
   /** Pass taskId for workspace files, fetched via API (non-Tauri environment) */
   taskId?: string;
   onClose: () => void;
+  /** Optional delete callback */
+  onDelete?: () => void;
 }
 
 const MAX_PREVIEW_SIZE = 100 * 1024 * 1024;
@@ -55,6 +69,7 @@ export function FilePreviewPanel({
   file,
   taskId,
   onClose,
+  onDelete,
 }: FilePreviewPanelProps) {
   const { t } = useTranslation();
 
@@ -63,7 +78,7 @@ export function FilePreviewPanel({
   const [DocxPreviewComp, setDocxPreviewComp] = useState<any>(null);
   const [CodePreviewComp, setCodePreviewComp] = useState<any>(null);
   const [ExcelPreviewComp, setExcelPreviewComp] = useState<any>(null);
-  const [PdfPreviewComp, setPdfPreviewComp] = useState<any>(null);
+  const [CsvPreviewComp, setCsvPreviewComp] = useState<any>(null);
   const [WebsitePreviewComp, setWebsitePreviewComp] = useState<any>(null);
   const [MarkdownPreviewComp, setMarkdownPreviewComp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +92,17 @@ export function FilePreviewPanel({
   // Clean file type: remove whitespace (including newlines)
   const cleanType = file?.type?.trim() || "";
 
+  const isPdfDrawerPreview =
+    Boolean(file) &&
+    pdfContent != null &&
+    (cleanType === "pdf" || isAppleDocumentFile(cleanType));
+
+  const pdfDrawerModel = usePdfPreview(isPdfDrawerPreview ? pdfContent : null, {
+    path: fullArtifactPath ?? undefined,
+    downloadFileName: file?.name ?? "document.pdf",
+    enabled: isPdfDrawerPreview,
+  });
+
   // Use shared image extension constants (without dot)
   const imageFileTypes = IMAGE_FILE_EXTENSIONS.map((ext) => ext.slice(1));
 
@@ -87,7 +113,7 @@ export function FilePreviewPanel({
       import("./artifacts/docx-preview"),
       import("./artifacts/code-preview"),
       import("./artifacts/excel-preview"),
-      import("./artifacts/pdf-preview"),
+      import("./artifacts/csv-preview"),
       import("./website-preview"),
       import("./markdown-preview"),
     ])
@@ -97,7 +123,7 @@ export function FilePreviewPanel({
           docxModule,
           codeModule,
           excelModule,
-          pdfModule,
+          csvModule,
           websiteModule,
           markdownModule,
         ]) => {
@@ -105,7 +131,7 @@ export function FilePreviewPanel({
           setDocxPreviewComp(() => docxModule.DocxPreview);
           setCodePreviewComp(() => codeModule.CodePreview);
           setExcelPreviewComp(() => excelModule.ExcelPreview);
-          setPdfPreviewComp(() => pdfModule.PdfPreview);
+          setCsvPreviewComp(() => csvModule.CsvPreview);
           setWebsitePreviewComp(() => websiteModule.WebsitePreview);
           setMarkdownPreviewComp(() => markdownModule.MarkdownPreview);
           setLoading(false);
@@ -135,6 +161,7 @@ export function FilePreviewPanel({
       "txt",
       "sh",
       "bash",
+      "csv",
     ];
     const isCodeFile = codeFileTypes.includes(cleanType);
     const isHtmlFile = cleanType === "html" || cleanType === "htm";
@@ -171,9 +198,15 @@ export function FilePreviewPanel({
               },
             );
             if (!res.ok) {
-              setError(
-                t("common.filePreview.loadFailed") || "Failed to load file",
-              );
+              if (res.status === 404) {
+                setError(
+                  t("common.filePreview.fileNotFound") || "File not found",
+                );
+              } else {
+                setError(
+                  t("common.filePreview.loadFailed") || "Failed to load file",
+                );
+              }
               return;
             }
             const arrayBuffer = await res.arrayBuffer();
@@ -204,9 +237,15 @@ export function FilePreviewPanel({
             `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(file.path)}`,
           );
           if (!res.ok) {
-            setError(
-              t("common.filePreview.loadFailed") || "Failed to load file",
-            );
+            if (res.status === 404) {
+              setError(
+                t("common.filePreview.fileNotFound") || "File not found",
+              );
+            } else {
+              setError(
+                t("common.filePreview.loadFailed") || "Failed to load file",
+              );
+            }
             return;
           }
           const data = await res.json();
@@ -345,7 +384,29 @@ export function FilePreviewPanel({
         return;
       }
 
-      // If taskId already exists, construct full path for Tauri use
+      // If path starts with ~, expand to user home directory path
+      if (file.path?.startsWith("~/")) {
+        try {
+          const { homeDirCustom } = await import("@/lib/tauri");
+          const homePath = await homeDirCustom();
+          if (homePath) {
+            setFullArtifactPath(file.path.replace(/^~/, homePath));
+            return;
+          }
+        } catch (pathErr) {
+          console.error("[FilePreviewPanel] Failed to expand ~ path:", pathErr);
+        }
+      }
+
+      // If path looks like a real absolute path (starts with /Users/ or /home/),
+      // use it directly. Otherwise treat it as relative to session directory.
+      if (file.path?.startsWith("/Users/") || file.path?.startsWith("/home/")) {
+        setFullArtifactPath(file.path);
+        return;
+      }
+
+      // Only for truly relative paths (or LLM output like /output/xxx),
+      // use taskId to construct path
       if (taskId && file.path) {
         // Construct: ~/.alloomi/sessions/{taskId}/{relativePath}
         try {
@@ -362,26 +423,6 @@ export function FilePreviewPanel({
             "[FilePreviewPanel] Failed to resolve full path:",
             pathErr,
           );
-        }
-      }
-
-      // If path is already absolute (e.g., passed from Library page), use directly
-      if (file.path?.startsWith("/")) {
-        setFullArtifactPath(file.path);
-        return;
-      }
-
-      // If path starts with ~, expand to user home directory path
-      if (file.path?.startsWith("~/")) {
-        try {
-          const { homeDirCustom } = await import("@/lib/tauri");
-          const homePath = await homeDirCustom();
-          if (homePath) {
-            setFullArtifactPath(file.path.replace(/^~/, homePath));
-            return;
-          }
-        } catch (pathErr) {
-          console.error("[FilePreviewPanel] Failed to expand ~ path:", pathErr);
         }
       }
 
@@ -459,25 +500,26 @@ export function FilePreviewPanel({
   // Error state
   if (error) {
     return (
-      <div className="flex h-full flex-col bg-white">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <RemixIcon
-              name={getFileTypeIconName(cleanType)}
-              size="size-5"
-              className="text-primary shrink-0"
-            />
-            <span className="font-medium truncate">{file.name}</span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
-          >
-            <RemixIcon name="close" size="size-4" />
-          </button>
-        </div>
+      <div className="flex h-full min-h-0 flex-col bg-white">
+        <FilePreviewDrawerHeader fileName={file.name}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={onClose}
+                aria-label={t("common.close", "Close")}
+              >
+                <RemixIcon name="close" size="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{t("common.close", "Close")}</p>
+            </TooltipContent>
+          </Tooltip>
+        </FilePreviewDrawerHeader>
 
         {/* Error Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -524,50 +566,120 @@ export function FilePreviewPanel({
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <RemixIcon
-            name={getFileTypeIconName(cleanType)}
-            size="size-5"
-            className="text-primary shrink-0"
-          />
-          <span className="font-medium truncate">{file.name}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {fullArtifactPath && (
-            <>
-              <button
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      <FilePreviewDrawerHeader fileName={file.name}>
+        {isPdfDrawerPreview ? (
+          <PdfPreviewHeaderToolbar model={pdfDrawerModel} />
+        ) : null}
+        {cleanType === "csv" && codeContent ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 type="button"
-                onClick={() => revealItemInDir(fullArtifactPath)}
-                className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
-                title="Show in Folder"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => {
+                  const blob = new Blob([codeContent], {
+                    type: "text/csv;charset=utf-8;",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = file.name || "export.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
               >
-                <RemixIcon name="folder_open" size="size-4" />
-              </button>
-              <button
+                <RemixIcon name="download" size="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{t("common.spreadsheetPreview.exportCsv", "Export CSV")}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+        {fullArtifactPath && !isPdfDrawerPreview ? (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={() => revealItemInDir(fullArtifactPath)}
+                >
+                  <RemixIcon name="folder_open" size="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{t("common.filePreview.showInFolder", "Show in Folder")}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={() => openPathCustom(fullArtifactPath)}
+                >
+                  <RemixIcon name="external_link" size="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>
+                  {t(
+                    "common.filePreview.openWithDefaultApp",
+                    "Open with Default App",
+                  )}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        ) : null}
+        {onDelete ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 type="button"
-                onClick={() => openPathCustom(fullArtifactPath)}
-                className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
-                title="Open with Default App"
+                variant="ghost"
+                size="icon"
+                className="size-8 text-destructive hover:text-destructive"
+                onClick={onDelete}
+                aria-label={t("common.delete", "Delete")}
               >
-                <RemixIcon name="external_link" size="size-4" />
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
-          >
-            <RemixIcon name="close" size="size-4" />
-          </button>
-        </div>
-      </div>
+                <RemixIcon name="delete" size="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{t("common.delete", "Delete")}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={onClose}
+              aria-label={t("common.close", "Close")}
+            >
+              <RemixIcon name="close" size="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>{t("common.close", "Close")}</p>
+          </TooltipContent>
+        </Tooltip>
+      </FilePreviewDrawerHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {/* PPTX file preview - protected by error boundary */}
         {cleanType === "pptx" &&
         PptxPreview &&
@@ -627,7 +739,7 @@ export function FilePreviewPanel({
         ) : null}
 
         {/* Excel file preview - requires absolute path to read */}
-        {["xlsx", "xls", "csv"].includes(cleanType) &&
+        {["xlsx", "xls"].includes(cleanType) &&
         ExcelPreviewComp &&
         (fullArtifactPath || (!taskId && file.path?.startsWith("/"))) ? (
           <ErrorBoundary
@@ -650,6 +762,41 @@ export function FilePreviewPanel({
               artifact={{ ...file, path: fullArtifactPath || file.path }}
             />
           </ErrorBoundary>
+        ) : null}
+
+        {/* CSV: papaparse table preview (supports taskId API to fetch text) */}
+        {cleanType === "csv" && CsvPreviewComp ? (
+          <div className="relative h-full min-h-0 px-4 py-3">
+            {codeContent ? (
+              <ErrorBoundary
+                fallback={
+                  <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                    <p className="text-lg font-medium mb-2">
+                      {t(
+                        "common.filePreview.excelFailed",
+                        "Table preview failed",
+                      )}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{file.name}</p>
+                  </div>
+                }
+              >
+                <CsvPreviewComp
+                  content={codeContent}
+                  maxHeight="calc(100vh - 8rem)"
+                  hideFileTitleBar
+                />
+              </ErrorBoundary>
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <RemixIcon
+                  name="loader_2"
+                  size="size-6"
+                  className="animate-spin text-primary"
+                />
+              </div>
+            )}
+          </div>
         ) : null}
 
         {/* Code file preview */}
@@ -700,42 +847,45 @@ export function FilePreviewPanel({
 
         {/* PDF file preview */}
         {(cleanType === "pdf" ||
-          (isAppleDocumentFile(cleanType) && pdfContent)) &&
-          PdfPreviewComp && (
-            <ErrorBoundary
-              fallback={
-                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <p className="text-6xl mb-4">📕</p>
-                  <p className="text-lg font-medium mb-2">
-                    {isAppleDocumentFile(cleanType)
-                      ? t("common.filePreview.previewNotAvailable")
-                      : t("common.filePreview.pdfFailed")}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground max-w-md">
-                    {isAppleDocumentFile(cleanType)
-                      ? t("common.filePreview.applePreviewFailed") ||
-                        "This Apple document may not have an iCloud preview"
-                      : t("common.filePreview.pdfFailedHint")}
-                  </p>
-                </div>
-              }
-            >
-              {pdfContent ? (
-                <PdfPreviewComp file={pdfContent} maxHeight="100%" />
-              ) : (
-                <div className="flex items-center justify-center p-8">
-                  <RemixIcon
-                    name="loader_2"
-                    size="size-6"
-                    className="animate-spin text-primary"
-                  />
-                </div>
-              )}
-            </ErrorBoundary>
-          )}
+          (isAppleDocumentFile(cleanType) && pdfContent)) && (
+          <ErrorBoundary
+            fallback={
+              <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                <p className="text-6xl mb-4">📕</p>
+                <p className="text-lg font-medium mb-2">
+                  {isAppleDocumentFile(cleanType)
+                    ? t("common.filePreview.previewNotAvailable")
+                    : t("common.filePreview.pdfFailed")}
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {file.name}
+                </p>
+                <p className="text-xs text-muted-foreground max-w-md">
+                  {isAppleDocumentFile(cleanType)
+                    ? t("common.filePreview.applePreviewFailed") ||
+                      "This Apple document may not have an iCloud preview"
+                    : t("common.filePreview.pdfFailedHint")}
+                </p>
+              </div>
+            }
+          >
+            {pdfContent ? (
+              <PdfPreviewScrollBody
+                model={pdfDrawerModel}
+                maxHeight="100%"
+                className="h-full min-h-0"
+              />
+            ) : (
+              <div className="flex items-center justify-center p-8">
+                <RemixIcon
+                  name="loader_2"
+                  size="size-6"
+                  className="animate-spin text-primary"
+                />
+              </div>
+            )}
+          </ErrorBoundary>
+        )}
 
         {/* Image file preview */}
         {imageFileTypes.includes(cleanType) && (

@@ -7,7 +7,7 @@
  * Old sessions (not through login/register flow): continue reading from localStorage
  */
 
-import { shouldUseCloudAuth } from "@/lib/api/remote-client";
+import { shouldUseCloudAuth } from "@/lib/auth/remote-client";
 import { AUTH_TOKEN_CLIENT_COOKIE } from "./cookie-names";
 
 // Token refresh related constants
@@ -65,7 +65,10 @@ export function storeAuthToken(token: string): void {
 
   // Write non-httpOnly cookie (for getAuthToken cookie-first reads)
   try {
-    const maxAge = 30 * 24 * 60 * 60;
+    const maxAge = Number.parseInt(
+      process.env.AUTH_TOKEN_EXPIRY_SECONDS || "7776000",
+      10,
+    );
     // Only add 'secure' flag when actually on HTTPS (web production).
     // In Tauri production mode, the app runs on http://localhost where 'secure'
     // would prevent the cookie from being stored at all.

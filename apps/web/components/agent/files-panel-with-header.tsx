@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 
 /**
  * Files panel Header component (using Context)
- * Note: This component must be used under FilesPanelProvider
+ * Note: This component must be used within FilesPanelProvider
  */
 export function FilesPanelHeaderWrapper({
   children,
@@ -32,7 +32,7 @@ export function FilesPanelHeaderWrapper({
 
 /**
  * Files panel Content component (using Context)
- * Note: This component must be used under FilesPanelProvider
+ * Note: This component must be used within FilesPanelProvider
  */
 export function FilesPanelContentWrapper() {
   return <FilesPanel />;

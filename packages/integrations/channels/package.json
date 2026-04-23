@@ -1,6 +1,6 @@
 {
   "name": "@alloomi/integrations-channels",
-  "version": "0.4.1",
+  "version": "0.4.3",
   "private": true,
   "type": "module",
   "exports": {
@@ -19,8 +19,8 @@
     "./sources/types": "./src/sources/types.ts"
   },
   "dependencies": {
-    "zod": "^4.3.6",
-    "@alloomi/shared": "workspace:*"
+    "@alloomi/shared": "workspace:*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@alloomi/config": "workspace:*",

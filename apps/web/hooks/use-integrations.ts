@@ -41,6 +41,7 @@ export type IntegrationAccountClient = {
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+  hasValidContextToken?: boolean; // For WeChat, indicates if bot has valid context token for notifications
   bot: {
     id: string;
     name: string;

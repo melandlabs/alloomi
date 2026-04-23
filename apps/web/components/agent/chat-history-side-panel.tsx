@@ -12,7 +12,7 @@ import { ScrollArea } from "@alloomi/ui";
 import { RemixIcon } from "@/components/remix-icon";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import type { ChatWithExtendedInfo } from "@/lib/types/api";
+import type { ChatWithExtendedInfo } from "@/lib/ai/chat/api";
 import {
   useChatContext,
   useChatContextOptional,

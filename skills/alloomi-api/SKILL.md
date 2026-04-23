@@ -2,7 +2,7 @@
 name: alloomi-api
 description: "Alloomi API documentation and reference. Use when working with Alloomi backend APIs, AI, authentication, characters, messages, files, integrations, billing, or any server-side functionality. Triggers: API endpoints, backend routes, authentication, cloud API, integrations"
 metadata:
-  version: 0.4.0
+  version: 0.4.3
 ---
 
 # Alloomi API Documentation
@@ -19,7 +19,6 @@ metadata:
 | **Files** | `/api/files/*` | File storage and upload |
 | **Storage** | `/api/storage/*` | Session and disk management |
 | **Integrations** | `/api/integrations/*`, `/api/*/callback` | Slack, Discord, X, etc. |
-| **Affiliate** | `/api/affiliate/*` | Affiliate program |
 | **RAG** | `/api/rag/*` | Retrieval-augmented generation |
 | **Workspace** | `/api/workspace/*` | Artifacts and skills |
 | **Native** | `/api/native/*` | Native agent operations |

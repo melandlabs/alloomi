@@ -7,12 +7,12 @@
 
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { authenticateCloudRequest } from "@/lib/api/cloud-auth";
+import { authenticateCloudRequest } from "@/lib/auth/cloud-auth";
 import { AppError } from "@alloomi/shared/errors";
 import { withRateLimit, RateLimitPresets } from "@/lib/rate-limit/middleware";
 import { saveFeedback } from "@/lib/db/queries";
 import { generateUUID } from "@/lib/utils";
-import { forwardToCloud } from "@/lib/api/cloud-proxy";
+import { forwardToCloud } from "@/lib/auth/cloud-proxy";
 import { isTauriMode } from "@/lib/env/constants";
 
 const feedbackRequestBodySchema = z.object({

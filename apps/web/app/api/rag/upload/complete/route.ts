@@ -6,13 +6,16 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { parseFile } from "@/lib/files/parsers";
 import { randomUUID } from "node:crypto";
-import { processDocument, getUserRAGStats } from "@/lib/rag/langchain-service";
+import {
+  processDocument,
+  getUserRAGStats,
+} from "@/lib/ai/rag/langchain-service";
 import { isTauriMode } from "@/lib/env";
 import {
   SUPPORTED_RAG_MIME_TYPES,
   getMimeTypeFromExtension,
 } from "@/lib/files/config";
-import { uploadFile } from "@/lib/storage/adapters";
+import { uploadFile } from "@/lib/storage";
 
 const UPLOAD_TEMP_DIR = path.join(tmpdir(), "alloomi-uploads");
 

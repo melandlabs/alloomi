@@ -9,7 +9,7 @@ import {
   incrementUserSessionVersion,
 } from "@/lib/db/queries";
 import { isTauriMode } from "@/lib/env/constants";
-import { createCloudClientForRequest } from "@/lib/api/remote-client";
+import { createCloudClientForRequest } from "@/lib/auth/remote-client";
 import { createHash } from "node:crypto";
 
 const passwordUpdateSchema = z.object({

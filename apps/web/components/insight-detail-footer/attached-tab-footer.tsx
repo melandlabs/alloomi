@@ -15,7 +15,6 @@ import { ScrollArea } from "@alloomi/ui";
 import { toast } from "@/components/toast";
 import { useKnowledgeFiles } from "@/hooks/use-knowledge-files";
 import { useEnterSendWithIme } from "@alloomi/hooks/use-enter-send-ime";
-import { InsightNoteModal } from "@/components/insight-note/insight-note-modal";
 
 /** Supported file MIME types; consistent with insight-document-list */
 const SUPPORTED_FILE_TYPES = [
@@ -482,15 +481,6 @@ export function AttachedTabFooter({
           </Popover>
         </div>
       </div>
-
-      <InsightNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
-        insightId={insightId}
-        initialContent=""
-        editNoteId={null}
-        onSave={handleNoteSaved}
-      />
     </div>
   );
 }

@@ -22,6 +22,16 @@ interface AvatarDisplayFramedProps {
   forceCenter?: boolean;
   /** Default to bottom-right offset, center on hover/forceCenter */
   defaultBottomRight?: boolean;
+  /** Size class for the inner avatar renderer */
+  avatarClassName?: string;
+  /** Additional class names for the inner translation wrapper */
+  innerClassName?: string;
+  /** Class name for avatar background SVG scale wrapper */
+  backgroundScaleClassName?: string;
+  /** Class name for avatar facial-features SVG scale wrapper */
+  featureScaleClassName?: string;
+  /** Whether overflowing avatar content should be clipped by the frame */
+  overflowHidden?: boolean;
 }
 
 /**
@@ -36,6 +46,11 @@ export const AvatarDisplayFramed = memo(function AvatarDisplayFramed({
   staticMode = false,
   forceCenter = false,
   defaultBottomRight = false,
+  avatarClassName,
+  innerClassName,
+  backgroundScaleClassName,
+  featureScaleClassName,
+  overflowHidden = true,
 }: AvatarDisplayFramedProps) {
   const [isHovered, setIsHovered] = useState(false);
   const shouldTrack = enableInteractions && !staticMode && isHovered;
@@ -45,7 +60,9 @@ export const AvatarDisplayFramed = memo(function AvatarDisplayFramed({
 
   return (
     <div
-      className={`relative aspect-square overflow-hidden rounded-full border border-border/70 bg-background/80 shadow-[0_0_0_2px_rgba(255,255,255,0.45)] ${className ?? "w-[120px]"}`}
+      className={`relative aspect-square rounded-full bg-background ${
+        overflowHidden ? "overflow-hidden" : "overflow-visible"
+      } ${className ?? "w-[120px]"}`}
       role="img"
       aria-label="Avatar preview"
       onMouseEnter={staticMode ? undefined : () => setIsHovered(true)}
@@ -57,15 +74,17 @@ export const AvatarDisplayFramed = memo(function AvatarDisplayFramed({
           shouldCenter
             ? "translate-x-0 translate-y-0"
             : "translate-x-[14%] translate-y-[14%]"
-        }`}
+        } ${innerClassName ?? ""}`}
       >
         <AvatarDisplay
           config={config}
-          className="size-[250%]"
+          className={avatarClassName ?? "size-[250%]"}
           onDownloadRef={onDownloadRef}
           enableInteractions={enableInteractions}
           enableBlinking={shouldBlink}
           enableGazeTracking={shouldTrack}
+          backgroundScaleClassName={backgroundScaleClassName}
+          featureScaleClassName={featureScaleClassName}
         />
       </div>
     </div>

@@ -26,6 +26,10 @@ interface AvatarDisplayProps {
   enableBlinking?: boolean;
   /** Whether gaze tracking interaction is enabled */
   enableGazeTracking?: boolean;
+  /** Class name for avatar background SVG scale wrapper */
+  backgroundScaleClassName?: string;
+  /** Class name for avatar facial-features SVG scale wrapper */
+  featureScaleClassName?: string;
 }
 
 /** Canvas scale: 100 SVG user units span the 1024 export */
@@ -61,6 +65,8 @@ export function AvatarDisplay({
   enableInteractions = true,
   enableBlinking,
   enableGazeTracking,
+  backgroundScaleClassName,
+  featureScaleClassName,
 }: AvatarDisplayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lookAtRef = useRef({ x: 0, y: 0 });
@@ -303,7 +309,9 @@ export function AvatarDisplay({
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="xMidYMid meet"
-          className="h-[75%] w-[75%] overflow-visible"
+          className={
+            backgroundScaleClassName ?? "h-[75%] w-[75%] overflow-visible"
+          }
           aria-hidden
         >
           <defs>
@@ -380,7 +388,10 @@ export function AvatarDisplay({
       <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
         <svg
           viewBox="0 0 100 100"
-          className="h-[60%] w-[60%] [filter:drop-shadow(0_0_4px_rgba(255,255,255,0.55))]"
+          className={
+            featureScaleClassName ??
+            "h-[60%] w-[60%] [filter:drop-shadow(0_0_4px_rgba(255,255,255,0.55))]"
+          }
         >
           <g
             stroke="rgba(255, 255, 255, 0.65)"

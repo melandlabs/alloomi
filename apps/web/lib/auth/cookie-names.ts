@@ -24,8 +24,11 @@ export const AUTH_TOKEN_CLIENT_COOKIE = "cloud_auth_token_client";
  */
 export const AUTH_PAYLOAD_COOKIE = "cloud_auth_payload";
 
-/** Max age: 30 days in seconds */
-export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+/** Max age: configurable via AUTH_TOKEN_EXPIRY_SECONDS env var, default 90 days in seconds */
+export const AUTH_COOKIE_MAX_AGE = Number.parseInt(
+  process.env.AUTH_TOKEN_EXPIRY_SECONDS || "7776000",
+  10,
+);
 
 export const AUTH_TOKEN_OPTIONS = {
   httpOnly: true,

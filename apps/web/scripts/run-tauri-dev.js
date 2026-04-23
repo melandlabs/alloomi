@@ -34,7 +34,7 @@ async function main() {
   await run("pnpm", ["--filter", "web", "dev"], {
     ...env,
     NODE_OPTIONS: `--require ${path.join(scriptsDir, "patch-http-timeout.cjs")}`,
-    PORT: "3415",
+    PORT: "3515",
   });
 }
 

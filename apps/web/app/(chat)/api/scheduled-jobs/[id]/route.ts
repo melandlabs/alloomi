@@ -17,6 +17,7 @@ import {
 import { executeJob } from "@/lib/cron/executor";
 import { startJobExecution, completeJobExecution } from "@/lib/cron/service";
 import { isTauriMode } from "@/lib/env";
+import { AI_PROXY_BASE_URL } from "@/lib/env/constants";
 import type { JobExecutionContext } from "@/lib/cron/types";
 
 export const dynamic = "force-dynamic";
@@ -158,18 +159,11 @@ export async function POST(
         executionId: crypto.randomUUID(),
         triggeredBy: "manual" as const,
         ...(characterIdFromJob && { characterId: characterIdFromJob }),
+        modelConfig: {
+          baseUrl: AI_PROXY_BASE_URL,
+          ...(body.modelConfig || {}),
+        },
       };
-
-      // Get model config from request body (for using local API endpoint)
-      // Support both body.modelConfig and body.job.modelConfig
-      const modelConfig = body.modelConfig;
-      if (modelConfig) {
-        context.modelConfig = modelConfig;
-        console.log(
-          "[ScheduledJobs] Using modelConfig from request:",
-          context.modelConfig,
-        );
-      }
 
       await startJobExecution(context);
 
@@ -193,12 +187,7 @@ export async function POST(
       // Execute job asynchronously - don't wait for completion
       // This allows the UI to update immediately
       console.log("[ScheduledJobs] Starting async execution...");
-      executeJob(
-        context,
-        jobConfigStr,
-        job.description || undefined,
-        isTauriRequest, // Pass environment info
-      )
+      executeJob(context, jobConfigStr, job.description || undefined)
         .then(async (result) => {
           console.log(
             "[ScheduledJobs] Execution completed, updating database:",

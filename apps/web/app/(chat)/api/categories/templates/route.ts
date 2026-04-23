@@ -1,7 +1,7 @@
 import { auth } from "@/app/(auth)/auth";
 import { AppError } from "@alloomi/shared/errors";
 import { NextResponse } from "next/server";
-import { getDefaultCategoryTemplates } from "@/lib/config/default-categories";
+import { getDefaultCategoryTemplates } from "@/lib/types/categories";
 
 /**
  * GET /api/categories/templates

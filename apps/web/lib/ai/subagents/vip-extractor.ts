@@ -227,7 +227,7 @@ Based on the communication patterns, importance, and relationships shown in thes
 
   // Initial generation
   const response = await generateText({
-    model: modelProvider.languageModel("chat-model"),
+    model: modelProvider().languageModel("chat-model"),
     messages: conversation,
     maxRetries: 5,
   });
@@ -275,7 +275,7 @@ Requirements:
     conversation.push({ role: "user", content: repairPrompt });
 
     const repairResponse = await generateText({
-      model: modelProvider.languageModel("chat-model"),
+      model: modelProvider().languageModel("chat-model"),
       messages: conversation,
     });
 

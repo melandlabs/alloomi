@@ -4,7 +4,7 @@ import {
   estimateConversationTokens,
   getConversationBucket,
   prepareConversationWindows,
-} from "../../../../packages/agent/src/ai/conversation-windows";
+} from "@alloomi/ai/agent/context";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;

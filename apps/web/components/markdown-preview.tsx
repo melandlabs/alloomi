@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { RemixIcon } from "@/components/remix-icon";
-import { Button } from "./ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { toast } from "sonner";
 import { revealItemInDir, openPathCustom, openUrl } from "@/lib/tauri";
 import { CodePreview } from "./artifacts/code-preview";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
+import { FilePreviewDrawerRichTextToolbar } from "@/components/file-preview-drawer-rich-text-toolbar";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 // Directly import remark-gfm to bypass Turbopack dynamic import issue
 import remarkGfm from "remark-gfm";
@@ -20,6 +20,9 @@ export interface MarkdownPreviewProps {
   className?: string;
 }
 
+/**
+ * Markdown preview drawer: top bar shares FilePreviewDrawerHeader with WebsitePreview / library list cards.
+ */
 export function MarkdownPreview({
   content,
   filename = "document.md",
@@ -27,6 +30,7 @@ export function MarkdownPreview({
   onClose,
   className,
 }: MarkdownPreviewProps) {
+  const { t } = useTranslation();
   const remarkPlugins = [remarkGfm];
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
@@ -68,151 +72,34 @@ export function MarkdownPreview({
 
   return (
     <div
-      className={cn("bg-background flex h-full flex-col z-[1000]", className)}
+      className={cn(
+        "bg-background flex h-full min-h-0 flex-col z-[1000]",
+        className,
+      )}
     >
-      {/* Header */}
-      <div className="border-border/50 bg-muted/30 flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-foreground truncate text-sm font-medium">
-            {filename}
-          </span>
-          <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase">
-            Markdown
-          </span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {/* View Mode Toggle */}
-          <div className="bg-muted mr-2 flex items-center gap-1 rounded-lg p-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("preview")}
-                  className={cn(
-                    "h-7 px-2",
-                    viewMode === "preview"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <RemixIcon name="eye" size="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Preview</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("code")}
-                  className={cn(
-                    "h-7 px-2",
-                    viewMode === "code"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <RemixIcon name="code" size="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>View Code</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-
-          {/* Show in Folder */}
-          {filePath && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleShowInFolder}
-                  className="size-8"
-                >
-                  <RemixIcon name="folder_open" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Show in Folder</p>
-              </TooltipContent>
-            </Tooltip>
+      <FilePreviewDrawerHeader fileName={filename}>
+        <FilePreviewDrawerRichTextToolbar
+          format="markdown"
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          filePath={filePath}
+          onClose={onClose}
+          copied={copied}
+          onCopy={handleCopy}
+          onRevealInFolder={
+            filePath ? () => void handleShowInFolder() : undefined
+          }
+          showOpenExternal={Boolean(filePath)}
+          onOpenExternal={() => void handleOpenWithDefaultApp()}
+          openExternalTooltip={t(
+            "common.filePreview.openWithDefaultApp",
+            "Open with Default App",
           )}
-
-          {/* Open with Default App */}
-          {filePath && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleOpenWithDefaultApp}
-                  className="size-8"
-                >
-                  <RemixIcon name="external_link" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Open with Default App</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* Copy */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopy}
-                className="size-8"
-              >
-                {copied ? (
-                  <RemixIcon
-                    name="check"
-                    size="size-4"
-                    className="text-emerald-500"
-                  />
-                ) : (
-                  <RemixIcon name="file_copy" size="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{copied ? "Copied!" : "Copy Markdown"}</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Close */}
-          {onClose && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="size-8"
-                >
-                  <RemixIcon name="close" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Close</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      </div>
+        />
+      </FilePreviewDrawerHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {viewMode === "preview" ? (
           <div className="bg-background h-full overflow-auto p-6 text-sm leading-relaxed">
             <ReactMarkdown

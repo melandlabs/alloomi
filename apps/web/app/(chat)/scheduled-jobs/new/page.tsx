@@ -12,7 +12,7 @@ import {
   type NovelInstructionEditorRef,
 } from "@/components/novel-instruction-editor";
 import "@/i18n";
-import { TwoPaneSidebarLayout } from "@/components/layout/two-pane-sidebar-layout";
+import { TwoPaneSidebarLayout } from "@/components/layout/two-panel-sidebar-layout";
 import { DatePicker } from "@alloomi/ui";
 import { TimePicker } from "@alloomi/ui";
 import { MultiCombobox } from "@alloomi/ui";
@@ -34,19 +34,21 @@ type CronScheduleSelectValue =
   | "weekly"
   | "monthly"
   | "cron"
-  | "interval"
+  | "interval-hours"
+  | "interval-minutes"
   | "once";
 
 interface EditFormState {
   name: string;
   description: string;
-  scheduleType: "cron" | "interval" | "once";
+  scheduleType: "cron" | "interval-hours" | "interval-minutes" | "once";
   cronExpression: string;
   cronPreset: CronPreset;
   cronTime: string;
   cronWeekdays: string[];
   cronMonthDays: string[];
   intervalMinutes: number;
+  intervalHours: number;
   scheduledAt: string;
   selectedModel: ModelType;
   enabled: boolean;
@@ -183,13 +185,14 @@ export default function ScheduledJobCreatePage() {
   const [form, setForm] = useState<EditFormState>({
     name: "",
     description: "",
-    scheduleType: "interval",
+    scheduleType: "interval-minutes",
     cronExpression: "0 * * * *",
     cronPreset: "custom",
     cronTime: "00:00",
     cronWeekdays: getDefaultCronWeekdays(),
     cronMonthDays: getDefaultCronMonthDays(),
     intervalMinutes: 60,
+    intervalHours: 1,
     scheduledAt: "",
     selectedModel: "default",
     enabled: true,
@@ -291,9 +294,14 @@ export default function ScheduledJobCreatePage() {
               expression: computedCronExpression,
               timezone: userTz,
             }
-          : form.scheduleType === "interval"
-            ? { type: "interval" as const, minutes: form.intervalMinutes }
-            : { type: "once" as const, at: new Date(form.scheduledAt) };
+          : form.scheduleType === "interval-hours"
+            ? { type: "interval-hours" as const, hours: form.intervalHours }
+            : form.scheduleType === "interval-minutes"
+              ? {
+                  type: "interval-minutes" as const,
+                  minutes: form.intervalMinutes,
+                }
+              : { type: "once" as const, at: new Date(form.scheduledAt) };
 
       const cloudAuthToken = getAuthToken() || undefined;
       const modelConfig =
@@ -590,8 +598,22 @@ export default function ScheduledJobCreatePage() {
                         setForm((prev) => {
                           const nextCronTime = prev.cronTime || "00:00";
 
-                          if (value === "interval") {
-                            return { ...prev, scheduleType: "interval" };
+                          if (value === "interval-hours") {
+                            return {
+                              ...prev,
+                              scheduleType: "interval-hours",
+                              intervalHours: 1,
+                              intervalMinutes: 0,
+                            };
+                          }
+
+                          if (value === "interval-minutes") {
+                            return {
+                              ...prev,
+                              scheduleType: "interval-minutes",
+                              intervalHours: 0,
+                              intervalMinutes: 60,
+                            };
                           }
 
                           if (value === "once") {
@@ -698,7 +720,13 @@ export default function ScheduledJobCreatePage() {
                             "Monthly",
                           )}
                         </SelectItem>
-                        <SelectItem value="interval">
+                        <SelectItem value="interval-hours">
+                          {t(
+                            "agent.panels.scheduledJobsPanel.intervalHoursOption",
+                            "Interval (hours)",
+                          )}
+                        </SelectItem>
+                        <SelectItem value="interval-minutes">
                           {t(
                             "agent.panels.scheduledJobsPanel.intervalMinutes",
                             "Interval (minutes)",
@@ -1006,16 +1034,45 @@ export default function ScheduledJobCreatePage() {
                       </div>
                     )}
 
-                  {form.scheduleType === "interval" && (
+                  {form.scheduleType === "interval-hours" && (
                     <div className="w-[220px] shrink-0 space-y-1">
-                      <Label className="sr-only" htmlFor="job-interval">
+                      <Label className="sr-only" htmlFor="job-interval-hours">
                         {t(
-                          "agent.panels.scheduledJobsPanel.intervalMinutes",
-                          "Interval (minutes)",
+                          "agent.panels.scheduledJobsPanel.intervalHours",
+                          "Hours",
                         )}
                       </Label>
                       <Input
-                        id="job-interval"
+                        id="job-interval-hours"
+                        type="number"
+                        min={1}
+                        value={form.intervalHours}
+                        onChange={(event) => {
+                          const next =
+                            Number.parseInt(event.target.value, 10) || 1;
+                          setForm((prev) => ({
+                            ...prev,
+                            intervalHours: next,
+                          }));
+                        }}
+                        placeholder={t(
+                          "agent.panels.scheduledJobsPanel.intervalHours",
+                          "Hours",
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  {form.scheduleType === "interval-minutes" && (
+                    <div className="w-[220px] shrink-0 space-y-1">
+                      <Label className="sr-only" htmlFor="job-interval-minutes">
+                        {t(
+                          "agent.panels.scheduledJobsPanel.intervalMinutes",
+                          "Minutes",
+                        )}
+                      </Label>
+                      <Input
+                        id="job-interval-minutes"
                         type="number"
                         min={1}
                         value={form.intervalMinutes}
@@ -1029,7 +1086,7 @@ export default function ScheduledJobCreatePage() {
                         }}
                         placeholder={t(
                           "agent.panels.scheduledJobsPanel.intervalMinutes",
-                          "Interval (minutes)",
+                          "Minutes",
                         )}
                       />
                     </div>

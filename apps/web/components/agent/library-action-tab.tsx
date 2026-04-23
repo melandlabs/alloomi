@@ -56,7 +56,7 @@ export interface LibraryActionTabProps {
 }
 
 /**
- * Library Action Tab: Action item list, supports no grouping/group by time/group by event, unified layout with Stuff
+ * Library Action Tab: action item list, supports no grouping/group by time/group by event, unified layout with Stuff
  */
 export function LibraryActionTab({
   searchParams,

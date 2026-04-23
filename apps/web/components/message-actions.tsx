@@ -3,6 +3,8 @@ import { useCopyToClipboard } from "usehooks-ts";
 import { useMemo, useState, useEffect } from "react";
 
 import type { Vote } from "@/lib/db/schema";
+import { format } from "date-fns";
+import { zhCN, enUS } from "date-fns/locale";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { memo } from "react";
@@ -128,8 +130,27 @@ export function PureMessageActions({
     setLocalVote(vote);
   }, [vote]);
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { insightData } = useInsightPagination();
+
+  // Extract message timestamp for inline display
+  const messageTimestamp = useMemo(() => {
+    const msgAny = message as {
+      createdAt?: string | number | Date;
+      timestamp?: string | number | Date;
+    };
+    const raw = msgAny.createdAt ?? msgAny.timestamp;
+    if (raw != null && !Number.isNaN(new Date(raw).getTime())) {
+      return new Date(raw);
+    }
+    return new Date();
+  }, [message]);
+
+  // Format message time for inline display
+  const formattedMessageTime = useMemo(() => {
+    const locale = i18n.language.startsWith("zh") ? zhCN : enUS;
+    return format(messageTimestamp, "MMM d, h:mm a", { locale });
+  }, [messageTimestamp, i18n.language]);
 
   /**
    * Extract cited Insight platform info from message
@@ -220,11 +241,11 @@ export function PureMessageActions({
     });
   })();
 
-  if (isLoading) return <div className="h-2" />;
-  if (message.role === "user") return <div className="h-2" />;
-  if (message.metadata?.disableAction) return <div className="h-2" />;
+  if (isLoading) return <div className="h-7 w-full" />;
+  if (message.role === "user") return <div className="h-7 w-full" />;
+  if (message.metadata?.disableAction) return <div className="h-7 w-full" />;
   // Only show action buttons when there is actual content
-  if (!hasActualContent) return <div className="h-2" />;
+  if (!hasActualContent) return <div className="h-7 w-full" />;
 
   return (
     <div className="relative flex flex-row gap-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
@@ -425,6 +446,10 @@ export function PureMessageActions({
           <TooltipContent>{t("common.sources")}</TooltipContent>
         </Tooltip>
       )}
+      {/* Time display on the right side for assistant messages */}
+      <span className="flex items-center text-xs text-muted-foreground/60 ml-1">
+        {formattedMessageTime}
+      </span>
     </div>
   );
 }

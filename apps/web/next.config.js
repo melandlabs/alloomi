@@ -22,20 +22,20 @@ const nextConfig = {
     "@alloomi/shared",
     "@alloomi/indexeddb",
     "@alloomi/insights",
-    "@alloomi/agent",
+    "@alloomi/ai",
     "@alloomi/integrations",
     "@alloomi/hooks",
     "@alloomi/mcp",
     "@alloomi/rss",
     "@alloomi/search",
     "@alloomi/search/brave",
-    "@alloomi/agent/sandbox",
-    "@alloomi/agent/sandbox/types",
-    "@alloomi/agent/sandbox/plugin",
-    "@alloomi/agent/sandbox/registry",
-    "@alloomi/agent/sandbox/providers/native",
-    "@alloomi/agent/sandbox/providers/claude",
-    "@alloomi/agent/sandbox/providers/vercel",
+    "@alloomi/ai/agent/sandbox",
+    "@alloomi/ai/agent/sandbox/types",
+    "@alloomi/ai/agent/sandbox/plugin",
+    "@alloomi/ai/agent/sandbox/registry",
+    "@alloomi/ai/agent/sandbox/providers/native",
+    "@alloomi/ai/agent/sandbox/providers/claude",
+    "@alloomi/ai/agent/sandbox/providers/vercel",
   ],
 
   // Output mode: Tauri production builds need standalone mode to support API routes
@@ -103,6 +103,10 @@ const nextConfig = {
     "@wasm-audio-decoders/flac",
     "@eshaz/web-worker",
     "@eshaz/web-core",
+    // ioredis-mock uses fengari (Lua interpreter) which requires dynamic imports
+    "ioredis-mock",
+    "fengari",
+    "fengari-web",
   ],
 
   // Experimental features - performance improvements
@@ -282,7 +286,7 @@ const securityHeaders = [
   {
     key: "Content-Security-Policy",
     value:
-      "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' tauri:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http: blob:; font-src 'self' data:; connect-src 'self' https: http: wss: tauri: ipca:; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
+      "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' tauri: https://d3js.org https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; img-src 'self' data: https: http: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: http: wss: tauri: ipca: https://unpkg.com https://cdn.tailwindcss.com https://fonts.googleapis.com; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
   },
 ];
 

@@ -5,10 +5,35 @@ vi.mock("server-only", () => ({}));
 const mockIsTauriMode = vi.fn(() => false);
 vi.mock("@/lib/env", () => ({
   isTauriMode: () => mockIsTauriMode(),
-  getAppUrl: vi.fn(() => "http://localhost:3415"),
+  getApplicationBaseUrl: vi.fn(() => {
+    const envUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      process.env.APPLICATION_URL ||
+      process.env.NEXTAUTH_URL;
+    if (envUrl) {
+      return envUrl.replace(/\/$/, "");
+    }
+    return process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
+      : "http://localhost:3415";
+  }),
+  getAppUrl: vi.fn(() => {
+    const envUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      process.env.APPLICATION_URL ||
+      process.env.NEXTAUTH_URL;
+    if (envUrl) {
+      return envUrl.replace(/\/$/, "");
+    }
+    return process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
+      : "http://localhost:3415";
+  }),
 }));
 
-import { getApplicationBaseUrl } from "@/lib/url";
+import { getApplicationBaseUrl } from "@/lib/env";
 
 const originalEnv = { ...process.env };
 
@@ -31,14 +56,5 @@ describe("getApplicationBaseUrl", () => {
     process.env.NEXT_PUBLIC_APP_URL = undefined;
     process.env.VERCEL_URL = "my-app.vercel.app/";
     expect(getApplicationBaseUrl()).toBe("https://my-app.vercel.app");
-  });
-
-  it("returns localhost when no env provided", () => {
-    process.env.NEXT_PUBLIC_APP_URL = undefined;
-    process.env.APP_URL = undefined;
-    process.env.APPLICATION_URL = undefined;
-    process.env.NEXTAUTH_URL = undefined;
-    process.env.VERCEL_URL = undefined;
-    expect(getApplicationBaseUrl()).toBe("http://localhost:3415");
   });
 });

@@ -14,7 +14,7 @@ import {
 import { Button, Input, Label } from "@alloomi/ui";
 import { toast } from "@/components/toast";
 import { openUrl, isTauri } from "@/lib/tauri";
-import { getStoredAuthToken } from "@/lib/api/remote-client";
+import { getStoredAuthToken } from "@/lib/auth/remote-client";
 
 /**
  * Unified API call function
@@ -203,10 +203,9 @@ export function CreditsTopUpDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="p-8 sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <RemixIcon name="credit_card" size="size-5" />
+          <DialogTitle className="text-2xl">
             {t("common.creditsTopUp.topUpTitle")}
           </DialogTitle>
           <DialogDescription>

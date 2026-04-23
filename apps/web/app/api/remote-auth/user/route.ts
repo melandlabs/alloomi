@@ -16,7 +16,7 @@ import {
   createErrorResponse,
 } from "@/lib/auth/remote-auth-utils";
 
-import { createCloudClientForRequest } from "@/lib/api/remote-client";
+import { createCloudClientForRequest } from "@/lib/auth/remote-client";
 import { isTauriMode } from "@/lib/env/constants";
 
 export async function GET(request: NextRequest) {

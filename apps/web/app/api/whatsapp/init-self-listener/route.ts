@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { initWhatsAppSelfMessageListener } from "@/lib/whatsapp/init";
+import { initWhatsAppSelfMessageListener } from "@/lib/integrations/whatsapp/init";
 import { auth } from "@/app/(auth)/auth";
 
 /**

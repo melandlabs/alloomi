@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { auth } from "@/app/(auth)/auth";
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
 import { isTauriMode } from "@/lib/env/constants";
 
 const DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";

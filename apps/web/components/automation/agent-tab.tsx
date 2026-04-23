@@ -231,7 +231,7 @@ export const AgentTab = forwardRef<AgentTabRef>(function AgentTab(_, ref) {
                     className="text-[#6B7280]"
                   />
                   <h3 className="font-medium text-[#1F2937] text-sm">
-                    {t("agent.panels.agentPanel.soul", "Soul")}
+                    {t("agent.panels.agentPanel.description", "Description")}
                   </h3>
                 </div>
                 <div className="space-y-2">

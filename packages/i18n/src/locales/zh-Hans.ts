@@ -52,6 +52,7 @@ const zhHans = {
     downvoteResponse: "不喜欢",
     sources: "来源",
     noSources: "暂无引用来源",
+    temporary: "临时",
     previewImage: "预览图片",
     preview: "预览",
     pin: "置顶",
@@ -75,6 +76,8 @@ const zhHans = {
     end: "结束",
     loginAccount: "登录您的帐户",
     signOut: "退出登录",
+    logoutConfirmTitle: "确认退出登录？",
+    logoutConfirmDescription: "退出后需要重新登录才能继续使用。",
     operationFailed: "操作失败",
     backHome: "返回首页",
     scrollToTop: "回到顶部",
@@ -1781,6 +1784,17 @@ const zhHans = {
       "建议刷新当前页面，以确保飞书监听与集成状态已完全生效",
     feishuConnectRestartConfirm: "知道了",
     feishuAppIdSecretRequired: "请填写 App ID 和 App Secret",
+    feishuScanDescription: "使用手机飞书或 Lark 扫描下方二维码，按提示确认即可",
+    feishuScanPreparing: "正在向飞书申请二维码…",
+    feishuScanWaiting: "等待你在飞书中确认…",
+    feishuScanDenied: "你已在飞书中拒绝授权。",
+    feishuScanExpired: "扫码会话已过期，请关闭后重试。",
+    feishuScanSessionLost: "会话已失效，请关闭窗口后重新打开飞书连接。",
+    feishuScanUnavailable:
+      "当前环境不支持一键扫码创建应用（飞书未开放 client_secret 设备码注册或网络异常），可展开手动填写凭证。",
+    feishuUserCodeHint: "若页面要求输入验证码：",
+    feishuManualEntryTitle: "手动填写凭证",
+    feishuHideManual: "收起手动填写",
     feishuBotDescription: "通过飞书与 Alloomi 对话",
     feishuStepsLink: "接入步骤",
     feishuStepsSection1Title: "一、创建飞书应用并获取凭证",
@@ -2608,6 +2622,17 @@ const zhHans = {
     syncTopicsSuccess: "成功同步 {{count}} 个关注话题到策略记忆",
     syncTopicsFailed: "同步到策略记忆失败",
   },
+  passwordInput: {
+    title: "需要 sudo 密码",
+    instructions: "请在下方输入密码（输入内容隐藏），或者：",
+    optionSkip: "按回车键跳过（命令将失败）",
+    optionTimeout: "等待 {countdown} 秒后自动跳过",
+    passwordLabel: "密码（隐藏）：",
+    placeholder: "输入密码...",
+    cancel: "取消",
+    submit: "提交",
+    command: "命令：",
+  },
   securityPrompt: {
     title: "连接 Telegram",
     description: "授权我们访问您的 Telegram 账户、收发消息、查看频道和成员信息",
@@ -2968,6 +2993,7 @@ const zhHans = {
     fileSourceWorkspace: "空间内",
     /** Status of pending upload file card */
     uploading: "上传中",
+    sendMessageFailed: "消息发送失败，请稍后重试",
   },
   files: {
     title: "已保存文件",
@@ -3333,12 +3359,14 @@ const zhHans = {
     allCharacters: "所有角色",
     notificationChannels: "通知渠道",
     selectChannels: "选择通知渠道...",
+    systemNotification: "系统通知",
+    systemNotificationDescription: "任务完成时弹出桌面通知",
   },
   templateCharacter: {
     aiProductIntelligence: {
       name: "AI 产品日报",
       description:
-        "每天早上 9 点：抓取 X/Twitter、Reddit 和 Product Hunt 上的 AI 产品新闻，整理成简报，并使用前端设计技能更新 HTML 仪表盘。",
+        "抓取 X/Twitter、Reddit 和 Product Hunt 上的 AI 产品新闻，整理成简报，并使用前端设计技能更新 HTML 仪表盘。",
       insightTitle: "AI 产品日报",
       insightDescription: "每日 AI 产品新闻简报",
     },
@@ -3357,11 +3385,12 @@ const zhHans = {
       insightDescription: "监控邮件并在条件满足时触发自动回复",
     },
     contextAtlas: {
-      name: "上下文图谱",
+      name: "关系发现助手",
       description:
-        "持续分析收集的内容和事件，自动提取人物、公司、主题等实体及其关系，构建可视化知识图谱。帮助用户发现信息之间的隐藏关联，支持基于 GraphRAG 的上下文检索。使用前端设计技能构建交互式看板，将所有图谱数据嵌入单个 HTML 文件中，无需额外文件。",
-      insightTitle: "上下文图谱",
-      insightDescription: "带实体关系的知识图谱看板",
+        "持续分析我的集成收到的内容和事件，自动提取人物、公司、主题等实体及其关系，构建可视化知识图谱。帮助用户发现信息之间的隐藏关联，支持基于 GraphRAG 的上下文检索。使用前端设计技能构建交互式看板，将所有图谱数据嵌入单个 HTML 文件中，无需额外文件。",
+      insightTitle: "关系发现",
+      insightDescription:
+        "从信息中提取人物、公司、主题关系，生成可视化关系网络",
     },
     xAutomation: {
       name: "X 自动化",

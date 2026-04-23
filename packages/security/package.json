@@ -1,7 +1,7 @@
 {
   "name": "@alloomi/security",
-  "version": "0.4.1",
-  "private": false,
+  "version": "0.4.3",
+  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

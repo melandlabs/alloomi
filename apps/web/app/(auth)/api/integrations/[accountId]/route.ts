@@ -22,11 +22,11 @@ import {
 } from "@/lib/db/queries";
 import { integrationAccounts } from "@/lib/db/schema";
 import { AppError } from "@alloomi/shared/errors";
-import { WhatsAppAdapter } from "@/lib/integration/sources/whatsapp";
-import { WhatsAppBaileysAuthState } from "@/lib/integration/sources/whatsapp-auth-state";
+import { WhatsAppAdapter } from "@/lib/integrations/whatsapp";
+import { WhatsAppBaileysAuthState } from "@/lib/integrations/whatsapp/whatsapp-auth-state";
 import { isTauriMode } from "@/lib/env/constants";
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
-import { authenticateCloudRequest } from "@/lib/api/cloud-auth";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
+import { authenticateCloudRequest } from "@/lib/auth/cloud-auth";
 import { withRateLimit, RateLimitPresets } from "@/lib/rate-limit/middleware";
 
 const UpdateIntegrationSchema = z.object({

@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 - Recipient's language: ${language}
 
 For EACH reply option, you MUST generate THREE fields:
-1. "label": Short action label in ${userLanguage} only (e.g., "确认安排", "询问细节")
+1. "label": Short action label in ${userLanguage} only (e.g., "Confirm Schedule", "Ask Details")
 2. "draft": Actual reply text in ${language} (recipient's language) - THIS IS WHAT GETS SENT
 3. "userLanguageDraft": Translation in ${userLanguage} (for user reference only)
 
@@ -185,7 +185,7 @@ OUTPUT REQUIREMENTS:
       "framework_type": "ACT",
       "label": "Confirm Attendance",
       "draft": "I'll be there",
-      "userLanguageDraft": "我会参加",
+      "userLanguageDraft": "I will attend",
       "confidence_score": 0.25,
       "is_primary": false
     },
@@ -193,7 +193,7 @@ OUTPUT REQUIREMENTS:
       "framework_type": "ASK",
       "label": "Ask Details",
       "draft": "Thanks for the invite! Could you share the time and location?",
-      "userLanguageDraft": "谢谢邀请！能告诉我时间和地点吗？",
+      "userLanguageDraft": "Thanks for the invite! Can you tell me the time and location?",
       "confidence_score": 0.85,
       "is_primary": true
     },
@@ -201,7 +201,7 @@ OUTPUT REQUIREMENTS:
       "framework_type": "ALTER",
       "label": "Request Reschedule",
       "draft": "I might need to check my schedule",
-      "userLanguageDraft": "我可能需要查看一下日程",
+      "userLanguageDraft": "I may need to check my schedule",
       "confidence_score": 0.15,
       "is_primary": false
     }

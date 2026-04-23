@@ -613,7 +613,7 @@ export function SavedFiles() {
                 size="sm"
                 className="bg-amber-600 text-white hover:bg-amber-700"
               >
-                <Link href="/">{t("files.loginCTA", "Sign in")}</Link>
+                <Link href="/login">{t("files.loginCTA", "Sign in")}</Link>
               </Button>
             </div>
           </CardContent>

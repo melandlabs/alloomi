@@ -13,6 +13,7 @@ import useSWR from "swr";
 import { useTranslation } from "react-i18next";
 import TurndownService from "turndown";
 import { cn, fetcher } from "@/lib/utils";
+import { toast } from "sonner";
 import { buildRefMarker } from "@alloomi/shared/ref";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Node as TiptapNode } from "@tiptap/core";
@@ -60,6 +61,12 @@ type SkillItem = {
   argumentHint?: string;
 };
 
+type SourceBadgeInput = {
+  id: string;
+  label: string;
+  kind?: "file" | "folder";
+};
+
 /**
  * Inline renderer for event/skill tokens:
  * - event: [[ref:event:id|title]] (optionally followed by spaces)
@@ -72,6 +79,7 @@ function renderInlineBadges(
   skillNameById: Record<string, string>,
 ): string {
   const eventRe = /\[\[ref:event:([^\]]*)\]\]\s*/g;
+  const sourceRe = /\[\[ref:(file|folder):([^\]|]+)\|([^\]]+)\]\]\s*/g;
   // Skill token might lose trailing whitespace when persisted/trimmed.
   // Also sometimes tokens can be adjacent like `/id1/id2`, so we allow `/`
   // as a valid delimiter after the skill id.
@@ -82,22 +90,33 @@ function renderInlineBadges(
 
   let eMatch = eventRe.exec(text);
   let sMatch = skillRe.exec(text);
+  let fMatch = sourceRe.exec(text);
 
   const pushEscaped = (chunk: string) => {
     if (!chunk) return;
     parts.push(escapeHtml(chunk));
   };
 
-  while (eMatch || sMatch) {
-    const nextIsEvent = !!eMatch && (!sMatch || eMatch.index <= sMatch.index);
-    const match = nextIsEvent ? eMatch : sMatch;
+  while (eMatch || sMatch || fMatch) {
+    const eventIndex = eMatch ? eMatch.index : Number.POSITIVE_INFINITY;
+    const skillIndex = sMatch ? sMatch.index : Number.POSITIVE_INFINITY;
+    const sourceIndex = fMatch ? fMatch.index : Number.POSITIVE_INFINITY;
+    const earliest = Math.min(eventIndex, skillIndex, sourceIndex);
+    const nextType =
+      earliest === eventIndex
+        ? "event"
+        : earliest === sourceIndex
+          ? "source"
+          : "skill";
+    const match =
+      nextType === "event" ? eMatch : nextType === "source" ? fMatch : sMatch;
     if (!match) break;
 
     if (match.index > cursor) {
       pushEscaped(text.slice(cursor, match.index));
     }
 
-    if (nextIsEvent) {
+    if (nextType === "event") {
       const full = match[0] ?? "";
       const label = match[1] ?? "";
       const [idRaw, ...rest] = label.split("|");
@@ -112,6 +131,25 @@ function renderInlineBadges(
           marker,
         )}" class="inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] min-w-0 mr-1 overflow-hidden group" contenteditable="false"><i class="ri-radar-line"></i><span class="flex-1 min-w-0 truncate whitespace-nowrap">${escapeHtml(
           title,
+        )}</span><button type="button" data-badge-remove="true" data-badge-marker="${escapeHtmlAttribute(
+          marker,
+        )}" aria-label="Remove" class="ml-0 inline-flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded-[4px] text-[12px] leading-none text-muted-foreground/70 hover:text-foreground hover:bg-border/70 opacity-0 group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 transition-all">x</button></span>`,
+      );
+    } else if (nextType === "source") {
+      const full = match[0] ?? "";
+      const sourceKind = ((match[1] as string) ?? "file").trim();
+      const sourceId = ((match[2] as string) ?? "").trim();
+      const sourceLabel = ((match[3] as string) ?? sourceId).trim();
+      const marker = full.trimEnd();
+      parts.push(
+        `<span data-badge-kind="${escapeHtmlAttribute(
+          sourceKind,
+        )}" data-badge-id="${escapeHtmlAttribute(
+          sourceId,
+        )}" data-badge-label="${escapeHtmlAttribute(sourceLabel)}" data-badge-marker="${escapeHtmlAttribute(
+          marker,
+        )}" class="inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] min-w-0 mr-1 overflow-hidden group" contenteditable="false"><i class="${sourceKind === "folder" ? "ri-folder-line" : "ri-file-line"}"></i><span class="flex-1 min-w-0 truncate whitespace-nowrap">${escapeHtml(
+          sourceLabel,
         )}</span><button type="button" data-badge-remove="true" data-badge-marker="${escapeHtmlAttribute(
           marker,
         )}" aria-label="Remove" class="ml-0 inline-flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded-[4px] text-[12px] leading-none text-muted-foreground/70 hover:text-foreground hover:bg-border/70 opacity-0 group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 transition-all">x</button></span>`,
@@ -140,8 +178,10 @@ function renderInlineBadges(
     }
 
     cursor = match.index + match[0].length;
-    if (nextIsEvent) {
+    if (nextType === "event") {
       eMatch = eventRe.exec(text);
+    } else if (nextType === "source") {
+      fMatch = sourceRe.exec(text);
     } else {
       sMatch = skillRe.exec(text);
     }
@@ -166,7 +206,7 @@ function markdownToBasicHtml(
   markdown: string,
   skillNameById: Record<string, string>,
 ): string {
-  if (!markdown.trim()) return "<p><br /></p>";
+  if (!markdown.trim()) return "";
 
   // Parse line by line, avoid missing #/## headings that appear in the middle of double-newline-separated blocks.
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
@@ -238,7 +278,7 @@ function markdownToBasicHtml(
 
   flushParagraph(paragraphBuffer);
 
-  return htmlParts.length > 0 ? htmlParts.join("\n") : "<p><br /></p>";
+  return htmlParts.length > 0 ? htmlParts.join("\n") : "";
 }
 
 /**
@@ -253,7 +293,7 @@ function htmlToMarkdown(html: string, turndown: TurndownService): string {
   // whitespace after tokens (e.g. `/skill-xxx\\s`).
   return raw
     .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n{2,}/g, "\n\n")
     .replace(/^\n+/, "")
     .replace(/\n+$/, "");
 }
@@ -320,7 +360,16 @@ const RefBadgeNode = TiptapNode.create({
       // Left icon
       [
         "i",
-        { class: kind === "event" ? "ri-radar-line" : "ri-apps-2-ai-line" },
+        {
+          class:
+            kind === "event"
+              ? "ri-radar-line"
+              : kind === "file"
+                ? "ri-file-line"
+                : kind === "folder"
+                  ? "ri-folder-line"
+                  : "ri-apps-2-ai-line",
+        },
       ],
       // Text area truncation: no wrap, truncate and ellipsis when exceeding max width
       ["span", { class: "flex-1 min-w-0 truncate whitespace-nowrap" }, label],
@@ -352,9 +401,20 @@ interface NovelInstructionEditorProps {
   placeholder?: string;
   disabled?: boolean;
   /**
-   * Whether to show "Add Event / Add Skill" buttons for inserting inline badges.
+   * Whether to show "Add event/Add skill" buttons for inserting inline badges.
    */
   showSkillEventButtons?: boolean;
+  /**
+   * Callback for drag-and-drop file upload.
+   */
+  onFileDrop?: (files: File[]) => void | Promise<void>;
+  /**
+   * Callback for drag-and-drop folder.
+   */
+  onFolderDrop?: (
+    folderPath: string,
+    folderName: string,
+  ) => void | Promise<void>;
 }
 
 export type NovelInstructionEditorRef = {
@@ -368,6 +428,10 @@ export type NovelInstructionEditorRef = {
    * Prioritizes saving current cursor selection to ensure badge is inserted at the correct position.
    */
   openSkillPicker: () => void;
+  /**
+   * Inserts a file/folder badge at current cursor position.
+   */
+  insertSourceBadge: (source: SourceBadgeInput) => void;
 };
 
 /**
@@ -386,6 +450,8 @@ export const NovelInstructionEditor = forwardRef<
     placeholder = "Write some instructions (Markdown supported)...",
     disabled = false,
     showSkillEventButtons = false,
+    onFileDrop,
+    onFolderDrop,
   }: NovelInstructionEditorProps,
   ref,
 ) {
@@ -397,7 +463,7 @@ export const NovelInstructionEditor = forwardRef<
    * would otherwise keep the old badge markup because we intentionally skip
    * `setContent` when value hasn't changed.
    */
-  const BADGE_RENDER_VERSION = 9;
+  const BADGE_RENDER_VERSION = 10;
   // turndown instance is stable to avoid rule re-registration
   const turndown = useMemo(() => {
     const svc = new TurndownService({
@@ -431,6 +497,7 @@ export const NovelInstructionEditor = forwardRef<
 
   const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
   const [isEventPickerOpen, setIsEventPickerOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [skillQuery, setSkillQuery] = useState("");
 
   const [eventQuery, setEventQuery] = useState("");
@@ -540,6 +607,7 @@ export const NovelInstructionEditor = forwardRef<
       }),
       Placeholder.configure({
         placeholder,
+        showOnlyCurrent: false,
         emptyEditorClass:
           "before:content-[attr(data-placeholder)] before:text-muted-foreground before:float-left before:pointer-events-none before:h-0",
       }),
@@ -694,15 +762,6 @@ export const NovelInstructionEditor = forwardRef<
     setIsSkillPickerOpen(true);
   }, [disabled, editor, saveSelection]);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      openEventPicker,
-      openSkillPicker,
-    }),
-    [openEventPicker, openSkillPicker],
-  );
-
   /**
    * Insert an event badge at the current cursor position.
    */
@@ -764,6 +823,55 @@ export const NovelInstructionEditor = forwardRef<
   );
 
   /**
+   * Insert a file/folder badge at the current cursor position.
+   */
+  const insertSourceBadge = useCallback(
+    (source: SourceBadgeInput) => {
+      if (!editor) return;
+      const sourceKind = source.kind ?? "file";
+      const marker = `[[ref:${sourceKind}:${source.id}|${source.label}]]`;
+
+      // Determine the insertion position
+      let pos: number;
+      if (lastSelectionRef.current) {
+        pos = lastSelectionRef.current.from;
+      } else {
+        pos = editor.state.doc.content.size;
+        if (pos === 0) pos = 1;
+      }
+
+      // First focus the editor
+      editor.commands.focus();
+
+      // Then set selection and insert
+      editor
+        .chain()
+        .setTextSelection(pos)
+        .insertContent({
+          type: "refBadge",
+          attrs: {
+            kind: sourceKind,
+            id: source.id,
+            label: source.label,
+            marker,
+          },
+        })
+        .run();
+    },
+    [editor],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openEventPicker,
+      openSkillPicker,
+      insertSourceBadge,
+    }),
+    [insertSourceBadge, openEventPicker, openSkillPicker],
+  );
+
+  /**
    * Handle dialog open changes and keep related search query state consistent.
    */
   const handleEventOpenChange = useCallback((open: boolean) => {
@@ -781,6 +889,81 @@ export const NovelInstructionEditor = forwardRef<
     setIsSkillPickerOpen(open);
     if (!open) setSkillQuery("");
   }, []);
+
+  /**
+   * Handle drag over event to show visual feedback.
+   */
+  const handleEditorDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  /**
+   * Handle drag enter event to ensure we capture the drag.
+   */
+  const handleEditorDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  /**
+   * Handle drag leave event - only clear drag state if leaving the editor area.
+   */
+  const handleEditorDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { clientX, clientY } = e;
+    if (
+      clientX < rect.left ||
+      clientX >= rect.right ||
+      clientY < rect.top ||
+      clientY >= rect.bottom
+    ) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  /**
+   * Handle file drop event.
+   */
+  const handleEditorDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      if (disabled || !onFileDrop) return;
+
+      const files: File[] = [];
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        const entry = item.webkitGetAsEntry?.();
+        if (entry?.isDirectory) {
+          // Handle folder drop - extract folder path and name
+          if (onFolderDrop) {
+            // entry.fullPath might be empty or just "/" for root, use name as fallback
+            const folderPath = entry.fullPath || entry.name;
+            const folderName = entry.name;
+            await onFolderDrop(folderPath, folderName);
+          } else {
+            toast.error(
+              t(
+                "character.sources.useBindFolderButton",
+                "Please use 'Bind Folder' button to bind folders",
+              ),
+            );
+          }
+          return;
+        }
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+      if (files.length > 0) await onFileDrop(files);
+    },
+    [disabled, onFileDrop, onFolderDrop, t],
+  );
 
   return (
     <div className={cn("h-full min-h-0 flex flex-col", className)}>
@@ -822,9 +1005,16 @@ export const NovelInstructionEditor = forwardRef<
 
       <div
         id={id}
+        role="region"
+        aria-label="Content drop zone"
         className={cn(
-          "flex-1 min-h-0 overflow-y-auto rounded-none border-0 bg-transparent",
+          "flex-1 min-h-0 overflow-y-auto rounded-none border-0 bg-transparent transition-colors",
+          isDragOver && "border-2 border-dashed border-primary bg-primary/5",
         )}
+        onDragEnter={handleEditorDragEnter}
+        onDragOver={handleEditorDragOver}
+        onDragLeave={handleEditorDragLeave}
+        onDrop={handleEditorDrop}
       >
         {editor ? <EditorContent editor={editor} /> : null}
       </div>

@@ -1,0 +1,18 @@
+// Copyright 2026 Alloomi Team. All rights reserved.
+//
+// Use of this source code is governed by a license that can be
+// found in the LICENSE file in the root of this source tree.
+
+//! Shared constants for the Alloomi Tauri application.
+
+/// The port where the Next.js development server runs.
+pub const NEXTJS_PORT: u16 = 3515;
+
+/// The base URL for the Next.js server.
+pub const NEXTJS_BASE_URL: &str = "http://localhost";
+
+/// Full URL for the Next.js server (convenience constructor).
+#[inline]
+pub fn nextjs_url() -> String {
+    format!("{}:{}", NEXTJS_BASE_URL, NEXTJS_PORT)
+}

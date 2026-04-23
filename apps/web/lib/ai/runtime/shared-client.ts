@@ -5,9 +5,10 @@
  * Used for iMessage Tauri frontend environment
  */
 
-import type { AgentConfig, AgentOptions } from "@alloomi/agent/types";
-import { getAgentRegistry } from "@alloomi/agent/registry";
+import type { AgentConfig, AgentOptions } from "@alloomi/ai/agent/types";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
 import { registerPlugins } from "./register-plugins";
+import { formatAgentStreamErrorForUser } from "./shared";
 
 // Track if plugins have been registered
 let pluginsRegistered = false;
@@ -22,25 +23,15 @@ function ensurePluginsRegistered() {
 /**
  * Get display name for a tool (similar to Web UI)
  * Extracts base name and returns a readable format
- * Supports both English and Chinese
  */
-function getToolDisplayName(
-  toolName: string,
-  language: string | null = null,
-): string {
+function getToolDisplayName(toolName: string): string {
   // Extract tool name without prefix (e.g., "mcp__business-tools__chatInsight" -> "chatInsight")
   const nameWithoutPrefix = toolName.includes("__")
     ? toolName.split("__").pop() || toolName
     : toolName;
 
-  // Determine if user prefers Chinese (zh-Hans or zh-CN)
-  const isChinese =
-    language === "zh-Hans" ||
-    language === "zh-CN" ||
-    (language?.startsWith?.("zh") ?? false);
-
-  // Tool display names - English and Chinese
-  const enNames: Record<string, string> = {
+  // Tool display names
+  const names: Record<string, string> = {
     Read: "Read",
     Write: "Write",
     Edit: "Edit",
@@ -66,33 +57,6 @@ function getToolDisplayName(
     searchRawMessages: "Search Messages",
   };
 
-  const zhNames: Record<string, string> = {
-    Read: "读取文件",
-    Write: "写入文件",
-    Edit: "编辑文件",
-    Bash: "执行命令",
-    WebSearch: "网络搜索",
-    WebFetch: "获取网页",
-    Glob: "搜索文件",
-    Grep: "搜索内容",
-    TodoWrite: "管理待办",
-    Skill: "调用技能",
-    LSP: "代码分析",
-    Task: "运行子任务",
-    chatInsight: "查询聊天洞察",
-    queryContacts: "查询联系人",
-    queryIntegrations: "查询集成",
-    sendReply: "发送回复",
-    createInsight: "创建洞察",
-    modifyInsight: "修改洞察",
-    searchKnowledgeBase: "搜索知识库",
-    getFullDocumentContent: "读取文档",
-    searchMemoryPath: "搜索记忆",
-    getRawMessages: "搜索消息",
-    searchRawMessages: "搜索原始消息",
-  };
-
-  const names = isChinese ? zhNames : enNames;
   return names[nameWithoutPrefix] || nameWithoutPrefix;
 }
 
@@ -225,6 +189,11 @@ export async function handleAgentRuntime(
     const platformPrompt = `[PLATFORM CONTEXT]
 You are running on USER'S COMPUTER, accessed via a ${platform.toUpperCase()} bot conversation.
 
+RESPONSE STYLE (CRITICAL):
+- Go directly to conclusions. DO NOT start with "Sure", "Okay", "Got it", "Of course", "Certainly", "No problem", "Sure thing" or similar filler phrases
+- Answer in the same language as the user's question
+- Be concise and specific
+
 IMPORTANT CAPABILITIES:
 - You can ACCESS files on user's computer (Desktop, Documents, Downloads, etc.)
 - You can READ, WRITE, COPY files from anywhere on the system
@@ -274,10 +243,7 @@ ${prompt}`;
         }
         // Real-time notification to user about tools being used and their inputs
         if (message.name) {
-          const toolDisplayName = getToolDisplayName(
-            message.name,
-            options.language,
-          );
+          const toolDisplayName = getToolDisplayName(message.name);
 
           // Extract key input information
           let inputInfo = "";
@@ -304,7 +270,11 @@ ${prompt}`;
         }
       }
       if (message.type === "error") {
-        await replyCallback(`Error: ${message.message}`);
+        const userFriendlyError = formatAgentStreamErrorForUser(
+          platform,
+          message.message ?? "(unknown)",
+        );
+        await replyCallback(`Error: ${userFriendlyError}`);
         return;
       }
       if (message.type === "done") {

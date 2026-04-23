@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDiskUsageOverview } from "@/lib/workspace/disk-usage";
+import { getDiskUsageOverview } from "@/lib/files/workspace/disk-usage";
 
 export async function GET() {
   try {

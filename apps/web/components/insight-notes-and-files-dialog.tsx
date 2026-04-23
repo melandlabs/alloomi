@@ -14,7 +14,7 @@ interface InsightNotesAndFilesViewProps {
 }
 
 /**
- * Insight attachments view: Notes and files mixed display, sorted by time, no add/upload buttons within tabs
+ * Insight attachment view: mixed notes and files display, sorted by time, no add/upload buttons in tab
  */
 export function InsightNotesAndFilesView({
   insightId,

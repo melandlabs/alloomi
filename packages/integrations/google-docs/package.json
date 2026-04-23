@@ -1,0 +1,23 @@
+{
+  "name": "@alloomi/integrations-google-docs",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "googleapis": "^140.0.0",
+    "google-auth-library": "^9.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

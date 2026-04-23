@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useMemo, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { RemixIcon } from "@/components/remix-icon";
-import { Button } from "./ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { toast } from "sonner";
 import { openUrl, openPathCustom, revealItemInDir, isTauri } from "@/lib/tauri";
-import { inlineResources } from "@alloomi/shared/inline-resources";
+import { inlineResources } from "@/lib/files/inline-resources";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
+import { FilePreviewDrawerRichTextToolbar } from "@/components/file-preview-drawer-rich-text-toolbar";
+import { useTranslation } from "react-i18next";
+import { injectHtmlPreviewScrollFix } from "@/lib/files/html-preview-scroll-fix";
 
 // Bundle optimization: Dynamically import CodePreview
 const CodePreview = lazy(() =>
@@ -24,6 +26,9 @@ export interface WebsitePreviewProps {
   className?: string;
 }
 
+/**
+ * Embedded HTML preview: toolbar aligns with library list grid card header (icon slot + title layout).
+ */
 export function WebsitePreview({
   content,
   filename = "index.html",
@@ -31,6 +36,7 @@ export function WebsitePreview({
   onClose,
   className,
 }: WebsitePreviewProps) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
@@ -41,12 +47,12 @@ export function WebsitePreview({
   // Inline CSS and JS resources when content or filePath changes
   useEffect(() => {
     const processContent = async () => {
-      // If content has no external resources (no <link href="*.css"> or <script src="*.js">), use as-is
-      const hasExternalCss =
-        /<link\s+[^>]*href=["'][^"']+\.css["'][^>]*>/i.test(content);
-      const hasExternalJs = /<script\s+src=["'][^"']+\.js["'][^>]*>/i.test(
+      // If content has no external resources (no <link> or <script src>), use as-is
+      const hasExternalCss = /<link\s+[^>]*href=["'][^"']+["'][^>]*>/i.test(
         content,
       );
+      const hasExternalJs =
+        /<script\s+src=["'][^"']+["'][^>]*><\/script>/i.test(content);
 
       if ((!hasExternalCss && !hasExternalJs) || !filePath) {
         setInlineContent(content);
@@ -80,6 +86,22 @@ export function WebsitePreview({
 
     processContent();
   }, [content, filePath]);
+
+  /** iframe-specific: inject single-scroll root styles to prevent multiple vertical scrollbars in preview document html/body vs inner container */
+  const previewSrcDoc = useMemo(
+    () => injectHtmlPreviewScrollFix(inlineContent),
+    [inlineContent],
+  );
+
+  const openExternalTooltip = useMemo(() => {
+    if (isTauri() && filePath) {
+      return t(
+        "common.filePreview.openWithDefaultApp",
+        "Open with Default App",
+      );
+    }
+    return t("common.filePreview.openInNewTab", "Open in New Tab");
+  }, [filePath, t]);
 
   // Use srcdoc instead of blob URL to avoid CSP restrictions in dev mode
   // (Vite dev server CSP blocks blob: in frame-src)
@@ -137,168 +159,32 @@ export function WebsitePreview({
 
   return (
     <div
-      className={cn("bg-background flex h-full flex-col z-[1000]", className)}
+      className={cn(
+        "bg-background flex h-full min-h-0 flex-col z-[1000]",
+        className,
+      )}
     >
-      {/* Header */}
-      <div className="border-border/50 bg-muted/30 flex shrink-0 items-center justify-between border-b px-4 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-foreground truncate text-sm font-medium">
-            {filename}
-          </span>
-          <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase">
-            HTML
-          </span>
-        </div>
+      <FilePreviewDrawerHeader fileName={filename}>
+        <FilePreviewDrawerRichTextToolbar
+          format="html"
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          filePath={filePath}
+          onClose={onClose}
+          copied={copied}
+          onCopy={handleCopy}
+          onRefreshPreview={handleRefresh}
+          onRevealInFolder={
+            filePath ? () => void handleShowInFolder() : undefined
+          }
+          showOpenExternal
+          onOpenExternal={() => void handleOpenExternal()}
+          openExternalTooltip={openExternalTooltip}
+        />
+      </FilePreviewDrawerHeader>
 
-        <div className="flex shrink-0 items-center gap-1">
-          {/* View Mode Toggle */}
-          <div className="bg-muted mr-2 flex items-center gap-1 rounded-lg p-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("preview")}
-                  className={cn(
-                    "h-7 px-2",
-                    viewMode === "preview"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <RemixIcon name="eye" size="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Preview</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("code")}
-                  className={cn(
-                    "h-7 px-2",
-                    viewMode === "code"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <RemixIcon name="code" size="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>View Code</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-
-          {/* Refresh Preview */}
-          {viewMode === "preview" && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleRefresh}
-                  className="size-8"
-                >
-                  <RemixIcon name="refresh" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Refresh Preview</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* Copy */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopy}
-                className="size-8"
-              >
-                {copied ? (
-                  <RemixIcon
-                    name="check"
-                    size="size-4"
-                    className="text-emerald-500"
-                  />
-                ) : (
-                  <RemixIcon name="copy" size="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{copied ? "Copied!" : "Copy HTML"}</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Show in Folder */}
-          {filePath && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleShowInFolder}
-                  className="size-8"
-                >
-                  <RemixIcon name="folder_open" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Show in Folder</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* Open External */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleOpenExternal}
-                className="size-8"
-              >
-                <RemixIcon name="external_link" size="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>Open in New Tab</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Close */}
-          {onClose && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="size-8"
-                >
-                  <RemixIcon name="close" size="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>Close</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Content: min-h-0 allows flex children to shrink, avoiding duplicate scrollbars in outer and iframe */}
+      <div className="min-h-0 flex-1 overflow-hidden">
         {viewMode === "preview" ? (
           isInlining ? (
             <div className="flex h-full items-center justify-center">
@@ -314,18 +200,19 @@ export function WebsitePreview({
               </div>
             </div>
           ) : (
-            <div className="h-full bg-white">
+            <div className="h-full min-h-0 overflow-hidden bg-white">
               <iframe
                 key={iframeKey}
                 ref={iframeRef}
-                srcDoc={inlineContent}
-                className="size-full border-0"
+                srcDoc={previewSrcDoc}
+                className="block size-full min-h-0 border-0"
                 title={filename}
+                sandbox="allow-same-origin allow-popups"
               />
             </div>
           )
         ) : (
-          <div className="bg-muted/30 h-full overflow-auto p-4">
+          <div className="bg-muted/30 h-full min-h-0 overflow-auto p-4">
             <Suspense
               fallback={
                 <div className="flex items-center justify-center h-full">

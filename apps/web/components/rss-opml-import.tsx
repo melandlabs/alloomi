@@ -6,7 +6,7 @@ import { RemixIcon } from "@/components/remix-icon";
 
 import { Button } from "@alloomi/ui";
 import { toast } from "@/components/toast";
-import { importRssOpmlClient } from "@/lib/integration/rss-client";
+import { importRssOpmlClient } from "@/lib/integrations/rss-client";
 
 type RssOpmlImportProps = {
   onImported?: () => Promise<unknown> | unknown;
@@ -52,8 +52,8 @@ export function RssOpmlImport({ onImported }: RssOpmlImportProps) {
   );
 
   /**
-   * Handler function that triggers OPML import
-   * Validates file selection, calls import API, triggers callback on success and resets state
+   * Handler to trigger OPML import
+   * Responsible for validating whether a file has been selected, calling the import API, and triggering callback and resetting state on success
    */
   const handleImport = useCallback(async () => {
     if (!selectedFile) {

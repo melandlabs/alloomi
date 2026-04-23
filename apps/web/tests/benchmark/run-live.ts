@@ -15,12 +15,12 @@ async function runBenchmark() {
   const totalStartTime = Date.now();
 
   // Dynamic imports to ensure environment variables are loaded before these modules are evaluated
-  const { model } = await import("@/lib/ai");
+  const { getModel } = await import("@/lib/ai");
   const { insightSystemPrompt } = await import("@/lib/ai/subagents/insights");
 
   console.log("🚀 Starting Live Benchmark...");
   console.log(`Found ${BENCHMARK_SCENARIOS.length} scenarios.`);
-  console.log(`==================================================\n`);
+  console.log("==================================================\n");
 
   let passedCount = 0;
   let failedCount = 0;
@@ -29,10 +29,10 @@ async function runBenchmark() {
   for (const scenario of BENCHMARK_SCENARIOS) {
     const scenarioStartTime = Date.now();
 
-    console.log(`--------------------------------------------------`);
+    console.log("--------------------------------------------------");
     console.log(`Running Scenario: ${scenario.name}`);
     console.log(`Description: ${scenario.description}`);
-    console.log(`Status: Running...`);
+    console.log("Status: Running...");
 
     const messagesText = JSON.stringify(scenario.messages, null, 2);
     const userPrompt = `My platform identity is ${JSON.stringify(scenario.userProfile)}, historical Insights: ${JSON.stringify(scenario.insights ?? [])}, please analyze the following incremental messages:\n${messagesText} and generate an Insight${scenario.extraInfo ? `\nAdditional information: ${scenario.extraInfo}` : ""}`;
@@ -41,7 +41,7 @@ async function runBenchmark() {
       // 3. Call LLM
       console.log("⏳ Generating insight...");
       const { text } = await generateText({
-        model: model,
+        model: getModel(false),
         messages: [
           { role: "system", content: insightSystemPrompt },
           { role: "user", content: userPrompt },
@@ -189,7 +189,7 @@ async function runBenchmark() {
     console.log(`- Fastest Scenario: ${formatTime(fastest)}`);
     console.log(`- Slowest Scenario: ${formatTime(slowest)}`);
   }
-  console.log(`==================================================`);
+  console.log("==================================================");
 
   if (failedCount > 0) process.exit(1);
 }

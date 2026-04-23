@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { initTelegramUserListener } from "@/lib/telegram/init";
+import { initTelegramUserListener } from "@/lib/integrations/telegram/init";
 import { auth } from "@/app/(auth)/auth";
 
 /**

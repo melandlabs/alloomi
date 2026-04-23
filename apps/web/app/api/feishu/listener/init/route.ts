@@ -5,7 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { startFeishuListenersForUser } from "@/lib/feishu/ws-listener";
+import { startFeishuListenersForUser } from "@/lib/integrations/feishu/ws-listener";
 import { setCloudAuthToken } from "@/lib/auth/token-manager";
 import { isTauriMode } from "@/lib/env/constants";
 import { createLogger } from "@/lib/utils/logger";

@@ -9,8 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@alloomi/ui";
-
-const REFRESH_OPTIONS = [5, 15, 30, 60, 120];
+import { LanguageSettingsMenu } from "@/components/language-settings-menu";
 
 /**
  * Props for the language and refresh interval selector component
@@ -18,12 +17,12 @@ const REFRESH_OPTIONS = [5, 15, 30, 60, 120];
 interface PersonalizationLanguageRefreshProps {
   /** Current language setting */
   language: string;
-  /** Current refresh interval (in minutes) */
-  refreshInterval: number;
   /** Language change callback */
   onLanguageChange: (language: string) => void;
-  /** Refresh interval change callback */
-  onRefreshIntervalChange: (interval: number) => void;
+  /** Current interface language */
+  currentLang: string;
+  /** Interface language change callback */
+  onUiLanguageChange: (language: string) => void;
 }
 
 /**
@@ -32,9 +31,9 @@ interface PersonalizationLanguageRefreshProps {
  */
 export function PersonalizationLanguageRefresh({
   language,
-  refreshInterval,
   onLanguageChange,
-  onRefreshIntervalChange,
+  currentLang,
+  onUiLanguageChange,
 }: PersonalizationLanguageRefreshProps) {
   const { t } = useTranslation();
 
@@ -50,29 +49,15 @@ export function PersonalizationLanguageRefresh({
     [t],
   );
 
-  /**
-   * Refresh frequency options list
-   */
-  const refreshOptions = useMemo(
-    () =>
-      REFRESH_OPTIONS.map((minutes) => ({
-        value: minutes,
-        label: t("insightPreferences.refreshOption", {
-          minutes,
-        }),
-      })),
-    [t],
-  );
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Language selection */}
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-medium text-foreground mb-2">
+      {/* Language selection row, aligned with account settings layout */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">
             {t("insightPreferences.languageLabel")}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {t("insightPreferences.languageDescription")}
           </p>
         </div>
@@ -82,7 +67,7 @@ export function PersonalizationLanguageRefresh({
             onLanguageChange(value === "auto" ? "" : value)
           }
         >
-          <SelectTrigger className="h-11">
+          <SelectTrigger className="h-9 w-full sm:w-[220px] shrink-0 self-start sm:self-center rounded-md px-3 text-sm font-medium border border-border/80 bg-surface hover:bg-surface-hover hover:text-foreground/90 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&>span]:w-fit [&>span]:flex-none">
             <SelectValue
               placeholder={t("insightPreferences.languagePlaceholder")}
             />
@@ -96,36 +81,23 @@ export function PersonalizationLanguageRefresh({
           </SelectContent>
         </Select>
       </div>
-
-      {/* Refresh frequency selection */}
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-medium text-foreground mb-2">
-            {t("insightPreferences.refreshLabel")}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">
+            {t("insightPreferences.uiLanguageLabel")}
           </p>
-          <p className="text-sm text-muted-foreground">
-            {t("insightPreferences.refreshDescription")}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t(
+              "insightPreferences.uiLanguageDescription",
+              "Switch the interface language.",
+            )}
           </p>
         </div>
-        <Select
-          value={refreshInterval.toString()}
-          onValueChange={(value) =>
-            onRefreshIntervalChange(Number.parseInt(value, 10))
-          }
-        >
-          <SelectTrigger className="h-11">
-            <SelectValue
-              placeholder={t("insightPreferences.refreshPlaceholder")}
-            />
-          </SelectTrigger>
-          <SelectContent className="z-[1010]">
-            {refreshOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value.toString()}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <LanguageSettingsMenu
+          variant="personalization"
+          currentLang={currentLang}
+          onLanguageChange={onUiLanguageChange}
+        />
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import {
 import { getChatById, getMessageById } from "@/lib/db/queries";
 import { deriveBlobPathFromUrl } from "@/lib/files/blob-path";
 import { isTauriMode, getAppUrl } from "@/lib/env";
-import { readFile, fileExists } from "@/lib/storage/adapters";
+import { readFile, fileExists } from "@/lib/storage";
 import { fetchWithSSRFProtection } from "@alloomi/security/url-validator";
 
 const downloadSchema = z.union([
@@ -70,7 +70,11 @@ export async function GET(request: Request) {
       // Tauri mode: Prioritize reading from local file system
       if (fileExists(decodedPathname)) {
         const buffer = await readFile(decodedPathname);
-        return new NextResponse(new Uint8Array(buffer), {
+        // Ensure buffer is a Buffer (readFile may return string in some cases)
+        const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+        // Convert Buffer to Uint8Array for NextResponse compatibility
+        const uint8Data = new Uint8Array(data);
+        return new NextResponse(uint8Data, {
           headers: {
             "Content-Type": contentType,
             "Content-Disposition": `inline; filename="${decodedPathname.split("/").pop()}"`,

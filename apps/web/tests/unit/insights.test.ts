@@ -13,7 +13,7 @@ runTest(
   async () => {
     const { generateProjectInsights } =
       await import("@/lib/ai/subagents/insights");
-    const { SlackAdapter } = await import("@/lib/integration/sources/slack");
+    const { SlackAdapter } = await import("@/lib/integrations/slack");
     const adapter = new SlackAdapter();
     // Get all channels including general channels and peoples
     const messages = await adapter.getChatsByHours();
@@ -34,8 +34,7 @@ runTest(
   async () => {
     const { generateProjectInsights } =
       await import("@/lib/ai/subagents/insights");
-    const { TelegramAdapter } =
-      await import("@/lib/integration/sources/telegram");
+    const { TelegramAdapter } = await import("@alloomi/integrations/telegram");
     const adapter = new TelegramAdapter({
       session: process.env.TG_SESSION,
     });
@@ -65,8 +64,7 @@ runTest(
   async () => {
     const { generateProjectInsights } =
       await import("@/lib/ai/subagents/insights");
-    const { TelegramAdapter } =
-      await import("@/lib/integration/sources/telegram");
+    const { TelegramAdapter } = await import("@alloomi/integrations/telegram");
     const adapter = new TelegramAdapter({
       session: process.env.TG_SESSION,
     });
@@ -90,8 +88,7 @@ runTest(
 runTest(
   "telegram send messages",
   async () => {
-    const { TelegramAdapter } =
-      await import("@/lib/integration/sources/telegram");
+    const { TelegramAdapter } = await import("@alloomi/integrations/telegram");
     const adapter = new TelegramAdapter({
       session: process.env.TG_SESSION,
     });
@@ -107,7 +104,7 @@ runTest(
 runTest(
   "gmail app password recieve messages",
   async () => {
-    const { EmailAdapter } = await import("@/lib/integration/sources/email");
+    const { EmailAdapter } = await import("@/lib/integrations/email");
     const adapter = new EmailAdapter();
     const emails = await adapter.getEmailsByHours(1);
     console.log("emails", JSON.stringify(emails, null, 2));

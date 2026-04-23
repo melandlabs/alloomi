@@ -16,8 +16,9 @@ export {
   getTauriDbPath,
   getTauriStoragePath,
   getTauriLogsPath,
-} from "./tauri-paths";
+} from "@/lib/utils/path";
 
+import { DEV_PORT, PROD_PORT } from "@alloomi/shared";
 import {
   DEPLOYMENT_MODE,
   TAURI_SERVER_PORT,
@@ -29,7 +30,7 @@ import {
   TAURI_DB_PATH,
   TAURI_STORAGE_PATH,
   TAURI_LOGS_PATH,
-} from "./tauri-paths";
+} from "@/lib/utils/path";
 
 /**
  * Initialize Tauri data directory
@@ -66,16 +67,42 @@ export function getDatabaseUrl(): string {
 }
 
 /**
- * Get application base URL
+ * Get application base URL (server-safe, checks multiple env vars)
  */
-export function getAppUrl(): string {
+export function getApplicationBaseUrl(): string {
+  // Prefer URL configured in environment variables
+  const envUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.APPLICATION_URL ||
+    process.env.NEXTAUTH_URL;
+
+  if (envUrl) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // Tauri mode uses localhost
   if (isTauriMode()) {
     return `http://${TAURI_SERVER_HOST}:${TAURI_SERVER_PORT}`;
   }
 
-  return process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3415";
+  // Vercel deployment
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
+  }
+
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const port = isDevelopment ? DEV_PORT : PROD_PORT;
+
+  // Default to localhost with environment-based port
+  return `http://localhost:${port}`;
+}
+
+/**
+ * @deprecated Use getApplicationBaseUrl() instead
+ */
+export function getAppUrl(): string {
+  return getApplicationBaseUrl();
 }
 
 /**

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { isPromotionalEmail } from "@/lib/integration/sources/email";
+import { isPromotionalEmail } from "@/lib/integrations/email";
 
 /** Helper to build a minimal ParsedMail-like object */
 function mockParsed(overrides: {

@@ -62,6 +62,7 @@ export function AgentChatPanel({
   const [showScrollButton, setShowScrollButton] = useState(false);
   const scrollButtonTimerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
   // Get chat context (must be called before using status)
   const {
@@ -70,6 +71,7 @@ export function AgentChatPanel({
     setMessages,
     stop,
     isAgentRunning,
+    setIsAgentRunning,
     activeChatId: contextActiveChatId,
     switchChatId,
     isVaultOpen,
@@ -297,9 +299,11 @@ export function AgentChatPanel({
    */
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer) {
+    const endElement = endRef.current;
+    if (scrollContainer && endElement) {
+      // Use offsetTop for more reliable positioning instead of scrollHeight
       scrollContainer.scrollTo({
-        top: scrollContainer.scrollHeight,
+        top: endElement.offsetTop,
         behavior,
       });
     }
@@ -331,18 +335,23 @@ export function AgentChatPanel({
 
     // On chat switch or message load complete, use auto for immediate scroll
     // On new message send, use smooth animation
+    const isNewMessage = messages.length > prevMessagesCountRef.current;
     const behavior =
-      didSwitchChat || didLoadMessages || messages.length > 0
+      didSwitchChat || didLoadMessages
         ? "auto"
-        : "smooth";
+        : isNewMessage
+          ? "smooth"
+          : "instant";
 
-    // Use setTimeout to ensure DOM and virtual list rendering complete before scrolling
-    // Avoids incorrect scroll position during async message loading
-    const timeoutId = setTimeout(() => {
-      scrollToBottom(behavior);
-    }, 50);
+    // Use double rAF to ensure DOM and virtual list rendering complete before scrolling
+    // This is more reliable than fixed timeout (50ms) which may fire before DOM updates
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToBottom(behavior);
+      });
+    });
 
-    return () => clearTimeout(timeoutId);
+    return () => cancelAnimationFrame(rafId);
   }, [messages, contextActiveChatId, scrollToBottom]);
 
   /**
@@ -366,7 +375,7 @@ export function AgentChatPanel({
 
       return sendMessage(message, requestOptions);
     },
-    [isAgentRunning, sendMessage],
+    [sendMessage],
   );
 
   /** Auto-send initialMessageToSend after mount (e.g., from onboarding "Chat with Alloomi" click): switches to new chat first, then sends, runs only once; if from URL send param, clears after sending */
@@ -514,6 +523,8 @@ export function AgentChatPanel({
                 />
               </div>
             </div>
+            {/* Scroll anchor - used by scrollToBottom to determine bottom position */}
+            <div ref={endRef} className="shrink-0 min-w-[24px] min-h-[24px]" />
           </div>
         </div>
 

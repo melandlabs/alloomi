@@ -18,11 +18,11 @@ vi.mock("@/lib/ai", () => ({
   triggerCompactionAsync: vi.fn(),
 }));
 
-vi.mock("@alloomi/agent", () => ({
+vi.mock("@alloomi/ai/agent", () => ({
   sanitizeCompactionMessages: vi.fn(),
 }));
 
-vi.mock("@alloomi/agent/registry", () => ({
+vi.mock("@alloomi/ai/agent/registry", () => ({
   getAgentRegistry: vi.fn(),
 }));
 
@@ -31,8 +31,8 @@ import {
   getUserInsightSettings,
 } from "@/lib/db/queries";
 import { prepareConversationWindows, triggerCompactionAsync } from "@/lib/ai";
-import { sanitizeCompactionMessages } from "@alloomi/agent";
-import { getAgentRegistry } from "@alloomi/agent/registry";
+import { sanitizeCompactionMessages } from "@alloomi/ai/agent";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
 import { handleAgentRuntime } from "@/lib/ai/runtime/shared";
 
 function createDoneOnlyGenerator() {

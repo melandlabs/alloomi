@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { RemixIcon } from "@/components/remix-icon";
 import { Button } from "./ui/button";
-import { inlineResources } from "@alloomi/shared/inline-resources";
+import { inlineResources } from "@/lib/files/inline-resources";
 import {
   Dialog,
   DialogContent,

@@ -4,7 +4,18 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import type { Session } from "next-auth";
-import { DropdownMenu, DropdownMenuContent } from "@alloomi/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@alloomi/ui";
 import { cn } from "@/lib/utils";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { UserMenuContent } from "@/components/user-menu-content";
@@ -19,6 +30,13 @@ interface UserMenuDropdownProps {
   isLoadingCredit: boolean;
   /** User plan type */
   plan: string | null;
+  /** Credit data */
+  creditData?: {
+    remaining: number;
+    total: number;
+  } | null;
+  /** Credit usage percentage */
+  creditPercentage?: number | null;
   /** Current language code */
   currentLang: string;
   /** Whether it is mobile */
@@ -33,18 +51,24 @@ interface UserMenuDropdownProps {
   onCloseSidebar?: () => void;
   /** Open "Contact Us" dialog (accessed from menu when sidebar is collapsed) */
   onOpenContactUs?: () => void;
+  /** Open mandatory onboarding modal in development mode */
+  onOpenMandatoryOnboardingDebug?: () => void;
   /** Child elements (trigger) */
   children: React.ReactNode;
 }
 
 /**
  * User menu dropdown component
- * Displays user info card and menu items
+ * Displays user info card and menu items.
+ * Logout confirmation dialog is rendered outside DropdownMenu
+ * to avoid z-index and portal conflicts.
  */
 export function UserMenuDropdown({
   session,
   isLoadingCredit,
   plan,
+  creditData,
+  creditPercentage,
   currentLang,
   isMobile,
   onLanguageChange,
@@ -52,11 +76,13 @@ export function UserMenuDropdown({
   onLogin,
   onCloseSidebar,
   onOpenContactUs,
+  onOpenMandatoryOnboardingDebug,
   children,
 }: UserMenuDropdownProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { profile } = useUserProfile();
 
   /**
@@ -97,9 +123,15 @@ export function UserMenuDropdown({
   useEffect(() => {
     const handleOpenPersonalization = (event: Event) => {
       const customEvent = event as CustomEvent<{
+        targetPage?: "profile-soul";
         tab?: "basic" | "contexts" | "roles" | "people" | "linkedAccounts";
         addPlatform?: boolean;
       }>;
+
+      if (customEvent.detail?.targetPage === "profile-soul") {
+        router.push("/?page=profile-soul");
+        return;
+      }
 
       if (
         customEvent.detail?.tab === "roles" ||
@@ -121,7 +153,7 @@ export function UserMenuDropdown({
         return;
       }
       if (customEvent.detail?.tab === "contexts") {
-        router.push("/?page=my-contexts");
+        router.push("/?page=profile-soul");
         return;
       }
 
@@ -171,6 +203,8 @@ export function UserMenuDropdown({
             session={session}
             isLoadingCredit={isLoadingCredit}
             plan={plan}
+            creditData={creditData}
+            creditPercentage={creditPercentage}
             currentLang={currentLang}
             isMobile={isMobile}
             isFullscreen={false}
@@ -178,13 +212,41 @@ export function UserMenuDropdown({
             userAvatarUrl={userAvatarUrl}
             onLanguageChange={onLanguageChange}
             onLogout={onLogout}
+            onRequestLogout={() => setShowLogoutConfirm(true)}
             onLogin={onLogin}
             onMenuItemClick={handleMenuItemClick}
             onOpenContactUs={onOpenContactUs}
+            onOpenMandatoryOnboardingDebug={onOpenMandatoryOnboardingDebug}
             onPersonalSettingsClick={handlePersonalSettingsClick}
           />
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Logout confirmation dialog — rendered outside DropdownMenu
+          to avoid z-index / portal conflicts */}
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("common.logoutConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("common.logoutConfirmDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                onLogout();
+              }}
+            >
+              {t("common.signOut")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

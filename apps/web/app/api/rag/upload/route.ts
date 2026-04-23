@@ -5,12 +5,12 @@ import { randomUUID } from "node:crypto";
 import {
   processDocumentFromFile,
   getUserRAGStats,
-} from "@/lib/rag/langchain-service";
+} from "@/lib/ai/rag/langchain-service";
 import {
   SUPPORTED_RAG_MIME_TYPES,
   getMimeTypeFromExtension,
 } from "@/lib/files/config";
-import { uploadFile } from "@/lib/storage/adapters";
+import { uploadFile } from "@/lib/storage";
 import { createWriteStream } from "node:fs";
 import { unlink, readFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";

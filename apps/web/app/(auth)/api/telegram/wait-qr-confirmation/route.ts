@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getLoginSession, deleteLoginSession } from "@/lib/session/context";
+import {
+  ensureRedis,
+  getLoginSession,
+  deleteLoginSession,
+} from "@/lib/session/context";
 
 // Wait interval (milliseconds)
 const WAIT_INTERVAL = 1000;
@@ -8,6 +12,8 @@ const MAX_WAIT_ATTEMPTS = 120;
 
 export async function GET(request: Request) {
   try {
+    await ensureRedis();
+
     // Get sessionId from URL
     const url = new URL(request.url);
     const sessionId = url.searchParams.get("sessionId");

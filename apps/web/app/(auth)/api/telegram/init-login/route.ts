@@ -1,7 +1,8 @@
-import { TelegramAdapter } from "@/lib/integration/sources/telegram";
+import { TelegramAdapter } from "@alloomi/integrations/telegram/adapter";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import {
+  ensureRedis,
   expireTime,
   setLoginSession,
   getLoginSession,
@@ -19,6 +20,8 @@ const MAX_WAIT_ATTEMPTS = 120;
 
 export async function POST(request: Request) {
   try {
+    await ensureRedis();
+
     const { phone, sessionId } = await request.json();
 
     if (sessionId) {

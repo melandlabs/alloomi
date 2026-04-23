@@ -19,7 +19,7 @@ import {
   createRssSubscriptionClient,
   deleteRssSubscriptionClient,
   updateRssSubscriptionClient,
-} from "@/lib/integration/rss-client";
+} from "@/lib/integrations/rss-client";
 import type { RssSubscription } from "@/lib/db/schema";
 import { RssOpmlImport } from "./rss-opml-import";
 
@@ -180,7 +180,7 @@ export function RssAddControls() {
 
 /**
  * RSS subscription list component
- * Used to display and manage existing RSS subscription status and operations
+ * Used to display and manage the status and operations of existing RSS subscriptions
  */
 export function RssIntegrations() {
   const { t, i18n } = useTranslation();
@@ -364,8 +364,8 @@ export function RssIntegrations() {
               );
 
               /**
-               * Get site favicon URL based on subscription source URL
-               * Prefers DuckDuckGo general favicon service, browser naturally falls back on failure
+               * Get site favicon URL from subscription source URL
+               * Prefer using DuckDuckGo universal favicon service, browser naturally falls back on failure
                */
               const faviconUrl = (() => {
                 try {

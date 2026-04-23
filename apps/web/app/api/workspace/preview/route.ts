@@ -8,7 +8,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { getTaskSessionDir } from "@/lib/workspace/sessions";
+import { getTaskSessionDir } from "@/lib/files/workspace/sessions";
 
 // Vite process management
 const viteProcesses = new Map<

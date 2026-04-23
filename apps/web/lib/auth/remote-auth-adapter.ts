@@ -1,4 +1,7 @@
-import { getCloudApiClient, shouldUseCloudAuth } from "@/lib/api/remote-client";
+import {
+  getCloudApiClient,
+  shouldUseCloudAuth,
+} from "@/lib/auth/remote-client";
 import type { User } from "../db/schema";
 
 /**
@@ -201,7 +204,10 @@ async function getOrCreateShadowUser(cloudUser: CloudUser): Promise<User> {
   const { user } = await import("@/lib/db/schema");
 
   // Shadow user ID format: cloud_<cloudUserId>
-  const shadowUserId = `cloud_${cloudUser.id}`;
+  // Avoid cloud_cloud_xxx if caller already added prefix
+  const shadowUserId = cloudUser.id.startsWith("cloud_")
+    ? cloudUser.id
+    : `cloud_${cloudUser.id}`;
 
   // 1. Try to get existing shadow user
   const existing = await getUserById(shadowUserId);

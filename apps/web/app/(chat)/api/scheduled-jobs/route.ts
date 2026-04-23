@@ -63,7 +63,13 @@ export async function POST(request: Request) {
     }
 
     // Validate schedule
-    const validScheduleTypes = ["cron", "interval", "once"];
+    const validScheduleTypes = [
+      "cron",
+      "interval",
+      "interval-hours",
+      "interval-minutes",
+      "once",
+    ];
     if (
       !body.schedule.type ||
       !validScheduleTypes.includes(body.schedule.type)
@@ -83,6 +89,16 @@ export async function POST(request: Request) {
         type: "cron",
         expression: body.schedule.expression,
         timezone: body.schedule.timezone,
+      };
+    } else if (body.schedule.type === "interval-hours") {
+      schedule = {
+        type: "interval-hours",
+        hours: body.schedule.hours,
+      };
+    } else if (body.schedule.type === "interval-minutes") {
+      schedule = {
+        type: "interval-minutes",
+        minutes: body.schedule.minutes,
       };
     } else if (body.schedule.type === "interval") {
       schedule = {

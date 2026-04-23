@@ -29,6 +29,7 @@ export {
   completeJobExecution,
   getJobExecutions,
   recoverStuckJobs,
+  cleanupStuckJobs,
 } from "./service";
 
 // Executor

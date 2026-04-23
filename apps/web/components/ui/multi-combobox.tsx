@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
 import { cn } from "@/lib/utils";
 import { Badge, Input } from "@alloomi/ui";
@@ -52,22 +53,39 @@ export function MultiCombobox({
   onChange,
   max = 99,
   maxVisible = max,
-  placeholder = "Please select...",
+  placeholder,
   allowCustom = true,
-  searchPlaceholder = "Search...",
-  customPlaceholder = "Press Enter to add after input",
+  searchPlaceholder,
+  customPlaceholder,
   getOptionLabel,
   disabled = false,
   className,
 }: MultiComboboxProps) {
+  const { t } = useTranslation();
+
+  const placeholderText =
+    placeholder ?? t("common.selectPlaceholder", "Please select...");
+  const searchPlaceholderText =
+    searchPlaceholder ?? t("common.search", "Search...");
+  const customPlaceholderText =
+    customPlaceholder ??
+    t("common.customInputPlaceholder", "Press Enter to add after input");
+
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [customInput, setCustomInput] = React.useState("");
   const contentRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const measureRef = React.useRef<HTMLDivElement>(null);
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const [calculatedVisibleCount, setCalculatedVisibleCount] =
     React.useState(maxVisible);
+  const firstSelectedValue = value[0] ?? "";
+
+  React.useEffect(() => {
+    if (open) return;
+    setSearch("");
+  }, [open]);
 
   /**
    * Calculates the number of selected items that can be displayed in a single row (including width reservation for +N)
@@ -146,6 +164,58 @@ export function MultiCombobox({
   React.useLayoutEffect(() => {
     recalculateVisibleCount();
   }, [recalculateVisibleCount]);
+
+  const scrollSelectedIntoView = React.useCallback((selectedValue: string) => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea || !selectedValue) return false;
+
+    const safeValue =
+      typeof CSS !== "undefined" ? CSS.escape(selectedValue) : selectedValue;
+    const selectedButton = scrollArea.querySelector<HTMLElement>(
+      `button[data-value="${safeValue}"][data-selected="true"]`,
+    );
+    const viewport = scrollArea.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+
+    if (!selectedButton || !viewport || viewport.clientHeight <= 0) {
+      return false;
+    }
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const selectedRect = selectedButton.getBoundingClientRect();
+    const selectedTop =
+      selectedRect.top - viewportRect.top + viewport.scrollTop;
+    const nextScrollTop =
+      selectedTop - viewport.clientHeight / 2 + selectedRect.height / 2;
+    viewport.scrollTop = Math.max(0, nextScrollTop);
+    return true;
+  }, []);
+
+  React.useEffect(() => {
+    if (!open || !firstSelectedValue || search.trim()) return;
+
+    let cancelled = false;
+    let frameId = 0;
+    let attempts = 0;
+
+    const tryScroll = () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      if (scrollSelectedIntoView(firstSelectedValue)) return;
+      if (attempts >= 8) return;
+
+      frameId = requestAnimationFrame(tryScroll);
+    };
+
+    frameId = requestAnimationFrame(tryScroll);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [open, firstSelectedValue, search, scrollSelectedIntoView]);
 
   React.useEffect(() => {
     const trigger = triggerRef.current;
@@ -274,7 +344,7 @@ export function MultiCombobox({
               </>
             ) : (
               <span className="text-muted-foreground truncate">
-                {placeholder}
+                {placeholderText}
               </span>
             )}
           </span>
@@ -335,14 +405,14 @@ export function MultiCombobox({
         <div ref={contentRef} className="outline-none">
           <div className="p-2 border-b border-border">
             <Input
-              placeholder={searchPlaceholder}
+              placeholder={searchPlaceholderText}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9"
               autoFocus
             />
           </div>
-          <ScrollArea className="h-[200px]">
+          <ScrollArea ref={scrollAreaRef} className="h-[200px]">
             <div className="p-1">
               {filteredOptions.map((opt) => {
                 const selected = value.includes(opt.value);
@@ -350,6 +420,8 @@ export function MultiCombobox({
                   <button
                     key={opt.value}
                     type="button"
+                    data-selected={selected ? "true" : undefined}
+                    data-value={opt.value}
                     className={cn(
                       "w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md text-left transition-colors",
                       selected ? "bg-accent" : "hover:bg-accent/50",
@@ -372,7 +444,7 @@ export function MultiCombobox({
           {allowCustom && (
             <div className="p-2 border-t border-border flex gap-2">
               <Input
-                placeholder={customPlaceholder}
+                placeholder={customPlaceholderText}
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -383,14 +455,6 @@ export function MultiCombobox({
                 }}
                 className="h-9 flex-1"
               />
-              <button
-                type="button"
-                className="shrink-0 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
-                onClick={addCustom}
-                disabled={!showCustomHint}
-              >
-                <RemixIcon name="add" size="size-4" />
-              </button>
             </div>
           )}
         </div>

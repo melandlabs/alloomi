@@ -5,8 +5,6 @@ import { useCallback, useRef, type ReactNode } from "react";
 import { useSidePanel } from "./side-panel-context";
 import { useIsMobile } from "@alloomi/hooks/use-is-mobile";
 import { useTranslation } from "react-i18next";
-import { useOnboarding } from "@/components/onboarding/onboarding-context";
-import { OnboardingPage } from "@/components/onboarding/onboarding-page";
 import "../../i18n";
 
 /** Responsive: sidebar width constraints below md breakpoint (768px, matching Tailwind max-md) */
@@ -104,7 +102,6 @@ export function SidePanelShell({ children }: { children: ReactNode }) {
   const { sidePanel, setSidePanelWidth } = useSidePanel();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
-  const { isOpen: isOnboardingOpen } = useOnboarding();
 
   const hasSidePanel = sidePanel !== null;
   const isFullscreen = sidePanel?.displayMode === "fullscreen";
@@ -135,7 +132,7 @@ export function SidePanelShell({ children }: { children: ReactNode }) {
           isFullscreen ? "hidden" : "flex-1",
         )}
       >
-        {isOnboardingOpen ? <OnboardingPage /> : children}
+        {children}
       </div>
 
       {hasSidePanel && sidePanel && (

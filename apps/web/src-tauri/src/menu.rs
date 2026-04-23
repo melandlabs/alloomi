@@ -16,6 +16,9 @@ pub fn build_native_menu(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     #[cfg(not(target_os = "macos"))]
     let about_item = MenuItemBuilder::with_id("about-alloomi", "About Alloomi").build(app)?;
 
+    // Restart item
+    let restart_item = MenuItemBuilder::with_id("restart-alloomi", "Restart Alloomi").build(app)?;
+
     // Alloomi app menu
     let alloomi_menu = SubmenuBuilder::new(app, "Alloomi")
         .item(&about_item)
@@ -25,6 +28,7 @@ pub fn build_native_menu(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
         .item(&PredefinedMenuItem::hide_others(app, Some("Hide Others"))?)
         .item(&PredefinedMenuItem::show_all(app, Some("Show All"))?)
         .separator()
+        .item(&restart_item)
         .item(&PredefinedMenuItem::quit(app, Some("Quit Alloomi"))?)
         .build()?;
 
@@ -69,6 +73,8 @@ pub fn build_native_menu(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
                 .title("About Alloomi")
                 .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                 .show(|_| {});
+        } else if id == "restart-alloomi" {
+            app.restart();
         }
     });
 

@@ -32,7 +32,7 @@ export function addRecentInsight(insight: Insight): void {
     // Add new item to the beginning
     const newItem: RecentInsight = {
       id: insight.id,
-      title: insight.title || "未命名事件",
+      title: insight.title || "Untitled event",
       description: insight.description || undefined,
       time:
         typeof insight.time === "string"

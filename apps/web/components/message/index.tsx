@@ -25,9 +25,12 @@ import { CitedInsightsDrawer } from "../cited-insights-drawer";
 import InsightDetailDrawer from "../insight-detail-drawer";
 import { useInsightPagination } from "@/hooks/use-insight-data";
 import { useInsightActions } from "@/hooks/use-insight-actions";
-import { getFileIcon, getFileColor } from "@/lib/utils/file-icons";
+import { getFileIcon, getFileColor } from "@/components/file-icons";
+import { stripMalformedToolCalls } from "@/lib/utils/tool-names";
+import { parseStructuredOutput } from "@/lib/types/execution-result";
 import { QuestionInput } from "../question-input";
 import { useChatContext } from "../chat-context";
+import { useGlobalInsightDrawer } from "../global-insight-drawer";
 import type { ContentSegment } from "@alloomi/shared/ref";
 import { parseContentWithRefs } from "@alloomi/shared/ref";
 import { InlineRefBadge } from "../inline-ref-badge";
@@ -37,10 +40,27 @@ import { ErrorMessageDisplay } from "./error-message-display";
 import { NativeToolCall } from "./native-tool-call";
 import { RawMessagesResult } from "./raw-messages-result";
 import { ToolCallAccordion, type ToolCallPart } from "./tool-call-accordion";
+import {
+  LibraryItemRow,
+  type LibraryItem,
+} from "@/components/library/library-item-row";
+import { sessionRelativePathFromStoredPath } from "@/lib/files/open-workspace-file-locally";
+import { collectToolOutputFilesFromParts } from "./message-output-files";
+import { format } from "date-fns";
+import { zhCN, enUS } from "date-fns/locale";
 
 // Global set to track processed insight IDs across all message components
 // This prevents duplicate processing when components re-render
 const globallyProcessedInsightIds = new Set<string>();
+
+/**
+ * Format message timestamp for hover display
+ * Shows full date and time like "Apr 22, 2026, 10:30 AM"
+ */
+const formatMessageTime = (date: Date, language: string): string => {
+  const locale = language.startsWith("zh") ? zhCN : enUS;
+  return format(date, "MMM d, yyyy, h:mm a", { locale });
+};
 
 // Global state management - ensure only one floating panel is open at a time
 const useFloatingPanelState = () => {
@@ -93,7 +113,7 @@ const PurePreviewMessage = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const panelId = `reply-panel-${message.id}`;
   const { openPanel, isPanelOpen } = useFloatingPanelState();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { accounts } = useIntegrations();
   const hasConnectedAccounts = accounts.length > 0;
   const previousPanelIdRef = useRef(panelId);
@@ -110,6 +130,9 @@ const PurePreviewMessage = ({
   const [, copyToClipboard] = useCopyToClipboard();
 
   const { insightData, mutateInsightList } = useInsightPagination();
+
+  // Global insight drawer hook
+  const globalDrawer = useGlobalInsightDrawer();
 
   // Insight operations hook
   const { handleFavoriteInsight, handleArchiveInsight } = useInsightActions(
@@ -207,19 +230,29 @@ const PurePreviewMessage = ({
   }, [citedInsightIds, insightData.items]);
 
   /**
-   * Handle citation badge click event
+   * Handle citation badge click event - use global drawer with API fetch fallback
    */
   const handleCitationClick = useCallback(
     (insightId: string) => {
       const insight = insightData.items.find(
         (i: Insight) => i.id === insightId,
       );
-      if (insight) {
-        setSelectedInsight(insight);
-        setIsDrawerOpen(true);
+
+      if (!insight) {
+        // Fetch directly from API if not in paginated data
+        fetch(`/api/insights/${insightId}?fetch=true`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.insight && globalDrawer?.openDrawer) {
+              globalDrawer.openDrawer(data.insight);
+            }
+          })
+          .catch((err) => console.error("[Message] Direct fetch error:", err));
+      } else if (globalDrawer?.openDrawer) {
+        globalDrawer.openDrawer(insight);
       }
     },
-    [insightData.items],
+    [insightData.items, globalDrawer],
   );
 
   /**
@@ -365,16 +398,8 @@ const PurePreviewMessage = ({
         (p) => (p.currentStep ?? 0) > 0,
       );
       if (plansWithProgress.length === 0) {
-        // All plans are at step 0, hide them all
-        console.log(
-          `[Message] Message ${message.id.substring(0, 8)}... has error, hiding all unstarted plans`,
-        );
         return otherParts.map((item) => item.part);
       }
-      // Keep only plans with progress
-      console.log(
-        `[Message] Message ${message.id.substring(0, 8)}... has error, keeping only plans with progress`,
-      );
       return [...otherParts, ...plansWithProgress]
         .sort((a, b) => a.index - b.index)
         .map((item) => item.part);
@@ -403,13 +428,6 @@ const PurePreviewMessage = ({
       );
 
       return filtered;
-    }
-
-    // Even with only one plan, still log it
-    if (agentPlans.length === 1) {
-      console.log(
-        `[Message] Message ${message.id.substring(0, 8)}... has 1 agent plan: ${agentPlans[0].planId.substring(0, 8)}...`,
-      );
     }
 
     return message.parts;
@@ -473,6 +491,41 @@ const PurePreviewMessage = ({
     return groups;
   }, [filteredParts, message.id]);
 
+  /**
+   * Convert tool output paths to LibraryItem same as "My Files / Dialog Space" for LibraryItemRow rendering.
+   */
+  const assistantOutputLibraryItems = useMemo((): LibraryItem[] => {
+    if (message.role !== "assistant") return [];
+    const files = collectToolOutputFilesFromParts(message.parts);
+    const msgAny = message as {
+      createdAt?: string | number | Date;
+      timestamp?: string | number | Date;
+    };
+    const raw = msgAny.createdAt ?? msgAny.timestamp;
+    const rowDate =
+      raw != null && !Number.isNaN(new Date(raw).getTime())
+        ? new Date(raw)
+        : new Date();
+
+    return files.map((f) => {
+      const rel = sessionRelativePathFromStoredPath(f.path, chatId);
+      return {
+        id: `${message.id}-${rel}`,
+        kind: "workspace_file",
+        title: f.name,
+        date: rowDate,
+        groupKey: "chat-output",
+        workspaceFile: {
+          taskId: chatId,
+          path: rel,
+          name: f.name,
+          type: f.type,
+        },
+        isTemporary: f.isTemporary,
+      };
+    });
+  }, [message.role, message.parts, message.id, chatId, message]);
+
   // Detect if the last tool call is executing
   const isLastToolExecuting = useMemo(() => {
     if (!filteredParts) return false;
@@ -493,6 +546,18 @@ const PurePreviewMessage = ({
     // If agent is not running, no tool can be executing
     if (!isAgentRunning) return false;
 
+    // Check if there are user messages after this assistant message
+    // If so, this assistant message is no longer the active one, so tool should show as completed
+    const currentMessageIndex = contextMessages.findIndex(
+      (m) => m.id === message.id,
+    );
+    if (currentMessageIndex !== -1) {
+      const hasUserMessageAfter = contextMessages
+        .slice(currentMessageIndex + 1)
+        .some((m) => m.role === "user");
+      if (hasUserMessageAfter) return false;
+    }
+
     // If the last tool status is executing, return true
     if (lastToolStatus === "executing") return true;
 
@@ -501,7 +566,26 @@ const PurePreviewMessage = ({
 
     // If there's nothing after, it means it's executing
     return !hasContentAfter;
-  }, [filteredParts, isAgentRunning]);
+  }, [filteredParts, isAgentRunning, contextMessages, message.id]);
+
+  // Extract message timestamp for hover display
+  const messageTimestamp = useMemo(() => {
+    const msgAny = message as {
+      createdAt?: string | number | Date;
+      timestamp?: string | number | Date;
+    };
+    const raw = msgAny.createdAt ?? msgAny.timestamp;
+    if (raw != null && !Number.isNaN(new Date(raw).getTime())) {
+      return new Date(raw);
+    }
+    return new Date();
+  }, [message]);
+
+  // Format message time for inline display
+  const formattedMessageTime = useMemo(
+    () => formatMessageTime(messageTimestamp, i18n.language),
+    [messageTimestamp, i18n.language],
+  );
 
   return (
     <AnimatePresence>
@@ -609,8 +693,12 @@ const PurePreviewMessage = ({
 
                     // Handle text type
                     if (type === "text") {
-                      const textContent =
+                      const rawText =
                         (part as any).text ?? (part as any).content ?? "";
+                      // Strip <structured-output> block from display text
+                      const { cleanText } = parseStructuredOutput(rawText);
+                      // Filter out malformed tool calls (XML format output by some models like MiniMax)
+                      const textContent = stripMalformedToolCalls(cleanText);
                       const isUserMessage = message.role === "user";
 
                       // Check if buttons need to be displayed (only show once, in the first text part)
@@ -642,7 +730,7 @@ const PurePreviewMessage = ({
                             <div
                               data-testid="message-content"
                               className={cn(
-                                "flex flex-col gap-1 min-w-0 max-w-full break-words",
+                                "flex flex-col gap-1 min-w-0 max-w-full break-words cursor-default",
                                 isUserMessage &&
                                   "rounded-2xl p-4 bg-[var(--primary-50)] text-slate-900 border-0 dark:bg-[#1e3a5f]/30 dark:text-slate-100",
                                 !isUserMessage && "font-serif",
@@ -678,17 +766,17 @@ const PurePreviewMessage = ({
                                   );
                                 return (
                                   <div className="flex flex-wrap items-baseline gap-x-0.5 gap-y-0.5">
-                                    {segments.map((seg) =>
+                                    {segments.map((seg, idx) =>
                                       seg.type === "text" ? (
                                         <span
-                                          key={`text-${seg.value.length}-${seg.value.slice(0, 40)}`}
+                                          key={`text-${idx}-${seg.value.length}-${seg.value.slice(0, 40)}`}
                                           className="whitespace-pre-wrap break-words"
                                         >
                                           {seg.value}
                                         </span>
                                       ) : (
                                         <InlineRefBadge
-                                          key={`ref-${seg.kind}-${seg.label}`}
+                                          key={`ref-${idx}-${seg.kind}-${seg.label}`}
                                           kind={seg.kind}
                                           label={seg.label}
                                           t={t}
@@ -707,6 +795,10 @@ const PurePreviewMessage = ({
                                   className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover/message:opacity-100 transition-opacity"
                                   data-testid="message-user-actions"
                                 >
+                                  {/* Time display on the left side for user messages */}
+                                  <span className="text-xs text-muted-foreground/60 mr-2">
+                                    {formattedMessageTime}
+                                  </span>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button
@@ -1005,6 +1097,28 @@ const PurePreviewMessage = ({
                     </div>
                   </div>
                 </div>
+              )}
+
+            {message.role === "assistant" &&
+              assistantOutputLibraryItems.length > 0 && (
+                <ul className="mt-3 space-y-3 min-w-0 w-full list-none p-0 m-0">
+                  {assistantOutputLibraryItems.map((item, i) => (
+                    <LibraryItemRow
+                      key={`${item.id}-${i}`}
+                      item={item}
+                      viewMode="list"
+                      t={t as (key: string, fallback?: string) => string}
+                      onOpenFile={(wf) =>
+                        openFilePreviewPanel({
+                          path: wf.path,
+                          name: wf.name,
+                          type: wf.type ?? "",
+                          taskId: wf.taskId,
+                        })
+                      }
+                    />
+                  ))}
+                </ul>
               )}
 
             <MessageActions

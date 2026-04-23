@@ -91,7 +91,7 @@ export type InsightTaskCardProps = InsightTaskCardBaseProps & {
 
 /**
  * Shared action item card
- * Used for action item list in Insight details and action item panel in right toolbar, maintaining consistent style and interaction.
+ * Used for the action item list in Insight details and the action item panel in the right toolbar, maintaining consistent style and interaction.
  */
 export function InsightTaskCard({
   cardKey,

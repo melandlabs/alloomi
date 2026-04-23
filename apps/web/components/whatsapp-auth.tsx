@@ -91,11 +91,24 @@ export function WhatsAppAuthForm({
   }, [clearPolling]);
 
   const handleClose = useCallback(() => {
+    // Analytics tracking: modal closed
+    const sessionDuration = Date.now() - sessionStartTimeRef.current;
+    const hasProgress = sessionId || qrValue || pairingCode || phoneNumber;
+
     closingRef.current = true;
     cleanup();
     onClose();
     closingRef.current = false;
-  }, [cleanup, onClose]);
+  }, [
+    cleanup,
+    onClose,
+    loginMethod,
+    status,
+    sessionId,
+    qrValue,
+    pairingCode,
+    phoneNumber,
+  ]);
 
   const pollStatus = useCallback(
     async (activeSessionId: string) => {
@@ -238,6 +251,8 @@ export function WhatsAppAuthForm({
         throw new Error(t("auth.whatsappErrorGeneric"));
       }
 
+      // Analytics tracking: QR code generated successfully
+
       setSessionId(data.sessionId);
       setQrValue(data.qr ?? "");
       setStatus(data.qr ? "qr" : "pending");
@@ -292,6 +307,8 @@ export function WhatsAppAuthForm({
       setPairingCode(data.pairingCode ?? "");
       setStatus(data.pairingCode ? "pairing" : "pending");
 
+      // Analytics tracking: pairing code generated successfully
+
       startPolling(data.sessionId);
     } catch (error) {
       setStatus("error");
@@ -304,6 +321,8 @@ export function WhatsAppAuthForm({
   const [hasInitiated, setHasInitiated] = useState(false);
 
   const handleRegenerate = useCallback(() => {
+    // Analytics tracking: regenerate
+
     if (loginMethod === "qr") {
       void generateQr();
     } else {
@@ -314,6 +333,11 @@ export function WhatsAppAuthForm({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
+        // Analytics tracking: modal opened
+        sessionStartTimeRef.current = Date.now();
+        stepStartTimeRef.current = Date.now();
+        previousStepRef.current = "";
+
         // Reset to QR mode and auto-generate QR code via the useEffect ref trigger
         setLoginMethod("qr");
         setStatus("idle");
@@ -335,6 +359,18 @@ export function WhatsAppAuthForm({
   // ========================================
   useEffect(() => {
     if (isOpen) {
+      const now = Date.now();
+      const stepDuration = now - stepStartTimeRef.current;
+
+      // Record duration of the previous step
+      if (previousStepRef.current && previousStepRef.current !== status) {
+      }
+
+      // Record new step view
+      if (status && status !== previousStepRef.current) {
+        previousStepRef.current = status;
+        stepStartTimeRef.current = now;
+      }
     }
   }, [isOpen, status, loginMethod]);
 

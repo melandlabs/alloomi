@@ -7,7 +7,7 @@ import {
   siteMetadata,
   softwareApplicationJsonLd,
   webSiteJsonLd,
-} from "@/lib/seo";
+} from "@/lib/marketing/seo";
 
 import "./globals.css";
 import "remixicon/fonts/remixicon.css";

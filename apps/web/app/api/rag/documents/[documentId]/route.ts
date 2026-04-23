@@ -4,7 +4,7 @@ import {
   getDocument,
   getDocumentChunks,
   deleteDocument,
-} from "@/lib/rag/langchain-service";
+} from "@/lib/ai/rag/langchain-service";
 
 /**
  * GET /api/rag/documents/[documentId]
@@ -47,6 +47,7 @@ export async function GET(
         id: document.id,
         fileName: document.fileName,
         contentType: document.contentType,
+        blobPath: document.blobPath,
         sizeBytes: Number(document.sizeBytes),
         totalChunks: document.totalChunks,
         uploadedAt: document.uploadedAt,

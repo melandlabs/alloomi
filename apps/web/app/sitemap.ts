@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { siteMetadata } from "@/lib/seo";
+import { siteMetadata } from "@/lib/marketing/seo";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = siteMetadata.siteUrl.replace(/\/$/, "");

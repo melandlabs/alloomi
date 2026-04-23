@@ -1,4 +1,4 @@
-# Alloomi
+![Alloomi Logo](apps/web/public/images/logo-full-light.svg)
 
 > **Proactive AI workspace** — understands your intent, orchestrates execution, and gets things done.
 
@@ -117,8 +117,6 @@ pnpm tauri:dev
 # Start web app
 pnpm dev
 ```
-
-Web app runs at [localhost:3415](http://localhost:3415).
 
 ## Build & Test
 

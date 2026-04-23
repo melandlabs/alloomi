@@ -10,8 +10,7 @@ import { describe, test, expect } from "vitest";
 
 describe("iMessage Utility Functions", () => {
   test("parseIMessageChatId parses phone numbers", async () => {
-    const { parseIMessageChatId } =
-      await import("@/lib/integration/sources/imessage");
+    const { parseIMessageChatId } = await import("@/lib/integrations/imessage");
     expect(parseIMessageChatId("iMessage;-;+8613800138000")).toEqual({
       phoneNumber: "+8613800138000",
     });
@@ -21,8 +20,7 @@ describe("iMessage Utility Functions", () => {
   });
 
   test("parseIMessageChatId parses email addresses", async () => {
-    const { parseIMessageChatId } =
-      await import("@/lib/integration/sources/imessage");
+    const { parseIMessageChatId } = await import("@/lib/integrations/imessage");
     expect(parseIMessageChatId("iMessage;-;user@example.com")).toEqual({
       email: "user@example.com",
     });
@@ -30,7 +28,7 @@ describe("iMessage Utility Functions", () => {
 
   test("formatIMessageChatId always returns iMessage; prefix", async () => {
     const { formatIMessageChatId } =
-      await import("@/lib/integration/sources/imessage");
+      await import("@/lib/integrations/imessage");
     // Already in iMessage format, return as-is
     expect(formatIMessageChatId("iMessage;-;+8615928069834")).toBe(
       "iMessage;-;+8615928069834",
@@ -69,8 +67,7 @@ describe("iMessage Sending", () => {
         );
       }
 
-      const { IMessageAdapter } =
-        await import("@/lib/integration/sources/imessage");
+      const { IMessageAdapter } = await import("@/lib/integrations/imessage");
       const adapter = new IMessageAdapter({ botId: "imessage-send-test" });
       const text = `[Alloomi] iMessage unit test ${new Date().toISOString()}`;
 

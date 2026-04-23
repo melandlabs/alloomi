@@ -222,7 +222,7 @@ export function TagEditor({
                     {inlineExampleIntro}
                     {inlineExamplePhrases.map((phrase, i) => (
                       <span key={phrase}>
-                        {i > 0 && "，"}
+                        {i > 0 && ", "}
                         <button
                           type="button"
                           onClick={() => handleInlineExampleClick(phrase)}

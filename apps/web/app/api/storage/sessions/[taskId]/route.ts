@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { deleteSession } from "@/lib/workspace/disk-usage";
+import { deleteSession } from "@/lib/files/workspace/disk-usage";
 
 export async function DELETE(
   _req: NextRequest,

@@ -71,7 +71,7 @@ async function processFileAsync(
 
     // Dynamic import to avoid circular dependencies
     const { processDocumentFromFile } =
-      await import("@/lib/rag/langchain-service");
+      await import("@/lib/ai/rag/langchain-service");
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();

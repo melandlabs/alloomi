@@ -11,13 +11,11 @@ export interface BriefPanelStatsProps {
 }
 
 /**
- * Brief panel stats text: Number of information sources processed in the past 24 hours (displayed in header)
+ * Brief panel stats text: number of information sources processed in the past 24 hours (displayed in header)
  */
 export function BriefPanelStats({ messageStats }: BriefPanelStatsProps) {
   const { t } = useTranslation();
-  const count = process.env.NEXT_PUBLIC_USE_MOCK_RAW_MESSAGES
-    ? 364
-    : messageStats.messageCount;
+  const count = messageStats.messageCount;
 
   return (
     <p className="text-sm text-muted-foreground pt-0">

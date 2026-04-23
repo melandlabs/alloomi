@@ -9,9 +9,7 @@ pub fn send_notification(
     let notification = app_handle.notification();
 
     // Check and request permission if needed
-    let permission_state = notification
-        .permission_state()
-        .map_err(|e| e.to_string())?;
+    let permission_state = notification.permission_state().map_err(|e| e.to_string())?;
 
     if permission_state != tauri_plugin_notification::PermissionState::Granted {
         notification

@@ -1,0 +1,23 @@
+{
+  "name": "@alloomi/rss",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.4",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

@@ -41,6 +41,8 @@ export interface AgentBriefPanelProps {
   embedInCard?: boolean;
   externalSelectedInsight?: Insight | null;
   onExternalInsightClose?: () => void;
+  /** When true, excludes manual platform insights from the list */
+  excludeManualInsights?: boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export function AgentBriefPanel({
   embedInCard = false,
   externalSelectedInsight = null,
   onExternalInsightClose,
+  excludeManualInsights = false,
 }: AgentBriefPanelProps = {}) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -68,7 +71,10 @@ export function AgentBriefPanel({
       window.removeEventListener("alloomi:request-integration", handler);
   }, [router]);
 
-  const state = useBriefPanelState({ externalSelectedInsight });
+  const state = useBriefPanelState({
+    externalSelectedInsight,
+    excludeManualInsights,
+  });
 
   // Use useInsightPagination to determine whether to show skeleton screen
   // If data has already loaded (pages has data and not validating), don't show skeleton
@@ -163,7 +169,7 @@ export function AgentBriefPanel({
               ? ""
               : isMobile
                 ? "bg-background"
-                : "bg-card/90 backdrop-blur-md rounded-2xl border border-border/40"),
+                : "bg-card/90 backdrop-blur-md rounded-2xl"),
         )}
       >
         <div

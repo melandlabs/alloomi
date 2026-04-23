@@ -23,7 +23,7 @@ function renderInlineInstructionBadges(
   const SKILL_TOKEN_RE = /\/([\w-]+)(?=\s|\/|$)/g;
 
   const badgeBaseClass =
-    "inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] truncate min-w-0";
+    "inline-flex items-center gap-px rounded-md bg-muted px-[3px] py-px";
 
   const nodes: React.ReactNode[] = [];
   let cursor = 0;
@@ -299,7 +299,7 @@ const components: Partial<Components> = {
   h2: ({ node, children, ...props }) => {
     return (
       <h2
-        className="text-[18px] font-semibold mt-2 mb-1 leading-tight"
+        className="text-[14px] font-medium mt-2 mb-1 leading-tight"
         {...props}
       >
         {children}

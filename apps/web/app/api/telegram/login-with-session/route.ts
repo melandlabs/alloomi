@@ -3,7 +3,7 @@ import {
   convertTdataToStringSession,
   validateTdataDirectory,
   extractAccountInfo,
-} from "@/lib/telegram/tdata-converter";
+} from "@alloomi/integrations/telegram/tdata-converter";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { auth } from "@/app/(auth)/auth";

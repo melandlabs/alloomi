@@ -22,7 +22,7 @@ import {
   type IntegrationId,
 } from "@/hooks/use-integrations";
 import { resolvePlatformLogo } from "./integration-platform-card";
-import { deleteIntegrationAccountRemote } from "@/lib/integration/client";
+import { deleteIntegrationAccountRemote } from "@/lib/integrations/client";
 import { getAuthToken } from "@/lib/auth/token-manager";
 import {
   DropdownMenu,
@@ -498,29 +498,17 @@ export function PlatformIntegrations({
                               align="end"
                               className="text-xs"
                             >
-                              {account.platform === "telegram" && (
-                                <>
-                                  {telegramBotLink ? (
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        window.open(telegramBotLink, "_blank");
-                                      }}
-                                    >
-                                      {t("common.openTelegramBot")}
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                  {account.metadata?.telegramLastError ? (
-                                    <DropdownMenuItem
-                                      disabled={isUpdating}
-                                      onClick={() => {
-                                        void handleTelegramReconnect(account);
-                                      }}
-                                    >
-                                      {t("common.reconnect", "Reconnect")}
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                </>
-                              )}
+                              {account.platform === "telegram" &&
+                              account.metadata?.telegramLastError ? (
+                                <DropdownMenuItem
+                                  disabled={isUpdating}
+                                  onClick={() => {
+                                    void handleTelegramReconnect(account);
+                                  }}
+                                >
+                                  {t("common.reconnect", "Reconnect")}
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuItem
                                 className="text-red-600"
                                 disabled={isDisconnecting}

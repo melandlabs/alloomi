@@ -15,10 +15,12 @@ import {
 } from "@alloomi/ui";
 import { toast } from "@/components/toast";
 import { cn } from "@/lib/utils";
-import { getFileColor } from "@/lib/utils/file-icons";
+import { getFileColor } from "@/components/file-icons";
 import { uploadRagFile } from "@/lib/files/upload";
 import { Spinner } from "@/components/spinner";
 import { FilePreviewPanel } from "@/components/file-preview-panel";
+import { FilePreviewDrawerShell } from "@/components/file-preview-drawer-shell";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
 import { useIsMobile } from "@alloomi/hooks/use-is-mobile";
 import { useSidePanel } from "@/components/agent/side-panel-context";
 import { useChatContextOptional } from "@/components/chat-context";
@@ -210,7 +212,7 @@ function getFileType(fileName: string, contentType: string): FileTypeFilter {
 }
 
 /**
- * Insight Files View: Displays all file details associated with this event
+ * Insight Files View: displays all file details associated with this event
  * Style consistent with Library Page
  */
 export function InsightFilesView({
@@ -220,12 +222,9 @@ export function InsightFilesView({
   const { t } = useTranslation();
   const router = useRouter();
   const isMobile = useIsMobile();
-  const { openSidePanel, sidePanel } = useSidePanel() ?? {
+  const { openSidePanel } = useSidePanel() ?? {
     openSidePanel: () => {},
-    sidePanel: null,
   };
-  // Dynamically calculate preview panel right value based on side panel
-  const previewRight = sidePanel?.width ?? 0;
   const { switchChatId } = useChatContextOptional() ?? {
     toggleFocusedInsight: () => {},
     focusedInsights: [],
@@ -1097,114 +1096,52 @@ export function InsightFilesView({
         </ScrollArea>
       )}
 
-      {/* File preview panel - fixed positioning, adjusts position based on side panel */}
       {isPreviewOpen && previewFile && (
-        <>
-          <div
-            role="button"
-            tabIndex={0}
-            className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-            onClick={() => setIsPreviewOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setIsPreviewOpen(false);
-              }
+        <FilePreviewDrawerShell
+          open={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+        >
+          <FilePreviewPanel
+            file={{
+              path: previewFile.path,
+              name: previewFile.name,
+              type: previewFile.type,
             }}
-            style={{ opacity: isPreviewOpen ? 1 : 0 }}
+            taskId={previewFile.taskId}
+            onClose={() => setIsPreviewOpen(false)}
           />
-          <div
-            className={cn(
-              "fixed top-0 z-[1001] h-full max-h-screen flex flex-col border-l border-border/60 bg-background shadow-2xl transition-transform duration-300 ease-out md:w-[600px] lg:w-[700px] w-full overflow-x-hidden overflow-y-auto",
-              isPreviewOpen ? "translate-x-0" : "translate-x-full",
-            )}
-            style={{
-              right: previewRight,
-              maxWidth: `calc(100vw - ${previewRight}px)`,
-            }}
-          >
-            <FilePreviewPanel
-              file={{
-                path: previewFile.path,
-                name: previewFile.name,
-                type: previewFile.type,
-              }}
-              taskId={previewFile.taskId}
-              onClose={() => setIsPreviewOpen(false)}
-            />
-          </div>
-        </>
+        </FilePreviewDrawerShell>
       )}
 
-      {/* Knowledge base document preview panel - fixed positioning, adjusts position based on side panel */}
       {isDocPreviewOpen && previewDocId && (
-        <>
-          <div
-            role="button"
-            tabIndex={0}
-            className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-            onClick={() => {
+        <FilePreviewDrawerShell
+          onClose={() => {
+            setIsDocPreviewOpen(false);
+            setPreviewDocId(null);
+          }}
+        >
+          <KnowledgeDocPreviewPanel
+            documentId={previewDocId}
+            onClose={() => {
               setIsDocPreviewOpen(false);
               setPreviewDocId(null);
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setIsDocPreviewOpen(false);
-                setPreviewDocId(null);
-              }
-            }}
           />
-          <div
-            className="fixed top-0 z-[1001] h-full max-h-screen flex flex-col border-l border-border/60 bg-background shadow-2xl md:w-[600px] lg:w-[700px] w-full overflow-x-hidden overflow-y-auto"
-            style={{
-              right: previewRight,
-              maxWidth: `calc(100vw - ${previewRight}px)`,
-            }}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 shrink-0">
-              <h3 className="font-medium truncate">
-                {t("insightFiles.preview", "Preview")}
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setIsDocPreviewOpen(false);
-                  setPreviewDocId(null);
-                }}
-              >
-                <RemixIcon name="close" size="size-4" />
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <KnowledgeDocPreviewPanel
-                documentId={previewDocId}
-                onClose={() => {
-                  setIsDocPreviewOpen(false);
-                  setPreviewDocId(null);
-                }}
-                hideContainer
-              />
-            </div>
-          </div>
-        </>
+        </FilePreviewDrawerShell>
       )}
     </div>
   );
 }
 
 /**
- * Knowledge base document preview panel content
+ * Knowledge base document preview: header consistent with library preview, body scrolls within the shell.
  */
 function KnowledgeDocPreviewPanel({
   documentId,
   onClose,
-  hideContainer = false,
 }: {
   documentId: string;
   onClose: () => void;
-  hideContainer?: boolean;
 }) {
   const { t } = useTranslation();
   const [doc, setDoc] = useState<{
@@ -1307,36 +1244,19 @@ function KnowledgeDocPreviewPanel({
     </>
   );
 
-  // If container is hidden, only return content
-  if (hideContainer) {
-    return <ScrollArea className="flex-1 min-h-0">{content}</ScrollArea>;
-  }
-
   return (
-    <>
-      <div
-        role="button"
-        tabIndex={0}
-        className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-        onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-      />
-      <div className="fixed top-0 right-0 z-[1001] h-full max-h-screen min-w-0 flex flex-col border-l border-border/60 bg-background shadow-2xl transition-transform duration-300 ease-out md:w-[800px] lg:w-[900px] w-full translate-x-0 overflow-x-hidden overflow-y-auto">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 shrink-0">
-          <h3 className="font-medium truncate">
-            {doc?.fileName || t("insightFiles.preview", "Preview")}
-          </h3>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <RemixIcon name="close" size="size-4" />
-          </Button>
-        </div>
-        <ScrollArea className="flex-1 min-h-0">{content}</ScrollArea>
-      </div>
-    </>
+    <div className="bg-background flex h-full min-h-0 flex-col">
+      <FilePreviewDrawerHeader fileName={doc?.fileName ?? documentId}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
+          aria-label={t("common.close", "Close")}
+        >
+          <RemixIcon name="close" size="size-4" />
+        </button>
+      </FilePreviewDrawerHeader>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">{content}</div>
+    </div>
   );
 }

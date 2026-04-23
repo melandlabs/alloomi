@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, it } from "vitest";
 import { buildRssItemInserts, type RssSubscription } from "@alloomi/rss";
 
 const baseSubscription: RssSubscription = {
@@ -10,6 +10,11 @@ const baseSubscription: RssSubscription = {
   title: null,
   category: null,
 };
+
+// Helper to test parseDate indirectly via buildRssItemInserts
+function extractDateFromItem(item: any): Date | null {
+  return item.publishedAt;
+}
 
 describe("buildRssItemInserts", () => {
   test("generates stable hashes and metadata", () => {
@@ -54,5 +59,77 @@ describe("buildRssItemInserts", () => {
     expect(inserts.length).toBe(5);
     // Check all guidHash are unique
     expect(new Set(inserts.map((item) => item.guidHash)).size).toBe(5);
+  });
+
+  describe("parseDate (via buildRssItemInserts)", () => {
+    // RN-01: ISO 8601 date format
+    it("RN-01: should parse ISO 8601 date format", () => {
+      const inserts = buildRssItemInserts({
+        subscription: baseSubscription,
+        items: [
+          {
+            title: "Test",
+            isoDate: "2024-01-15T10:30:00.000Z",
+          },
+        ],
+      });
+      expect(inserts[0].publishedAt).toBeInstanceOf(Date);
+      expect(inserts[0].publishedAt?.toISOString()).toContain("2024-01-15");
+    });
+
+    // RN-02: RFC 2822 date format (pubDate)
+    it("RN-02: should parse RFC 2822 date format", () => {
+      const inserts = buildRssItemInserts({
+        subscription: baseSubscription,
+        items: [
+          {
+            title: "Test",
+            pubDate: "Mon, 15 Jan 2024 10:30:00 +0000",
+          },
+        ],
+      });
+      expect(inserts[0].publishedAt).toBeInstanceOf(Date);
+    });
+
+    // RN-03: null date
+    it("RN-03: should handle null date", () => {
+      const inserts = buildRssItemInserts({
+        subscription: baseSubscription,
+        items: [
+          {
+            title: "Test",
+          },
+        ],
+      });
+      expect(inserts[0].publishedAt).toBeNull();
+    });
+
+    // RN-04: invalid date
+    it("RN-04: should handle invalid date", () => {
+      const inserts = buildRssItemInserts({
+        subscription: baseSubscription,
+        items: [
+          {
+            title: "Test",
+            isoDate: "not-a-date",
+          },
+        ],
+      });
+      expect(inserts[0].publishedAt).toBeNull();
+    });
+
+    // RN-05: empty string date
+    it("RN-05: should handle empty string date", () => {
+      const inserts = buildRssItemInserts({
+        subscription: baseSubscription,
+        items: [
+          {
+            title: "Test",
+            isoDate: "",
+          },
+        ],
+      });
+      expect(inserts[0].publishedAt).toBeNull();
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { WhatsAppAdapter } from "@/lib/integration/sources/whatsapp";
+import { WhatsAppAdapter } from "@/lib/integrations/whatsapp";
 import { auth } from "@/app/(auth)/auth";
 
 /**

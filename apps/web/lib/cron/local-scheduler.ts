@@ -8,6 +8,7 @@ import {
   startJobExecution,
   completeJobExecution,
   recoverStuckJobs,
+  cleanupStuckJobs,
 } from "./service";
 import { executeJob } from "./executor";
 import {
@@ -62,9 +63,7 @@ export async function startLocalScheduler() {
     return;
   }
 
-  // Recover any stuck jobs from previous crashed sessions
-  await recoverStuckJobs();
-  // Immediately check due jobs after recovery so recovered jobs get re-scheduled
+  // Immediately check due jobs (includes recoverStuckJobs internally)
   checkAndExecuteDueJobs();
 
   // Then check periodically
@@ -82,6 +81,17 @@ export function stopLocalScheduler() {
     schedulerInterval = null;
     console.log("[LocalScheduler] Scheduler stopped");
   }
+  // Clear running jobs to prevent stuck entries on shutdown
+  runningJobs.clear();
+}
+
+// Register cleanup on process exit to prevent jobs from being stuck in runningJobs
+// This handles unexpected crashes or process termination
+if (typeof process !== "undefined" && process.on) {
+  const cleanupHandler = () => {
+    runningJobs.clear();
+  };
+  process.on("exit", cleanupHandler);
 }
 
 /**
@@ -96,6 +106,14 @@ async function checkAndExecuteDueJobs() {
   isProcessing = true;
 
   try {
+    // First, recover any stuck jobs (runs every minute as part of the scheduler cycle)
+    // Jobs running longer than RECOVERY_TIMEOUT_MS (120 min) are considered stuck
+    await recoverStuckJobs();
+
+    // Then clean up zombie jobs that have been stuck for over 4 hours
+    // These are beyond recovery and are simply deleted
+    await cleanupStuckJobs();
+
     // Get all jobs that are due to run for the current user
     const dueJobs = await getDueJobs(new Date(), schedulerUserId);
 
@@ -178,6 +196,7 @@ async function checkAndExecuteDueJobs() {
           executionId: crypto.randomUUID(),
           triggeredBy: "scheduler" as const,
           modelConfig,
+          timezone: (job as any).timezone,
         };
 
         // Start execution record
@@ -190,12 +209,7 @@ async function checkAndExecuteDueJobs() {
             : JSON.stringify(job.jobConfig);
 
         // Execute job asynchronously - don't wait for completion
-        executeJob(
-          context,
-          jobConfigStr,
-          job.description || undefined,
-          true, // isTauri
-        )
+        executeJob(context, jobConfigStr, job.description || undefined)
           .then(async (result) => {
             console.log(
               `[LocalScheduler] Job ${job.id} completed:`,

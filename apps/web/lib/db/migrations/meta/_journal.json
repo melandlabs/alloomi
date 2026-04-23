@@ -565,12 +565,26 @@
     {
       "idx": 80,
       "version": "7",
+      "when": 1772250000000,
+      "tag": "0089_drop_virtual_file_system_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1772300000000,
+      "tag": "0090_add_topics_to_characters",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
       "when": 1772350000000,
       "tag": "0091_drop_soul_from_characters",
       "breakpoints": true
     },
     {
-      "idx": 81,
+      "idx": 83,
       "version": "7",
       "when": 1772500000000,
       "tag": "0092_add_notification_channels_to_characters",

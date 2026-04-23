@@ -4,8 +4,8 @@
  * Common agent runtime logic used by Telegram and WhatsApp
  */
 
-import type { AgentConfig, AgentOptions } from "@alloomi/agent/types";
-import { getAgentRegistry } from "@alloomi/agent/registry";
+import type { AgentConfig, AgentOptions } from "@alloomi/ai/agent/types";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
 import {
   getUserTypeForService,
   getUserInsightSettings,
@@ -17,9 +17,11 @@ import {
   prepareConversationWindows,
   type ConversationWindowMessage,
 } from "@/lib/ai";
-import { sanitizeCompactionMessages } from "@alloomi/agent";
+import { sanitizeCompactionMessages } from "@alloomi/ai/agent";
 import { saveCompactionSummary } from "@alloomi/ai/store";
 import { getAppMemoryDir } from "@/lib/utils/path";
+import { stripMalformedToolCalls } from "@/lib/utils/tool-names";
+import { formatAgentStreamErrorForUser } from "./format-error";
 
 /**
  * Maximum tokens allowed in conversation history passed to the agent.
@@ -42,6 +44,8 @@ function ensurePluginsRegistered() {
     pluginsRegistered = true;
   }
 }
+
+export { formatAgentStreamErrorForUser } from "./format-error";
 
 /**
  * Get display name for a tool (similar to Web UI)
@@ -136,6 +140,8 @@ export interface HandleAgentRuntimeOptions {
   stream?: boolean; // Enable streaming output (default: true)
   aiSoulPrompt?: string | null; // User-defined AI Soul prompt
   language?: string | null; // User language preference
+  /** Caller controls timeout (e.g., Feishu inbound must respond within a reasonable time) */
+  abortController?: AbortController;
   modelConfig?: {
     // Model configuration for custom API endpoints
     apiKey?: string;
@@ -233,6 +239,9 @@ export async function handleAgentRuntime(
         // Pass stream option (default: true for web, false for Telegram/WhatsApp)
         stream: options.stream ?? false, // Default to false for non-web platforms
         aiSoulPrompt: userSettings?.aiSoulPrompt ?? null,
+        ...(options.abortController
+          ? { abortController: options.abortController }
+          : {}),
       };
 
       // Add conversation history if provided, with sliding-window monitoring
@@ -551,7 +560,12 @@ ${prompt}`;
           }
         }
         if (message.type === "error") {
-          await replyCallback(`Error: ${message.message}`);
+          await replyCallback(
+            formatAgentStreamErrorForUser(
+              platform,
+              message.message ?? "(unknown)",
+            ),
+          );
           return;
         }
         if (message.type === "result") {
@@ -608,7 +622,8 @@ ${prompt}`;
       // Only send final response if we haven't already sent it
       if (!hasSentFinalResponse && finalResponse) {
         const maxLength = 4000;
-        let messageToSend = finalResponse;
+        // Strip malformed tool calls (e.g., XML format output from some models like MiniMax)
+        let messageToSend = stripMalformedToolCalls(finalResponse);
         if (messageToSend.length > maxLength) {
           messageToSend = `${messageToSend.slice(0, maxLength)}\n\n... (truncated)`;
         }

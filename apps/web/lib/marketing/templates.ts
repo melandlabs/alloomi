@@ -1,4 +1,4 @@
-import { siteMetadata } from "@/lib/seo";
+import { siteMetadata } from "@/lib/marketing/seo";
 import type {
   MarketingEmailTemplateDefinition,
   MarketingLinkMap,

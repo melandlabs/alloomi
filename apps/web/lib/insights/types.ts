@@ -1,13 +1,14 @@
+// Zod-inferred types - from subagents (these are app-specific parsing types)
 import type {
-  ActionRequirementDetails,
-  DetailData,
-  ExperimentIdeaData,
-  FollowUpData,
-  RiskFlagData,
-  InsightSource,
   InsightTaskItem,
-  StrategicData,
+  DetailData,
   TimelineData,
+  InsightSource,
+  FollowUpData,
+  ActionRequirementDetails,
+  ExperimentIdeaData,
+  RiskFlagData,
+  StrategicData,
 } from "@/lib/ai/subagents/insights";
 import type { Insight } from "@/lib/db/schema";
 

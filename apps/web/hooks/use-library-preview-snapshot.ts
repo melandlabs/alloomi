@@ -6,7 +6,7 @@ import {
   buildLibrarySpreadsheetSnapshot,
   type LibrarySpreadsheetInput,
   type LibrarySpreadsheetSnapshot,
-} from "@/lib/library/spreadsheet-preview-snapshot";
+} from "@/lib/files/spreadsheet-preview-snapshot";
 import type { RenderedPage } from "@/components/artifacts/pdf-preview";
 import type * as XLSXType from "xlsx";
 

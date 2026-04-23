@@ -26,7 +26,10 @@ export async function bytesToImageDataUrl(
   }
 
   // For binary images, use Blob/FileReader to avoid btoa issues with high byte values
-  const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
+  // Create proper ArrayBuffer from Uint8Array for Blob constructor
+  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(arrayBuffer).set(bytes);
+  const blob = new Blob([arrayBuffer], { type: mime });
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {

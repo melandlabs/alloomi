@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  ensureRedis,
   getLoginSession,
   setLoginSession,
   type LoginSession,
@@ -14,6 +15,8 @@ const MAX_WAIT_ATTEMPTS = 120;
 
 export async function POST(request: Request) {
   try {
+    await ensureRedis();
+
     const { sessionId, password } = await request.json();
 
     if (!sessionId || !password) {
@@ -108,11 +111,12 @@ export async function POST(request: Request) {
       }
 
       if (resultSession.status === "error") {
+        const errorLower = resultSession.error?.toLowerCase() || "";
         // Check if it's a password error
         if (
-          resultSession.error?.includes("password") ||
-          resultSession.error?.includes("invalid") ||
-          resultSession.error?.includes("incorrect")
+          errorLower.includes("password") ||
+          errorLower.includes("invalid") ||
+          errorLower.includes("incorrect")
         ) {
           // Calculate remaining attempts
           const remainingAttempts = MAX_ATTEMPTS - newAttempts;

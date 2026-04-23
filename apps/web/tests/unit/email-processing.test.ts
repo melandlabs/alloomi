@@ -13,10 +13,7 @@ import { describe, it, expect } from "vitest";
 // To test them properly, I should probably export them.
 // I will start by modifying email.ts to export these utility functions.
 
-import {
-  stripQuotedText,
-  isBoilerplate,
-} from "@/lib/integration/sources/email";
+import { stripQuotedText, isBoilerplate } from "@/lib/integrations/email";
 
 describe("Email Processing Logic", () => {
   describe("stripQuotedText", () => {

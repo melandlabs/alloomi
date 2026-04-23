@@ -1,4 +1,4 @@
-import { uploadFile, deleteFile } from "@/lib/storage/adapters";
+import { uploadFile, deleteFile } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 

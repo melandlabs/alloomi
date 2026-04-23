@@ -22,7 +22,7 @@ import { enUS, zhCN } from "date-fns/locale";
 import useSWR from "swr";
 import { fetcher, generateUUID } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import type { ChatHistoryResponse } from "@/lib/types/api";
+import type { ChatHistoryResponse } from "@/lib/ai/chat/api";
 import type { Insight } from "@/lib/db/schema";
 import type { InsightReplyContext } from "./types";
 

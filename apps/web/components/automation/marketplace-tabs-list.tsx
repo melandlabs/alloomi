@@ -30,9 +30,7 @@ export function MarketplaceTabsList({
           size="size-4"
           filled={value === "character"}
         />
-        <span className="hidden xs:inline">
-          {t("nav.character", "Character")}
-        </span>
+        <span className="hidden xs:inline">{t("nav.mates", "Mates")}</span>
       </TabsTrigger>
       <TabsTrigger
         value="skills"

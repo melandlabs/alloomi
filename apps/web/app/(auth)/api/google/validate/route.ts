@@ -134,7 +134,8 @@ export async function POST(request: Request) {
       errorMessage.includes("auth failed") ||
       errorMessage.includes("login failed") ||
       errorMessage.includes("bad user") ||
-      errorMessage.includes("login info");
+      errorMessage.includes("login info") ||
+      errorMessage.includes("command failed");
 
     if (isInvalidPassword) {
       return NextResponse.json(
@@ -146,8 +147,21 @@ export async function POST(request: Request) {
       );
     }
 
+    // Try to extract more details from imapflow error
+    const imapError = error as {
+      message?: string;
+      responseText?: string;
+      responseCode?: string;
+    };
+
+    const detailedInfo = imapError.responseText
+      ? ` (server response: ${imapError.responseText})`
+      : "";
+
     return NextResponse.json(
-      { error: `Google auth validate failed: ${(error as Error).message}` },
+      {
+        error: `Google auth validate failed: ${(error as Error).message}${detailedInfo}`,
+      },
       { status: 500 },
     );
   }

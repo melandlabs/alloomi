@@ -233,8 +233,14 @@ export function useReplyAiAssist({
       });
 
       if (!generateResponse.ok) {
-        const errorText = await generateResponse.text();
-        throw new Error(errorText || "Failed to generate reply");
+        let errorMessage = "Failed to generate reply";
+        try {
+          const errorJson = JSON.parse(await generateResponse.text());
+          errorMessage = errorJson.cause || errorJson.message || errorMessage;
+        } catch {
+          // Not JSON, use default
+        }
+        throw new Error(errorMessage);
       }
 
       const generateData = (await generateResponse.json()) as {
@@ -297,7 +303,7 @@ export function useReplyAiAssist({
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (!errorMessage.includes("Failed to parse AI response")) {
-        toast.error(
+        console.error(
           t(
             "insight.aiDraftFailed",
             `Failed to generate reply. ${errorMessage}`,

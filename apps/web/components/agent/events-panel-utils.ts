@@ -163,7 +163,7 @@ export const formatDateForGroupLabel = (
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayKey = getDateKey(yesterday);
   if (dateKey === yesterdayKey) {
-    return language.startsWith("zh") ? "昨天" : "Yesterday";
+    return language.startsWith("zh") ? "Yesterday" : "Yesterday";
   }
   return formatDateForDisplay(date, language);
 };
@@ -228,19 +228,18 @@ export const formatTimeForTable = (
 
     if (daysDiff === 0) {
       return t("todayTitle", language.startsWith("zh") ? "Today" : "Today");
-    } else if (daysDiff === 1) {
+    }
+    if (daysDiff === 1) {
       return t(
         "yesterdayTitle",
-        language.startsWith("zh") ? "昨天" : "Yesterday",
+        language.startsWith("zh") ? "Yesterday" : "Yesterday",
       );
-    } else {
-      // 2-6 days ago
-      if (language.startsWith("zh")) {
-        return `${daysDiff} days ago`;
-      } else {
-        return `${daysDiff} ${t("common.dayAgo", "days ago")}`;
-      }
     }
+    // 2-6 days ago
+    if (language.startsWith("zh")) {
+      return `${daysDiff} days ago`;
+    }
+    return `${daysDiff} ${t("common.dayAgo", "days ago")}`;
   }
 
   // Beyond one week: show absolute date, but not year

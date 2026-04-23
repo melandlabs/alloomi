@@ -16,7 +16,7 @@ import {
   formatFileSize,
   getAllFilesRecursive,
   getAllWorkspaceFilesRecursive,
-} from "@/lib/workspace/sessions";
+} from "@/lib/files/workspace/sessions";
 import { db } from "@/lib/db/queries";
 import { chat } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";

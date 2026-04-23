@@ -24,7 +24,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.presentation.title"),
       emoji: "📊",
       type: "role_based" as const,
-      reasoning: "Create presentation slides",
+      reasoning: "Create presentation",
       related_insight_ids: [],
     },
     {
@@ -32,7 +32,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.frontendDesign.title"),
       emoji: "🖥️",
       type: "role_based" as const,
-      reasoning: "Frontend design - create website intro page for Alloomi",
+      reasoning: "Frontend design for Alloomi website introduction page",
       related_insight_ids: [],
     },
     {
@@ -40,7 +40,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.linkedinPost.title"),
       emoji: "📈",
       type: "role_based" as const,
-      reasoning: "Create event tracking",
+      reasoning: "Event tracking creation",
       related_insight_ids: [],
     },
     {
@@ -48,7 +48,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.productCopy.title"),
       emoji: "✍️",
       type: "role_based" as const,
-      reasoning: "Optimize product copy",
+      reasoning: "Product copy optimization",
       related_insight_ids: [],
     },
     {
@@ -56,7 +56,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.algorithmicArt.title"),
       emoji: "🎨",
       type: "role_based" as const,
-      reasoning: "Create algorithmic art",
+      reasoning: "Algorithmic art creation",
       related_insight_ids: [],
     },
     {
@@ -64,7 +64,7 @@ export function getAllDefaultSuggestions(
       title: t("common.suggestedCards.aiNews.title"),
       emoji: "📰",
       type: "role_based" as const,
-      reasoning: "Research AI industry news",
+      reasoning: "AI industry news research",
       related_insight_ids: [],
     },
   ];

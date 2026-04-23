@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, test, expect, vi } from "vitest";
+import { describe, beforeEach, afterEach, test, expect, vi, it } from "vitest";
 
 import {
   validateUrlForSSRF,
@@ -10,6 +10,179 @@ import {
 vi.mock("server-only", () => ({}));
 
 describe("url-validator - SSRF Protection", () => {
+  // Additional tests for ipToInt and isPrivateIp via validateUrlForSSRF
+  // since these functions are not exported directly
+
+  describe("IP address validation edge cases", () => {
+    // UV-01: boundary private IP addresses
+    it("UV-01: should reject IPs at start of 10.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://10.0.0.0/file", { strictWhitelist: false }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-02: should reject IPs at end of 10.x range
+    it("UV-02: should reject IPs at end of 10.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://10.255.255.255/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-03: should reject IPs at start of 172.16.x range
+    it("UV-03: should reject IPs at start of 172.16.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://172.16.0.0/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-04: should reject IPs at end of 172.31.x range
+    it("UV-04: should reject IPs at end of 172.31.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://172.31.255.255/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-05: should reject IPs at start of 192.168.x range
+    it("UV-05: should reject IPs at start of 192.168.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://192.168.0.0/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-06: should reject IPs at end of 192.168.x range
+    it("UV-06: should reject IPs at end of 192.168.x range", async () => {
+      await expect(
+        validateUrlForSSRF("http://192.168.255.255/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-07: should reject carrier-grade NAT range
+    it("UV-07: should reject carrier-grade NAT range 100.64.x", async () => {
+      await expect(
+        validateUrlForSSRF("http://100.64.0.1/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-08: should reject link-local 169.254.x
+    it("UV-08: should reject link-local 169.254.x", async () => {
+      await expect(
+        validateUrlForSSRF("http://169.254.0.1/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-09: should reject TEST-NET-1 192.0.2.x
+    it("UV-09: should reject TEST-NET-1 192.0.2.x", async () => {
+      await expect(
+        validateUrlForSSRF("http://192.0.2.1/file", { strictWhitelist: false }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-10: should reject TEST-NET-2 198.51.100.x
+    it("UV-10: should reject TEST-NET-2 198.51.100.x", async () => {
+      await expect(
+        validateUrlForSSRF("http://198.51.100.1/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-11: should reject TEST-NET-3 203.0.113.x
+    it("UV-11: should reject TEST-NET-3 203.0.113.x", async () => {
+      await expect(
+        validateUrlForSSRF("http://203.0.113.1/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-12: should accept valid public IP
+    it("UV-12: should accept valid public IP", async () => {
+      const url = await validateUrlForSSRF("http://8.8.8.8/file", {
+        strictWhitelist: false,
+        requireHttps: false,
+      });
+      expect(url.hostname).toBe("8.8.8.8");
+    });
+  });
+
+  describe("IPv6 validation", () => {
+    // UV-13: should reject IPv6 documentation range
+    it("UV-13: should reject IPv6 documentation range 2001:db8:x", async () => {
+      await expect(
+        validateUrlForSSRF("http://[2001:db8::1]/file", {
+          strictWhitelist: false,
+        }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-14: should reject IPv6 unique local fc00:x
+    it("UV-14: should reject IPv6 unique local fc00:x", async () => {
+      await expect(
+        validateUrlForSSRF("http://[fc00::1]/file", { strictWhitelist: false }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+
+    // UV-15: should reject IPv6 unique local fd00:x
+    it("UV-15: should reject IPv6 unique local fd00:x", async () => {
+      await expect(
+        validateUrlForSSRF("http://[fd00::1]/file", { strictWhitelist: false }),
+      ).rejects.toThrow(SSRFValidationError);
+    });
+  });
+
+  describe("isAllowedDomain via strictWhitelist", () => {
+    // UV-16: subdomain of whitelisted domain
+    it("UV-16: should allow subdomain of whitelisted domain", async () => {
+      const url = await validateUrlForSSRF("https://api.example.com/file", {
+        strictWhitelist: true,
+        allowedDomains: ["*.example.com"],
+      });
+      expect(url.hostname).toBe("api.example.com");
+    });
+
+    // UV-17: deep subdomain of whitelisted domain
+    it("UV-17: should allow deep subdomain of whitelisted domain", async () => {
+      const url = await validateUrlForSSRF(
+        "https://deep.sub.domain.example.com/file",
+        {
+          strictWhitelist: true,
+          allowedDomains: ["*.example.com"],
+        },
+      );
+      expect(url.hostname).toBe("deep.sub.domain.example.com");
+    });
+
+    // UV-18: exact match of whitelisted domain
+    it("UV-18: should allow exact match of whitelisted domain", async () => {
+      const url = await validateUrlForSSRF("https://googleapis.com/file", {
+        strictWhitelist: true,
+      });
+      expect(url.hostname).toBe("googleapis.com");
+    });
+
+    // UV-19: subdomain of googleapis.com
+    it("UV-19: should allow subdomain of googleapis.com", async () => {
+      const url = await validateUrlForSSRF(
+        "https://storage.googleapis.com/file",
+        { strictWhitelist: true },
+      );
+      expect(url.hostname).toBe("storage.googleapis.com");
+    });
+  });
   describe("isTrustedStorageUrl", () => {
     test("returns true for Vercel Blob URLs", () => {
       expect(

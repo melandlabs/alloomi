@@ -5,12 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { RemixIcon } from "@/components/remix-icon";
 import { useIntegrations } from "@/hooks/use-integrations";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import {
   getDiscordAuthorizationUrl,
   getSlackAuthorizationUrl,
   getTeamsAuthorizationUrl,
-} from "@/lib/integration";
+} from "@/lib/integrations";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";

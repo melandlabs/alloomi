@@ -17,7 +17,7 @@ import { AgentLayout } from "@/components/agent/layout";
 import { ResponsiveToolbar } from "@/components/agent/responsive-toolbar";
 import { AgentChatPanel } from "@/components/agent/chat-panel";
 import { ChatHeaderPanel } from "@/components/agent/chat-header-panel";
-import { PageSectionHeader } from "@alloomi/ui";
+import { Button, PageSectionHeader } from "@alloomi/ui";
 import {
   AgentEventsPanel,
   AgentBriefPanel,
@@ -32,17 +32,19 @@ import { buildNavigationUrl, cn, generateUUID, fetcher } from "@/lib/utils";
 import { UserProfileSettings } from "@/components/user-profile-settings";
 import { ProfileOverview } from "@/components/profile-overview";
 import { AboutSettings } from "@/components/about-settings";
+import { StorageManagementPanel } from "@/components/storage-management-panel";
 import { PersonalizationProfileSoulPanel } from "@/components/personalization/personalization-profile-soul-panel";
-import { PersonalizationMyContextsPanel } from "@/components/personalization/personalization-my-contexts-panel";
 import { useIsMobile } from "@alloomi/hooks/use-is-mobile";
 import { useChatContext } from "@/components/chat-context";
 import { InsightsPaginationProvider } from "@/hooks/use-insight-data";
 import { FilePreviewOverlay } from "@/components/file-preview-overlay";
 import { ChatHistorySidePanel } from "@/components/agent/chat-history-side-panel";
-import type { ChatHistoryResponse } from "@/lib/types/api";
+import type { ChatHistoryResponse } from "@/lib/ai/chat/api";
 import { mutate } from "swr";
 import { AddPlatformDialog } from "@/components/add-platform-dialog";
 import { useIntegrations } from "@/hooks/use-integrations";
+import { PanelSkeleton } from "@/components/agent/panel-skeleton";
+import { RemixIcon } from "@/components/remix-icon";
 
 // Lazy load motion components to reduce bundle size
 const MotionSection = dynamic(
@@ -573,15 +575,30 @@ export function Home() {
         return t("settings.profileSoulPageTitle", "About me");
       case "alloomi-soul":
         return t("settings.general", "General");
-      case "my-contexts":
-        return t("settings.personalizationTabs.contexts", "My Contexts");
       case "about":
         return t("about.title", "About");
+      case "storage-management":
+        return t("settings.storageManagementTitle", "Storage management");
       case "coupons":
         return t("nav.coupons", "Coupons");
       default:
         return t("nav.myAccount", "My Account");
     }
+  }
+
+  /**
+   * Controls whether utility pages should hide the top header section.
+   */
+  function shouldHideUtilityHeader(pageParam: string | null): boolean {
+    return [
+      "profile",
+      "account-settings",
+      "profile-edit",
+      "profile-soul",
+      "alloomi-soul",
+      "about",
+      "storage-management",
+    ].includes(pageParam ?? "");
   }
 
   // ============================================================================
@@ -598,19 +615,21 @@ export function Home() {
       headerDescription?: ReactNode,
     ) => (
       <div className="flex flex-col flex-1 min-h-0 h-full max-h-screen overflow-visible">
-        <PageSectionHeader
-          title={titleOverride ?? getUtilityPageTitle(pageParam)}
-          description={headerDescription}
-        >
-          {headerRight}
-        </PageSectionHeader>
+        {!shouldHideUtilityHeader(pageParam) && (
+          <PageSectionHeader
+            title={titleOverride ?? getUtilityPageTitle(pageParam)}
+            description={headerDescription}
+          >
+            {headerRight}
+          </PageSectionHeader>
+        )}
         <MotionSection
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: "easeOut" }}
           className="flex h-full min-h-0 flex-1 flex-col"
         >
-          <div className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto px-4 pb-4 pt-0 sm:px-6 sm:pb-12 sm:pt-0">
+          <div className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto px-4 pb-6 pt-6 sm:px-6 sm:pb-6 sm:pt-6">
             {content}
           </div>
         </MotionSection>
@@ -638,18 +657,27 @@ export function Home() {
       return renderUtilityPanel(<UserProfileSettings />, "account-settings");
     }
 
-    if (page === "my-contexts") {
-      return renderUtilityPanel(
-        <PersonalizationMyContextsPanel />,
-        "my-contexts",
-        undefined,
-        undefined,
-        t("settings.contextsDescription"),
-      );
-    }
-
     if (page === "about") {
       return renderUtilityPanel(<AboutSettings />, "about");
+    }
+
+    if (page === "storage-management") {
+      return renderUtilityPanel(
+        <StorageManagementPanel />,
+        "storage-management",
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => {
+            router.refresh();
+          }}
+        >
+          <RemixIcon name="refresh" size="size-4" />
+          {t("common.refresh", "Refresh")}
+        </Button>,
+      );
     }
 
     // Determine whether to show mobile menu bar (only show when mobile and on insight/brief page)
@@ -809,12 +837,7 @@ export function Home() {
         onExternalInsightClose={closeExternalInsight}
       />
     ) : (
-      <AgentBriefPanel
-        key="brief-panel"
-        embedInCard={true}
-        externalSelectedInsight={selectedInsight}
-        onExternalInsightClose={closeExternalInsight}
-      />
+      <PanelSkeleton key="panel-skeleton" />
     );
 
     return (

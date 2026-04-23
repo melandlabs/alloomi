@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { RemixIcon } from "@/components/remix-icon";
@@ -11,6 +10,7 @@ import type { Insight } from "@/lib/db/schema";
 import { getToolDisplayName } from "@/lib/utils/tool-names";
 
 import { FilePreviewPanel } from "@/components/file-preview-panel";
+import { FilePreviewDrawerShell } from "@/components/file-preview-drawer-shell";
 import "../../i18n";
 
 /** Single todo item parsed from chat messages */
@@ -482,39 +482,15 @@ export function WorkspaceFloatPanel({
         </div>
       </div>
 
-      {/* File preview panel - rendered to body via Portal to ensure full-screen overlay */}
-      {previewFile &&
-        createPortal(
-          <>
-            {/* Overlay */}
-            <div
-              role="button"
-              tabIndex={0}
-              className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-              onClick={() => setPreviewFile(null)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setPreviewFile(null);
-                }
-              }}
-            />
-            {/* Drawer */}
-            <div
-              className={cn(
-                "fixed top-0 right-0 z-[1001] h-full max-h-screen min-w-0 flex-col border-l border-border/60 bg-white shadow-2xl transition-transform duration-300 ease-out md:w-[600px] lg:w-[800px] w-full",
-                "translate-x-0",
-              )}
-            >
-              <FilePreviewPanel
-                file={previewFile}
-                taskId={chatId || undefined}
-                onClose={() => setPreviewFile(null)}
-              />
-            </div>
-          </>,
-          document.body,
-        )}
+      {previewFile && (
+        <FilePreviewDrawerShell onClose={() => setPreviewFile(null)}>
+          <FilePreviewPanel
+            file={previewFile}
+            taskId={chatId || undefined}
+            onClose={() => setPreviewFile(null)}
+          />
+        </FilePreviewDrawerShell>
+      )}
     </>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { isImageFile } from "@/lib/utils/file-icons";
+import { isImageFile } from "@/components/file-icons";
 import { getToolDisplayName } from "@/lib/utils/tool-names";
 
 interface NativeToolCallProps {

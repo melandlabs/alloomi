@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { InlineRefKind } from "@alloomi/shared/ref";
 
 /**
- * Inline reference Badge: Displayed mixed with text inside message bubbles or input box.
+ * Inline reference Badge: displayed mixed with text inside message bubbles or input fields.
  * Style reference lexical-beautiful-mentions: pill shape, clear type color, compact and readable.
  */
 export function InlineRefBadge({

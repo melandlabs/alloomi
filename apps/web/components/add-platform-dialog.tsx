@@ -35,7 +35,8 @@ import {
   getJiraAuthorizationUrl,
   getLinearAuthorizationUrl,
   getXAuthorizationUrl,
-} from "@/lib/integration";
+  getNotionAuthorizationUrl,
+} from "@/lib/integrations";
 import { useIsMobile } from "@alloomi/hooks/use-is-mobile";
 import {
   useIntegrations,
@@ -324,7 +325,7 @@ export function AddPlatformContent({
    * Start polling cloud accounts (Tauri mode)
    */
   const startPollingForAccounts = useCallback(
-    (platform: "slack" | "discord" | "twitter") => {
+    (platform: "slack" | "discord" | "twitter" | "notion") => {
       // Clear any existing polling timer
       if (pollingTimerRef.current) {
         clearInterval(pollingTimerRef.current);
@@ -631,9 +632,31 @@ export function AddPlatformContent({
       }
     };
 
-    const notionConnect = () => {
-      if (typeof window !== "undefined") {
-        openUrl("/api/notion/oauth");
+    const notionConnect = async () => {
+      try {
+        let authToken: string | undefined;
+        if (isTauri()) {
+          const { getAuthToken } = await import("@/lib/auth/token-manager");
+          const token = getAuthToken();
+          authToken = token || undefined;
+        }
+        const authorizationUrl = await getNotionAuthorizationUrl(authToken);
+        if (isTauri()) {
+          const { openUrl: tauriOpenUrl } = await import("@/lib/tauri");
+          await tauriOpenUrl(authorizationUrl);
+          startPollingForAccounts("notion");
+        } else {
+          openUrl(authorizationUrl);
+        }
+      } catch (error) {
+        console.error("[Notion Connect] Error:", error);
+        toast({
+          type: "error",
+          description:
+            error instanceof Error
+              ? error.message
+              : t("common.operationFailed", "Operation failed"),
+        });
       }
     };
 
@@ -1042,7 +1065,6 @@ export function AddPlatformContent({
         buttonClass: "bg-black text-white hover:bg-neutral-800",
         iconBackground: "bg-neutral-900/10 text-neutral-900",
         onConnect: notionConnect,
-        disable: true,
       },
       asana: {
         id: "asana",

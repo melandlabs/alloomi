@@ -5,9 +5,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { getAgentRegistry } from "@alloomi/agent/registry";
-import { getAllAgentMetadata } from "@alloomi/agent/registry";
-import { claudePlugin } from "@/lib/extensions";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
+import { getAllAgentMetadata } from "@alloomi/ai/agent/registry";
+import { claudePlugin } from "@/lib/ai/extensions";
 
 // Register Claude Agent plugin
 getAgentRegistry().register(claudePlugin);

@@ -19,7 +19,7 @@ type DingTalkStepsDialogProps = {
 };
 
 /**
- * DingTalk Stream bot connection steps
+ * DingTalk Stream bot connection steps description
  */
 export function DingTalkStepsDialog({
   open,

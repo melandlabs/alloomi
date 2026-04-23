@@ -19,7 +19,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@alloomi/ui";
 import { toast } from "@/components/toast";
 import { MarkdownWithCitations } from "@/components/markdown-with-citations";
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { InsightNoteModal } from "@/components/insight-note/insight-note-modal";
 import { Spinner } from "@/components/spinner";
 import { htmlToPlainText } from "@/components/insight-detail-footer";
 import type { KnowledgeFile } from "@/hooks/use-knowledge-files";
@@ -687,18 +686,6 @@ export function InsightAttachedList({
           </ul>
         </ScrollArea>
       )}
-
-      <InsightNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => {
-          setIsNoteModalOpen(false);
-          setEditNote(null);
-        }}
-        insightId={insightId}
-        initialContent={editNote?.content ?? ""}
-        editNoteId={editNote?.id ?? null}
-        onSave={handleNoteSaved}
-      />
 
       <AlertDialog
         open={deleteNoteDialogOpen}

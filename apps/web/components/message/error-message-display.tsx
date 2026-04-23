@@ -182,19 +182,13 @@ export function ErrorMessageDisplay({
         };
       }
 
-      // Generic custom API error without specific credit issue
-      // Remove the log file path from display
-      const cleanError = error
-        .replace(/__CUSTOM_API_ERROR__\|[^|]+/, "")
-        .replace(/http:\/\/[^/]+\/[^/]+\/Users\/[^/]+\/[^\s]+/, "")
-        .trim();
-
+      // Generic custom API error without specific credit issue - don't show raw error to user
       const suggestions = t("auth.errors.customApiError.suggestions", {
         returnObjects: true,
       });
       return {
         title: t("auth.errors.customApiError.title"),
-        description: cleanError || t("auth.errors.customApiError.description"),
+        description: t("auth.errors.customApiError.description"),
         suggestions: Array.isArray(suggestions) ? suggestions : [],
         icon: "alert_triangle",
         severity: "error" as const,

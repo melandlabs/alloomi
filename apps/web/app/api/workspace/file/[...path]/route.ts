@@ -14,7 +14,7 @@ import {
   deleteSessionFile,
   readSessionFile,
   readSessionFileBinary,
-} from "@/lib/workspace/sessions";
+} from "@/lib/files/workspace/sessions";
 
 // Image file extensions
 const IMAGE_EXTENSIONS = new Set([
@@ -33,10 +33,20 @@ const IMAGE_EXTENSIONS = new Set([
 // PDF file extensions
 const PDF_EXTENSIONS = new Set(["pdf"]);
 
+// Spreadsheet (requires `?binary=true` to fetch snapshot or download)
+const SPREADSHEET_BINARY_EXTENSIONS = new Set([
+  "xlsx",
+  "xls",
+  "xlsm",
+  "ods",
+  "csv",
+]);
+
 // Other binary file extensions
 const BINARY_EXTENSIONS = new Set([
   ...IMAGE_EXTENSIONS,
   ...PDF_EXTENSIONS,
+  ...SPREADSHEET_BINARY_EXTENSIONS,
   "zip",
   "tar",
   "gz",
@@ -61,6 +71,8 @@ const BINARY_EXTENSIONS = new Set([
   "eot",
   "bin",
   "dat",
+  "pptx",
+  "docx",
 ]);
 
 // File extension to MIME type mapping
@@ -94,6 +106,13 @@ const MIME_TYPES: Record<string, string> = {
   gz: "application/gzip",
   "7z": "application/x-7z-compressed",
   rar: "application/vnd.rar",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+  xlsm: "application/vnd.ms-excel.sheet.macroEnabled.12",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  csv: "text/csv; charset=utf-8",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
 // GET /api/workspace/file/[taskId]/[...path] - Read file content
@@ -117,7 +136,7 @@ export async function GET(
     }
 
     const [taskId, ...filePathParts] = pathParts;
-    const filePath = filePathParts.join("/");
+    const filePath = decodeURIComponent(filePathParts.join("/"));
 
     if (!taskId) {
       return NextResponse.json(
@@ -151,7 +170,7 @@ export async function GET(
       // Get MIME type
       const mimeType = MIME_TYPES[ext] || "application/octet-stream";
 
-      // Return binary content
+      // Return binary content - convert Buffer to Uint8Array for NextResponse compatibility
       return new NextResponse(new Uint8Array(binaryContent), {
         status: 200,
         headers: {
@@ -211,7 +230,7 @@ export async function DELETE(
     }
 
     const [taskId, ...filePathParts] = pathParts;
-    const filePath = filePathParts.join("/");
+    const filePath = decodeURIComponent(filePathParts.join("/"));
     if (!taskId) {
       return NextResponse.json(
         { error: "taskId is required" },

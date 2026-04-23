@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Alloomi",
-  "version": "0.4.0",
+  "version": "0.4.3",
   "identifier": "com.alloomi.app",
   "build": {
     "beforeDevCommand": "node scripts/run-tauri-dev.js",
     "beforeBuildCommand": "node scripts/run-tauri-build.js",
-    "devUrl": "http://localhost:3415"
+    "devUrl": "http://localhost:3515"
   },
   "app": {
     "withGlobalTauri": true,
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: tauri:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http: blob:; font-src 'self' data:; connect-src 'self' https: http: wss: blob: data: tauri: ipca:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';",
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: tauri: https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; img-src 'self' data: https: http: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: http: wss: blob: data: tauri: ipca: https://unpkg.com https://cdn.tailwindcss.com https://fonts.googleapis.com; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';",
       "capabilities": ["default"]
     }
   },

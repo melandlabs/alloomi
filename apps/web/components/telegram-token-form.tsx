@@ -15,7 +15,7 @@ import {
   createIntegrationAccount,
   updateIntegrationAccountCredentials,
   type CreatedIntegrationAccount,
-} from "@/lib/integration/client";
+} from "@/lib/integrations/client";
 import { getAuthToken } from "@/lib/auth/token-manager";
 import { getHomePath } from "@/lib/utils";
 import {
@@ -106,7 +106,17 @@ export function TelegramTokenForm({
     (newStep: string) => {
       if (!isOpen) return;
 
+      const now = Date.now();
+      const stepDuration = now - stepStartTimeRef.current;
+
+      // Record duration of previous step
+      if (previousStepRef.current) {
+      }
+
+      // Record new step view
+
       previousStepRef.current = newStep;
+      stepStartTimeRef.current = now;
     },
     [isOpen, loginMethod],
   );
@@ -128,6 +138,10 @@ export function TelegramTokenForm({
   // ========================================
   useEffect(() => {
     if (isOpen) {
+      // Reset session start time
+      sessionStartTimeRef.current = Date.now();
+      stepStartTimeRef.current = Date.now();
+      previousStepRef.current = "";
     }
   }, [isOpen, loginMethod, reconnectAccountId]);
 
@@ -680,6 +694,8 @@ export function TelegramTokenForm({
 
   // Refresh QR code - ensure error state is reset
   const refreshQrCode = () => {
+    // Analytics tracking: QR refresh
+
     // Reset error state and QR code state to allow regeneration
     resetQrState();
     // Reset throttle timestamp, allow immediate refresh
@@ -706,6 +722,8 @@ export function TelegramTokenForm({
       return () => clearTimeout(timer);
     }
     if (qrTimeoutCountdown === 0 && isWaitingForConfirmation) {
+      // Analytics tracking: QR expired
+
       setError(t("auth.qrTimeout"));
       setIsWaitingForConfirmation(false);
       setQrStep("generate");
@@ -757,6 +775,10 @@ export function TelegramTokenForm({
   }, []);
 
   const handleClose = () => {
+    // Analytics tracking: modal close
+    const sessionDuration = Date.now() - sessionStartTimeRef.current;
+    const hasProgress = sessionId || verificationCode || password || qrPassword;
+
     resetQrState();
     onClose();
   };
@@ -927,6 +949,8 @@ export function TelegramTokenForm({
           }`}
           onClick={() => {
             if (loginMethod !== "phone") {
+              // Analytics tracking: method switch
+
               if (loginMethod === "qr") {
                 cancelQrLogin();
               }
@@ -949,6 +973,8 @@ export function TelegramTokenForm({
           }`}
           onClick={() => {
             if (loginMethod !== "qr") {
+              // Analytics tracking: method switch
+
               setLoginMethod("qr");
             }
           }}
@@ -969,6 +995,8 @@ export function TelegramTokenForm({
             }`}
             onClick={() => {
               if (loginMethod !== "fast") {
+                // Analytics tracking: method switch
+
                 if (loginMethod === "qr") {
                   cancelQrLogin();
                 }

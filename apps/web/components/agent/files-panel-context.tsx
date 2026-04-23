@@ -4,7 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import { useKnowledgeFiles } from "@/hooks/use-knowledge-files";
 
 /**
- * Files panel Context value type
+ * Files panel context value type
  */
 interface FilesPanelContextValue {
   files: ReturnType<typeof useKnowledgeFiles>;
@@ -16,7 +16,7 @@ const FilesPanelContext = createContext<FilesPanelContextValue | undefined>(
 
 /**
  * Files panel Provider component
- * Manages useKnowledgeFiles hook state for sharing among child components
+ * Manages useKnowledgeFiles hook state, shared by child components
  */
 export function FilesPanelProvider({ children }: { children: ReactNode }) {
   const files = useKnowledgeFiles();
@@ -29,7 +29,7 @@ export function FilesPanelProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Hook for using files panel Context
+ * Hook using files panel Context
  */
 export function useFilesPanelContext() {
   const context = useContext(FilesPanelContext);

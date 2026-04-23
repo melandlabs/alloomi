@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { getUserRAGStats } from "@/lib/rag/langchain-service";
+import { getUserRAGStats } from "@/lib/ai/rag/langchain-service";
 
 /**
  * GET /api/rag/stats

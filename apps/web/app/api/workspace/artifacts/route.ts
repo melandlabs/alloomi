@@ -12,7 +12,10 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/app/(auth)/auth";
 import { db } from "@/lib/db/queries";
 import { message } from "@/lib/db/schema";
-import { listSessionFiles, getTaskSessionDir } from "@/lib/workspace/sessions";
+import {
+  listSessionFiles,
+  getTaskSessionDir,
+} from "@/lib/files/workspace/sessions";
 import { existsSync } from "node:fs";
 
 // Important file types (these files will be treated as artifacts)

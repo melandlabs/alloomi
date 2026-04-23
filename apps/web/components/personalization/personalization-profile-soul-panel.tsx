@@ -1,10 +1,8 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { Separator } from "@alloomi/ui";
 import { PersonalizationSwrBoundary } from "./personalization-swr-boundary";
 import { PersonalizationRoleSettings } from "./personalization-role-settings";
-import { PersonalizationInterestsSettings } from "./personalization-interests-settings";
 
 /**
  * "About me" page: merged identity/description and interests (people + topics).
@@ -22,13 +20,6 @@ export function PersonalizationProfileSoulPanel() {
             {t("settings.profileTitle", "Profile")}
           </p>
           <PersonalizationRoleSettings open hideIntro />
-        </div>
-        <Separator />
-        <div className="space-y-6">
-          <p className="px-0 pb-0 text-base font-semibold text-foreground-secondary">
-            {t("settings.personalizationTabs.people", "My Interests")}
-          </p>
-          <PersonalizationInterestsSettings open hideDescription />
         </div>
       </div>
     </PersonalizationSwrBoundary>

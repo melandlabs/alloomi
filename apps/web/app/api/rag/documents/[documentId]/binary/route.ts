@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { head } from "@vercel/blob";
 import { auth } from "@/app/(auth)/auth";
-import { getDocument } from "@/lib/rag/langchain-service";
+import { getDocument } from "@/lib/ai/rag/langchain-service";
 import { isTauriMode } from "@/lib/env";
-import { fileExists, readFile } from "@/lib/storage/adapters";
+import { fileExists, readFile } from "@/lib/storage";
 import { fetchWithSSRFProtection } from "@alloomi/security/url-validator";
 
 /**
@@ -92,10 +92,12 @@ export async function GET(
         const buffer = await readFile(document.blobPath);
         // Ensure buffer is a Buffer (readFile may return string in some cases)
         const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+        // Convert Buffer to Uint8Array for Response compatibility
+        const uint8Data = new Uint8Array(data);
         // Encode filename for Content-Disposition header using RFC 5987 to handle Unicode
         const encodedFilename = encodeURIComponent(document.fileName);
         // Use Response directly to avoid potential header processing issues with NextResponse
-        return new Response(new Blob([data as unknown as BlobPart]), {
+        return new Response(uint8Data, {
           headers: {
             "Content-Type": contentType,
             "Content-Disposition": `inline; filename="${encodedFilename}"`,

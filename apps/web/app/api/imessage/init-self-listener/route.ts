@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { initIMessageSelfListener } from "@/lib/imessage/init";
+import { initIMessageSelfListener } from "@/lib/integrations/imessage/init";
 import { auth } from "@/app/(auth)/auth";
 
 /**

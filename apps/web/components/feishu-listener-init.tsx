@@ -29,6 +29,7 @@ export function FeishuListenerInit() {
       return;
     }
 
+    // Too long delay causes server-side WS to connect but token not yet injected; user sends Feishu message first will get 401
     initTimeoutRef.current = setTimeout(async () => {
       const userId = session?.user?.id;
       const isAuthenticated = session !== null && !!userId;
@@ -50,7 +51,7 @@ export function FeishuListenerInit() {
       } catch {
         // Silent (no error handling)
       }
-    }, 3000);
+    }, 400);
 
     return () => {
       if (initTimeoutRef.current) {

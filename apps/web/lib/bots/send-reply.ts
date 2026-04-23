@@ -8,24 +8,24 @@ import {
 } from "../db/queries";
 import type { UserContact } from "../db/schema";
 import { AppError } from "@alloomi/shared/errors";
-import { EmailAdapter } from "../integration/sources/email";
-import { SlackAdapter } from "../integration/sources/slack";
-import { TelegramAdapter } from "../integration/sources/telegram";
-import { DiscordAdapter } from "../integration/sources/discord";
-import { WhatsAppAdapter } from "../integration/sources/whatsapp";
-import { TeamsAdapter } from "../integration/sources/teams";
-import { FacebookMessengerAdapter } from "../integration/sources/facebook-messenger";
-import { InstagramAdapter } from "../integration/sources/instagram";
-import { XAdapter } from "../integration/sources/x";
+import { EmailAdapter } from "../integrations/email";
+import { SlackAdapter } from "../integrations/slack";
+import { TelegramAdapter } from "@alloomi/integrations/telegram/adapter";
+import { DiscordAdapter } from "../integrations/discord";
+import { WhatsAppAdapter } from "../integrations/whatsapp";
+import { TeamsAdapter } from "../integrations/teams";
+import { FacebookMessengerAdapter } from "@alloomi/integrations/facebook-messenger";
+import { InstagramAdapter } from "@alloomi/integrations/instagram";
+import { XAdapter } from "@alloomi/integrations/x";
 import {
   IMessageAdapter,
   isIMessageContactMeta,
   formatIMessageChatId,
-} from "../integration/sources/imessage";
-import { FeishuAdapter } from "../integration/sources/feishu";
-import { DingTalkAdapter } from "../integration/sources/dingtalk";
-import { QQBotAdapter } from "../integration/sources/qqbot";
-import { WeixinAdapter } from "../integration/sources/weixin";
+} from "../integrations/imessage";
+import { FeishuAdapter } from "@alloomi/integrations/feishu";
+import { DingTalkAdapter } from "@alloomi/integrations/dingtalk";
+import { QQBotAdapter } from "@alloomi/integrations/qqbot";
+import { WeixinAdapter } from "@alloomi/integrations/weixin";
 import type { Attachment } from "@alloomi/shared";
 import type {
   File as FileMsg,
@@ -33,9 +33,11 @@ import type {
   Messages,
   Voice,
 } from "@alloomi/integrations/channels";
-import { handleTelegramAuthFailure } from "@/lib/telegram/session";
-import { isTelegramContactMeta } from "@/lib/types/contacts";
+import { handleTelegramAuthFailure } from "@/lib/integrations/telegram/session";
+import { isTelegramContactMeta } from "@alloomi/integrations/contacts";
 import { getBotCredentials } from "./token";
+import { fileIngester } from "../integrations/providers/file-ingester";
+import { telegramClientRegistry } from "../integrations/telegram/client-registry";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -267,6 +269,8 @@ export async function sendReplyByBotId({
         botId: bot.id,
         botToken,
         session: sessionKey,
+        fileIngester,
+        clientRegistry: telegramClientRegistry,
       });
       const previousSession = sessionKey;
 
@@ -695,12 +699,11 @@ export async function sendReplyByBotId({
         // Use Gmail OAuth Adapter
         console.log(`[Bot ${bot.id}] using Gmail OAuth adapter`);
 
-        const { GmailOAuthAdapter } =
-          await import("../integration/sources/gmail");
+        const { GmailOAuthAdapter } = await import("../integrations/gmail");
         const gmailAdapter = new GmailOAuthAdapter({
           bot,
           credentials:
-            credentials as import("../integration/sources/gmail").GmailStoredCredentials,
+            credentials as import("../integrations/gmail").GmailStoredCredentials,
         });
 
         try {
@@ -1136,8 +1139,6 @@ export async function sendReplyByBotId({
         expiresAt: credentials.expiresAt ?? undefined,
         clientId: process.env.TWITTER_CLIENT_ID,
         clientSecret: process.env.TWITTER_CLIENT_SECRET,
-        platformAccountId: bot.platformAccountId ?? undefined,
-        userAccountId: bot.userId,
         onCredentialsUpdated: async (updated) => {
           if (bot.platformAccountId) {
             await updateIntegrationAccount({
@@ -1319,6 +1320,7 @@ export async function sendReplyByBotId({
         botId: bot.id,
         appId: credentials.appId,
         appSecret: credentials.appSecret,
+        domain: credentials.domain,
       });
       try {
         for (const r of recipientsSet) {

@@ -6,12 +6,12 @@ import type { AvatarConfiguration } from "@/components/agent-avatar/types";
 import { cn } from "@/lib/utils";
 
 /**
- * AgentEmptyState component Props
- * Layout: AI avatar on top (optional) / content in middle / action buttons on bottom (optional)
+ * Generic empty state component Props
+ * Layout: Top AI avatar (optional) / Middle text / Bottom button (optional)
  */
 export interface AgentEmptyStateProps {
   /**
-   * AI avatar configuration, renders AvatarDisplay when provided; mutually exclusive with avatar
+   * AI avatar configuration, renders AvatarDisplay when passed; mutually exclusive with avatar
    */
   avatarConfig?: AvatarConfiguration | null;
   /**
@@ -23,11 +23,11 @@ export interface AgentEmptyStateProps {
    */
   avatar?: ReactNode;
   /**
-   * Middle content area
+   * Middle text area
    */
   children: ReactNode;
   /**
-   * Bottom action button area, not shown if not provided
+   * Bottom action button area, not shown if not passed
    */
   action?: ReactNode;
   /**
@@ -37,9 +37,9 @@ export interface AgentEmptyStateProps {
 }
 
 /**
- * General empty state component
- * Structure: AI avatar (or custom avatar) on top → content in middle → optional buttons on bottom
- * Pages customize display by passing avatarConfig/avatar, children, action
+ * Generic empty state component
+ * Structure: Top AI avatar (or custom avatar) → Middle text → Bottom optional button
+ * Each page customizes display by passing avatarConfig/avatar, children, action
  */
 export function AgentEmptyState({
   avatarConfig,

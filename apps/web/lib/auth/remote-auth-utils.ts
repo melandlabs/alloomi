@@ -32,6 +32,48 @@ export interface TokenPayload {
 }
 
 /**
+ * Default token lifetime: 90 days in seconds
+ */
+const DEFAULT_TOKEN_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
+
+/**
+ * Get token lifetime from environment variable or default
+ */
+export function getTokenLifetime(): number {
+  const envValue = process.env.AUTH_TOKEN_EXPIRY_SECONDS;
+  if (envValue) {
+    const parsed = Number.parseInt(envValue, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+    console.warn("[Auth] AUTH_TOKEN_EXPIRY_SECONDS invalid, using default");
+  }
+  return DEFAULT_TOKEN_LIFETIME_SECONDS;
+}
+
+/**
+ * Default refresh grace period: 24 hours in seconds
+ */
+const DEFAULT_REFRESH_GRACE_PERIOD_SECONDS = 24 * 60 * 60;
+
+/**
+ * Get refresh grace period from environment variable or default
+ */
+export function getRefreshGracePeriod(): number {
+  const envValue = process.env.AUTH_TOKEN_REFRESH_GRACE_PERIOD_SECONDS;
+  if (envValue) {
+    const parsed = Number.parseInt(envValue, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+    console.warn(
+      "[Auth] AUTH_TOKEN_REFRESH_GRACE_PERIOD_SECONDS invalid, using default",
+    );
+  }
+  return DEFAULT_REFRESH_GRACE_PERIOD_SECONDS;
+}
+
+/**
  * Generate auth token
  */
 export function generateToken(userId: string, email: string): string {
@@ -40,7 +82,7 @@ export function generateToken(userId: string, email: string): string {
     id: userId,
     email,
     sessionVersion: authSessionVersion,
-    exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days
+    exp: Math.floor(Date.now() / 1000) + getTokenLifetime(),
     iat: Math.floor(Date.now() / 1000),
   });
 

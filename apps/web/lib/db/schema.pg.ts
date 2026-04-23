@@ -17,7 +17,8 @@ import {
   bigint,
 } from "drizzle-orm/pg-core";
 import type { DetailData, TimelineData } from "../ai/subagents/insights";
-import type { ContactMeta } from "../types/contacts";
+import type { ContactMeta } from "@alloomi/integrations/contacts";
+import { entitlementsByUserType } from "@alloomi/billing/entitlements";
 import type { InsightFilter } from "@/lib/insights/filter-schema";
 
 export const user = pgTable("User", {
@@ -1440,7 +1441,9 @@ export const userFreeQuota = pgTable(
     userId: uuid("userId")
       .notNull()
       .references(() => user.id),
-    totalQuota: integer("total_quota").notNull().default(30000),
+    totalQuota: integer("total_quota")
+      .notNull()
+      .default(entitlementsByUserType.guest.totalQuota),
     usedQuota: integer("used_quota").notNull().default(0),
     lastAdjustedAt: timestamp("last_adjusted_at").defaultNow(),
   },
@@ -1990,13 +1993,21 @@ export const characters = pgTable(
     lastExecutionAt: timestamp("last_execution_at", { withTimezone: true }),
     lastExecutionStatus: varchar("last_execution_status", { length: 20 }),
     sources: jsonb("sources")
-      .$type<Array<{ type: "file" | "channel"; name: string; id?: string }>>()
+      .$type<
+        Array<{
+          type: "file" | "channel" | "folder";
+          name: string;
+          id?: string;
+          path?: string;
+        }>
+      >()
       .default([]),
     topics: jsonb("topics").$type<string[]>().default([]).notNull(),
     notificationChannels: jsonb("notification_channels")
       .$type<string[]>()
       .default([])
       .notNull(),
+    systemNotification: boolean("system_notification").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

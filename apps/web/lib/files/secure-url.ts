@@ -3,6 +3,7 @@
  * All files are accessed via backend proxy to ensure permission checking
  */
 
+import { DEV_PORT, PROD_PORT } from "@alloomi/shared";
 import type { Attachment } from "@alloomi/shared";
 
 /**
@@ -14,8 +15,13 @@ function getBaseUrl(): string {
     // Client-side: use current page's origin
     return window.location.origin;
   }
+
   // Server-side: use environment variables
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3415";
+  const isDevelopment = process.env.NODE_ENV === "development";
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    `http://localhost:${isDevelopment ? DEV_PORT : PROD_PORT}`
+  );
 }
 
 /**

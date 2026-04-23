@@ -253,7 +253,7 @@ export function LibraryItemRow({
     const wf = item.workspaceFile;
     if (!wf) return;
     const { openWorkspaceFileInSystemDefaultApp } =
-      await import("@/lib/open-workspace-file-locally");
+      await import("@/lib/files/open-workspace-file-locally");
     const r = await openWorkspaceFileInSystemDefaultApp({
       taskId: wf.taskId,
       path: wf.path,
@@ -280,7 +280,7 @@ export function LibraryItemRow({
     const wf = item.workspaceFile;
     if (!wf) return;
     const { revealWorkspaceFileInParentFolder } =
-      await import("@/lib/open-workspace-file-locally");
+      await import("@/lib/files/open-workspace-file-locally");
     const r = await revealWorkspaceFileInParentFolder({
       taskId: wf.taskId,
       path: wf.path,
@@ -555,9 +555,16 @@ export function LibraryItemRow({
               <div className="flex size-10 shrink-0 items-center justify-center rounded-[8px] border border-border/60 p-0.5">
                 <LibraryFileTypeIcon src={fileIconSrc} sizeClass="h-6 w-6" />
               </div>
-              <p className="min-w-0 flex-1 truncate text-left text-sm font-normal">
-                {item.title}
-              </p>
+              <div className="flex items-center gap-1 min-w-0 flex-1">
+                <p className="min-w-0 flex-1 truncate text-left text-sm font-normal">
+                  {item.title}
+                </p>
+                {item.isTemporary && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 shrink-0">
+                    {t("common.temporary", "Temp")}
+                  </span>
+                )}
+              </div>
             </div>
             {titleMenu}
           </div>
@@ -584,7 +591,14 @@ export function LibraryItemRow({
           <LibraryFileTypeIcon src={fileIconSrc} sizeClass="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1 text-left overflow-hidden space-y-0.5">
-          <p className="text-sm font-medium truncate">{item.title}</p>
+          <div className="flex items-center gap-1">
+            <p className="text-sm font-medium truncate">{item.title}</p>
+            {item.isTemporary && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                {t("common.temporary", "Temp")}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground truncate">{dateLabel}</p>
         </div>
         <div className="shrink-0 flex items-center gap-1">{titleMenu}</div>

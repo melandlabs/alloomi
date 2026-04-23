@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const MATERIAL_TO_REMIX: Record<string, { line: string; fill: string }> = {
   track_changes: { line: "ri-dashboard-line", fill: "ri-dashboard-fill" },
   timer: { line: "ri-timer-line", fill: "ri-timer-fill" },
-  folder_open: { line: "ri-folder-open-line", fill: "ri-folder-open-fill" },
+  folder_open: { line: "ri-file-2-line", fill: "ri-file-2-fill" },
   search: { line: "ri-search-line", fill: "ri-search-fill" },
   inbox: { line: "ri-inbox-line", fill: "ri-inbox-fill" },
   tune: { line: "ri-settings-3-line", fill: "ri-settings-3-fill" },
@@ -174,6 +174,8 @@ const MATERIAL_TO_REMIX: Record<string, { line: string; fill: string }> = {
   robot_2: { line: "ri-robot-2-line", fill: "ri-robot-2-fill" },
   /** Main sidebar Agents entry */
   robot_3: { line: "ri-robot-3-line", fill: "ri-robot-3-fill" },
+  /** Sidebar Board / Kanban entry (kanban) */
+  kanban_view: { line: "ri-kanban-view", fill: "ri-kanban-view" },
   /** Sidebar marketplace entry */
   store_3: { line: "ri-store-3-line", fill: "ri-store-3-fill" },
   /** Coupon/gift (semantically consistent with Lucide Gift) */
@@ -245,6 +247,11 @@ const MATERIAL_TO_REMIX: Record<string, { line: string; fill: string }> = {
     fill: "ri-arrow-right-s-fill",
   },
   logout: { line: "ri-logout-box-r-line", fill: "ri-logout-box-r-fill" },
+  /** Remove from squad / exit circle (character danger zone) */
+  logout_circle_r: {
+    line: "ri-logout-circle-r-line",
+    fill: "ri-logout-circle-r-fill",
+  },
   door_open: { line: "ri-door-open-line", fill: "ri-door-open-fill" },
   grip_vertical: { line: "ri-draggable", fill: "ri-draggable" },
   bell: { line: "ri-notification-3-line", fill: "ri-notification-3-fill" },
@@ -390,6 +397,10 @@ const MATERIAL_TO_REMIX: Record<string, { line: string; fill: string }> = {
   booklet: { line: "ri-booklet-line", fill: "ri-booklet-fill" },
   brain: { line: "ri-brain-line", fill: "ri-brain-fill" },
   hard_drive: { line: "ri-hard-drive-2-line", fill: "ri-hard-drive-2-fill" },
+  hard_drive_3_line: {
+    line: "ri-hard-drive-3-line",
+    fill: "ri-hard-drive-3-fill",
+  },
   bold: { line: "ri-bold", fill: "ri-bold" },
   italic: { line: "ri-italic", fill: "ri-italic" },
   list_ordered: { line: "ri-list-ordered", fill: "ri-list-ordered" },

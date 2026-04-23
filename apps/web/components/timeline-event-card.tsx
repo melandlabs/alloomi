@@ -66,7 +66,7 @@ export function TimelineEventCard({
   const dateLocale = locale === "zh" ? zhCN : enUS;
 
   /**
-   * Format event display time, prioritizing event time, then update time.
+   * Format event display time, prefer event time first, then use update time.
    */
   const formatEventTime = () => {
     if (event.time) {

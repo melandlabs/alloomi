@@ -10,7 +10,7 @@ import {
   getUserById,
 } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
-import { DUMMY_PASSWORD, authSessionVersion } from "@/lib/constants";
+import { DUMMY_PASSWORD, authSessionVersion } from "@/lib/env/constants";
 import type { DefaultJWT } from "next-auth/jwt";
 import { sendLifecycleEmail } from "@/lib/marketing/service";
 import { isTauriProductionEnv, createTauriProductionAuthModule } from "./tauri";

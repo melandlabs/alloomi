@@ -9,14 +9,14 @@
 
 import type { UserType } from "@/app/(auth)/auth";
 import { NextRequest } from "next/server";
-import { setAIUserContext } from "@alloomi/agent/ai/request-context";
+import { setAIUserContext } from "@alloomi/ai/agent/model";
 
 export {
   setAIUserContext,
   clearAIUserContext,
   getAIUserContext,
-} from "@alloomi/agent/ai/request-context";
-export type { AIUserContext } from "@alloomi/agent/ai/request-context";
+} from "@alloomi/ai/agent/model";
+export type { AIUserContext } from "@alloomi/ai/agent/model";
 
 /**
  * Extract cloud authentication token from request

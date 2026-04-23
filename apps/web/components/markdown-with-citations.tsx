@@ -9,7 +9,6 @@ import { CodeBlock } from "./code-block";
 import { CitationBadge } from "./citation-badge";
 import type { Insight } from "@/lib/db/schema";
 import { useTranslation } from "react-i18next";
-import { openUrl } from "@/lib/tauri";
 
 /**
  * Process citation markers in text, convert ^[ID]^ or [number] to clickable badges
@@ -31,10 +30,12 @@ function processTextWithCitations(
   const citationIndexMap = new Map<string, number>();
   let currentCitationIndex = 0;
 
-  // Match two formats:
-  // 1. ^[ID]^ - New format
-  // 2. \[(\d+(?:,\s*\d+)*)\] - Old format, supports [4] or [4, 5] or [4,5,6]
-  const citationRegex = /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]/g;
+  // Match three formats:
+  // 1. ^[ID]^ - New format with brackets
+  // 2. [number] or [number, number] - Old format, supports [4] or [4, 5] or [4,5,6]
+  // 3. ^[ID]^ - UUID/ID without brackets (e.g., ^2faf4305-7774-4051-a2b9-4856fc9402e5^)
+  const citationRegex =
+    /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]|\^([a-fA-F0-9-]+)\^/g;
   let lastIndex = 0;
   let match = citationRegex.exec(text);
   let keyCounter = 0;
@@ -105,13 +106,25 @@ function processTextWithCitations(
           displayIndex = indices[0]; // Use original index as display number
         }
       }
+    } else if (match[3]) {
+      // New format without brackets: ^ID^ (e.g., ^2faf4305-7774-4051-a2b9-4856fc9402e5^)
+      insightId = match[3];
+      insight = insights?.find((i) => i.id === insightId);
+
+      if (insightId && !citationIndexMap.has(insightId)) {
+        currentCitationIndex++;
+        citationIndexMap.set(insightId, currentCitationIndex);
+      }
+      displayIndex = citationIndexMap.get(insightId);
     }
 
-    if (insightId && insight && displayIndex) {
+    if (insightId && displayIndex) {
       parts.push(
         <CitationBadge
           key={`citation-${keyCounter++}`}
           index={displayIndex}
+          platform={insight?.platform}
+          tooltip={insight?.title ?? undefined}
           onClick={() => {
             if (insightId) {
               onCitationClick(insightId);
@@ -120,7 +133,6 @@ function processTextWithCitations(
         />,
       );
     }
-    // If no corresponding insight found, don't display any content (skip)
 
     lastIndex = match.index + match[0].length;
     match = citationRegex.exec(text);
@@ -145,7 +157,7 @@ function processTextWithCitations(
 }
 
 // Use shared utility function to detect image files
-import { IMAGE_FILE_EXTENSIONS } from "@/lib/utils/file-icons";
+import { IMAGE_FILE_EXTENSIONS } from "@/components/file-icons";
 
 /**
  * Detect file paths in text, return preview button if it's an image path
@@ -622,15 +634,17 @@ function NonMemoizedMarkdownWithCitations({
       }
 
       // Check if it contains citation markers
-      const hasCitation = /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]/.test(
-        textContent,
-      );
-      if (!hasCitation || !onCitationClick) {
+      const hasCitation =
+        /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]|\^[a-fA-F0-9-]+\^/.test(
+          textContent,
+        );
+      if (!hasCitation) {
         return content;
       }
 
-      // Process citation markers
-      return processTextWithCitations(textContent, onCitationClick, insights);
+      // Process citation markers (use no-op if onCitationClick not provided)
+      const clickHandler = onCitationClick ?? (() => {});
+      return processTextWithCitations(textContent, clickHandler, insights);
     };
 
     // Helper function to recursively extract text content
@@ -803,11 +817,13 @@ function NonMemoizedMarkdownWithCitations({
       const processChildrenDeep = (content: any): React.ReactNode => {
         // If it's a string, process citation markers directly
         if (typeof content === "string") {
-          const hasCitation = /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]/.test(
-            content,
-          );
-          if (hasCitation && onCitationClick) {
-            return processTextWithCitations(content, onCitationClick, insights);
+          const hasCitation =
+            /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]|\^[a-fA-F0-9-]+\^/.test(
+              content,
+            );
+          if (hasCitation) {
+            const clickHandler = onCitationClick ?? (() => {});
+            return processTextWithCitations(content, clickHandler, insights);
           }
           return content;
         }
@@ -859,11 +875,13 @@ function NonMemoizedMarkdownWithCitations({
       const processChildrenDeep = (content: any): React.ReactNode => {
         // If it's a string, process citation markers directly
         if (typeof content === "string") {
-          const hasCitation = /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]/.test(
-            content,
-          );
-          if (hasCitation && onCitationClick) {
-            return processTextWithCitations(content, onCitationClick, insights);
+          const hasCitation =
+            /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]|\^[a-fA-F0-9-]+\^/.test(
+              content,
+            );
+          if (hasCitation) {
+            const clickHandler = onCitationClick ?? (() => {});
+            return processTextWithCitations(content, clickHandler, insights);
           }
           return content;
         }
@@ -1024,11 +1042,13 @@ function NonMemoizedMarkdownWithCitations({
       const processChildrenDeep = (content: any): React.ReactNode => {
         // If it's a string, process citation markers directly
         if (typeof content === "string") {
-          const hasCitation = /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]/.test(
-            content,
-          );
-          if (hasCitation && onCitationClick) {
-            return processTextWithCitations(content, onCitationClick, insights);
+          const hasCitation =
+            /\^\[([^\]]+)\]\^|\[(\d+(?:,\s*\d+)*)\]|\^[a-fA-F0-9-]+\^/.test(
+              content,
+            );
+          if (hasCitation) {
+            const clickHandler = onCitationClick ?? (() => {});
+            return processTextWithCitations(content, clickHandler, insights);
           }
           return content;
         }
@@ -1072,17 +1092,13 @@ function NonMemoizedMarkdownWithCitations({
       if (showPreviewButton && previewFileData) {
         return (
           <>
-            <button
-              type="button"
+            <a
+              href={href}
               className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
-              onClick={(e) => {
-                e.preventDefault();
-                openUrl(href);
-              }}
-              {...(props as React.ComponentProps<"button">)}
+              {...(props as React.ComponentProps<"a">)}
             >
               {processedChildren}
-            </button>
+            </a>
             <button
               type="button"
               onClick={(e) => {
@@ -1116,17 +1132,13 @@ function NonMemoizedMarkdownWithCitations({
       }
 
       return (
-        <button
-          type="button"
+        <a
+          href={href}
           className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
-          onClick={(e) => {
-            e.preventDefault();
-            openUrl(href);
-          }}
-          {...(props as React.ComponentProps<"button">)}
+          {...(props as React.ComponentProps<"a">)}
         >
           {processedChildren}
-        </button>
+        </a>
       );
     };
 
@@ -1191,12 +1203,13 @@ function NonMemoizedMarkdownWithCitations({
       );
     };
 
-    // Handle pre tags (code block container) - consistent with CodeBlock styles
+    // Handle pre tags (code block container) - use CodeBlock for copy functionality
+    // Note: children here is the result of components.code processing, which is <code> element
     components.pre = ({ children }: any) => {
       return (
-        <pre className="text-sm w-full overflow-x-auto dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl dark:text-zinc-50 text-zinc-900">
+        <CodeBlock node={{}} inline={false}>
           {children}
-        </pre>
+        </CodeBlock>
       );
     };
 
@@ -1207,10 +1220,12 @@ function NonMemoizedMarkdownWithCitations({
       const isInline =
         !className || className === "" || !className.startsWith("language-");
 
-      // If it's a code block, render code element directly (wrapped by components.pre) - consistent with CodeBlock styles
+      // For code blocks, return the code element directly (will be wrapped by components.pre)
       if (!isInline) {
         return (
-          <code className="whitespace-pre font-mono min-w-0">{children}</code>
+          <code className={className} {...props}>
+            {children}
+          </code>
         );
       }
 
@@ -1378,9 +1393,8 @@ function NonMemoizedMarkdownWithCitations({
       let processed: React.ReactNode[] = [text];
 
       // Process citation markers first
-      if (onCitationClick) {
-        processed = processTextWithCitations(text, onCitationClick, insights);
-      }
+      const clickHandler = onCitationClick ?? (() => {});
+      processed = processTextWithCitations(text, clickHandler, insights);
 
       // Then process file path previews
       const previewLabel = t("common.preview", "Preview");

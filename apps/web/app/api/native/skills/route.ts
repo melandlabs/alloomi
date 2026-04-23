@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { loadSkills } from "@/lib/skills/loader";
+import { loadSkills } from "@/lib/ai/skills/loader";
 
 // GET /api/native/skills - List all available skills
 export async function GET() {

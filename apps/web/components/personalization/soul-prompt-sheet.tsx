@@ -46,7 +46,7 @@ export interface SoulPromptSheetProps {
 
 /**
  * Soul prompt inline panel (extra column)
- * Displayed as right column in layout, no overlay, no slide-in animation
+ * Displayed as a right-side column in the layout, no overlay, no slide-in animation
  */
 export function SoulPromptPanel({
   sheetSelectedId,
@@ -64,7 +64,7 @@ export function SoulPromptPanel({
     ? t("common.soulPreset.custom")
     : preset
       ? t(preset.titleKey)
-      : t("common.soulPromptSheetTitle");
+      : t("common.descriptionPromptSheetTitle");
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col rounded-none border-0 bg-card shrink-0 overflow-hidden">
@@ -168,7 +168,7 @@ export function SoulPromptPanel({
 
 /**
  * Soul prompt sidebar (drawer)
- * Displays prompt of currently selected card: preset is read-only, custom is editable Textarea
+ * Displays the prompt of the currently selected card: presets are read-only, custom is editable Textarea
  */
 export function SoulPromptSheet({
   open,
@@ -187,7 +187,7 @@ export function SoulPromptSheet({
     ? t("common.soulPreset.custom")
     : preset
       ? t(preset.titleKey)
-      : t("common.soulPromptSheetTitle");
+      : t("common.descriptionPromptSheetTitle");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

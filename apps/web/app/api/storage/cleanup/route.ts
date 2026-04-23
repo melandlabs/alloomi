@@ -3,8 +3,8 @@ import {
   cleanLogs,
   deleteAllSessions,
   cleanBrowserTemp,
-} from "@/lib/workspace/disk-usage";
-import { getAppDir } from "@/lib/config/constants";
+} from "@/lib/files/workspace/disk-usage";
+import { getAppDir } from "@/lib/env/config/constants";
 import fs from "node:fs";
 import path from "node:path";
 

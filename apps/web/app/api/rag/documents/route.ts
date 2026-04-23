@@ -3,7 +3,7 @@ import { auth } from "@/app/(auth)/auth";
 import {
   getUserDocuments,
   deleteUserDocuments,
-} from "@/lib/rag/langchain-service";
+} from "@/lib/ai/rag/langchain-service";
 import { db } from "@/lib/db";
 import { insightDocuments, insight } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";

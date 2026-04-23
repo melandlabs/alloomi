@@ -3,7 +3,7 @@ import { auth } from "@/app/(auth)/auth";
 import {
   searchSimilarChunks,
   formatSearchResultsForLLM,
-} from "@/lib/rag/langchain-service";
+} from "@/lib/ai/rag/langchain-service";
 
 export async function POST(request: Request) {
   const session = await auth();

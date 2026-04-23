@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 import { getUser, createUser } from "@/lib/db/queries";
 import {
   generateToken,
+  getTokenLifetime,
   withErrorHandler,
   createSuccessResponse,
   createErrorResponse,
@@ -20,7 +21,7 @@ import {
   RateLimitPresets,
 } from "@/lib/rate-limit/middleware";
 import { setAuthCookies } from "@/lib/auth/cookie-auth";
-import { createCloudClientForRequest } from "@/lib/api/remote-client";
+import { createCloudClientForRequest } from "@/lib/auth/remote-client";
 import { isTauriMode } from "@/lib/env/constants";
 import { sendLifecycleEmail } from "@/lib/marketing/service";
 import { authFormSchema } from "@/lib/auth/validation";
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     const payload = {
       id: newUser.id,
       email: newUser.email,
-      exp: now + 30 * 24 * 60 * 60,
+      exp: now + getTokenLifetime(),
       iat: now,
     };
 

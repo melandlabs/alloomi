@@ -5,9 +5,9 @@
  * Called when user logs out to ensure clean state.
  */
 import { type NextRequest, NextResponse } from "next/server";
-import { stopTelegramUserListener } from "@/lib/telegram/user-listener";
-import { stopWhatsAppSelfMessageListener } from "@/lib/whatsapp/init";
-import { stopIMessageSelfListener } from "@/lib/imessage/init";
+import { stopTelegramUserListener } from "@/lib/integrations/telegram/user-listener";
+import { stopWhatsAppSelfMessageListener } from "@/lib/integrations/whatsapp/init";
+import { stopIMessageSelfListener } from "@/lib/integrations/imessage/init";
 
 export async function POST(req: NextRequest) {
   try {

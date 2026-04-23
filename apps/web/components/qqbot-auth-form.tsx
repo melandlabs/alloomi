@@ -13,7 +13,7 @@ import {
 } from "@alloomi/ui";
 import { Button, Input, Label } from "@alloomi/ui";
 import { RemixIcon } from "@/components/remix-icon";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { toast } from "@/components/toast";
 import { QQBotStepsDialog } from "@/components/qqbot-steps-dialog";
 import { getAuthToken } from "@/lib/auth/token-manager";

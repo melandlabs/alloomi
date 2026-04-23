@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { refreshActiveBotInsight } from "@/lib/bots/insights";
+import { refreshActiveBotInsight } from "@/lib/insights";
 import {
   botExists,
   deleteInsightsByIds,
@@ -49,7 +49,7 @@ function releaseGlobalSlot(botId: string) {
 async function runWithConcurrencyControl<T = void>(
   botId: string,
   task: () => Promise<T>,
-  timeoutMs = 600000, // Timeout (600 seconds, 10 minutes)
+  timeoutMs = 55000, // Timeout (55 seconds, per-bot limit)
 ): Promise<T> {
   const existingTask = activeTasks.get(botId) as Promise<T> | undefined;
   if (existingTask) {

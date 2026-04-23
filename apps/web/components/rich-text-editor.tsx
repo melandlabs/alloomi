@@ -128,7 +128,33 @@ export function RichTextEditor({
             return true;
           }
         }
-        // When no files, return false to continue default paste behavior (text paste)
+
+        // Handle text/html paste - use TipTap's insertContent for proper HTML parsing
+        const clipboardData = event.clipboardData;
+        if (clipboardData) {
+          const htmlContent = clipboardData.getData("text/html");
+          const textContent = clipboardData.getData("text/plain");
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const editor = (view as any).editor;
+          if (!editor) return false;
+
+          if (htmlContent) {
+            // Insert HTML content using TipTap's built-in parser
+            editor.commands.insertContent(htmlContent, {
+              parseOptions: {
+                preserveWhitespace: "full",
+              },
+            });
+            return true;
+          } else if (textContent) {
+            // Fallback to plain text if no HTML
+            editor.commands.insertContent(textContent);
+            return true;
+          }
+        }
+
+        // Return false to continue with default paste behavior for other cases
         return false;
       },
     },

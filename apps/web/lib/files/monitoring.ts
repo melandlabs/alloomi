@@ -1,4 +1,4 @@
-import { deleteFile } from "@/lib/storage/adapters";
+import { deleteFile } from "@/lib/storage";
 
 type AttachmentTelemetryBase = {
   source: string;

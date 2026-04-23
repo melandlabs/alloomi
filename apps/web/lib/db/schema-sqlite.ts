@@ -2184,6 +2184,9 @@ export const characters = sqliteTable("characters", {
   notificationChannels: text("notification_channels").default(
     JSON.stringify([]),
   ),
+  systemNotification: integer("system_notification", { mode: "boolean" })
+    .notNull()
+    .default(sql`1`),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

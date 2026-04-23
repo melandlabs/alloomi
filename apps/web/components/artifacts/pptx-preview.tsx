@@ -90,8 +90,8 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
       console.error("[PptxPreview] Failed to open file:", err);
       // Show user-friendly error
       setError(
-        `无法打开文件: ${
-          err instanceof Error ? err.message : "请检查应用权限"
+        `Unable to open file: ${
+          err instanceof Error ? err.message : "Please check app permissions"
         }`,
       );
     }
@@ -139,7 +139,7 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
         // Check file size first
         const fileInfo = await fileStat(artifact.path);
         if (!fileInfo) {
-          setError("Failed to get file information");
+          setError(t("common.pptxPreview.getFileInfoFailed"));
           setLoading(false);
           return;
         }
@@ -153,7 +153,7 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
         // Read file using Tauri custom command
         const data = await readFileBinary(artifact.path);
         if (!data) {
-          setError("Failed to read file");
+          setError(t("common.pptxPreview.readFileFailed"));
           setLoading(false);
           return;
         }
@@ -191,7 +191,8 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
             // Create a single slide with the text content
             const textSlide: PptxSlide = {
               index: 0,
-              title: artifact.name || "Document",
+              title:
+                artifact.name || t("common.pptxPreview.defaultDocumentTitle"),
               content: textContent.split(/\n\n+/).filter((line) => line.trim()),
               shapes: [],
               background: "#ffffff",
@@ -202,9 +203,7 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
             return;
           } catch (decodeErr) {
             console.error("[PptxPreview] Failed to decode as text:", decodeErr);
-            throw new Error(
-              "Invalid PPTX file: file is not in valid ZIP or text format",
-            );
+            throw new Error(t("common.pptxPreview.invalidFileFormat"));
           }
         }
 
@@ -235,7 +234,7 @@ export function PptxPreview({ artifact }: PptxPreviewProps) {
           .file("ppt/presentation.xml")
           ?.async("string");
         if (!presentationXml) {
-          throw new Error("Invalid PPTX: missing presentation.xml");
+          throw new Error(t("common.pptxPreview.missingPresentationXml"));
         }
 
         // Helper function to parse color

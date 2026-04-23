@@ -12,7 +12,7 @@ import {
   deleteBotByEmailAndAdapter,
   deleteBotsByAdapter,
 } from "@/lib/db/queries";
-import type { IntegrationId } from "@/lib/integration/client";
+import type { IntegrationId } from "@/lib/integrations/client";
 import { AppError } from "@alloomi/shared/errors";
 import { BotRequestSchema } from "./schema";
 

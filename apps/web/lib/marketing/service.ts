@@ -1,7 +1,7 @@
-import { siteMetadata } from "@/lib/seo";
-import { getApplicationBaseUrl } from "@/lib/url";
-import { captureServerEvent } from "@/lib/analytics/posthog-server";
-import { sendViaSendGrid } from "@/lib/email/sendgrid";
+import { siteMetadata } from "@/lib/marketing/seo";
+import { getApplicationBaseUrl } from "@/lib/env";
+import { captureServerEvent } from "@/lib/analytics/posthog/posthog-server";
+import { sendViaSendGrid } from "@/lib/integrations/email/sendgrid";
 import {
   ensureUserEmailPreferences,
   getUserById,

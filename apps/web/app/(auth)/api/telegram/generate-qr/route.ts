@@ -1,7 +1,8 @@
-import { TelegramAdapter } from "@/lib/integration/sources/telegram";
+import { TelegramAdapter } from "@alloomi/integrations/telegram/adapter";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import {
+  ensureRedis,
   expireTime,
   getLoginSession,
   setLoginSession,
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       token: "",
     };
 
+    await ensureRedis();
     await setLoginSession(sessionId, initialSession);
     console.log(`[QR Auth] Created QR session: ${sessionId}`);
 

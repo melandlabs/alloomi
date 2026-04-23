@@ -285,10 +285,11 @@
     --foreground: 220 44% 10%;
     /* Sans-serif: unified to Noto Sans SC */
     --font-sans:
-      "Noto Sans SC", "思源黑体", "PingFang SC", "Helvetica Neue",
+      "Noto Sans SC", "Source Han Sans", "PingFang SC", "Helvetica Neue",
       -apple-system, BlinkMacSystemFont, sans-serif;
     /* Serif: unified to Noto Serif SC */
-    --font-serif: "Noto Serif SC", "思源宋体", "Songti SC", Georgia, serif;
+    --font-serif:
+      "Noto Serif SC", "Source Han Serif", "Songti SC", Georgia, serif;
     --font-mono:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     --surface: 220 10% 98%;

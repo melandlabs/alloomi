@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
 import {
@@ -13,7 +14,8 @@ import { cn } from "@/lib/utils";
 
 /** Supported UI languages (flag kept for potential future use, not shown in menu UI). */
 export const languages = [
-  { code: "zh-Hans", name: "Simplified Chinese", flag: "🇨🇳" },
+  { code: "system", name: "Follow system", flag: "💻" },
+  { code: "zh-Hans", name: "简体中文", flag: "🇨🇳" },
   { code: "en-US", name: "English", flag: "🇺🇸" },
 ] as const;
 
@@ -39,6 +41,9 @@ export type LanguageSettingsMenuProps =
       sidebarCollapsed?: boolean;
     })
   | (LanguageSettingsMenuPropsBase & {
+      variant: "personalization";
+    })
+  | (LanguageSettingsMenuPropsBase & {
       variant: "account-menu";
       accountMenuRow: AccountMenuLanguageRowStyles;
     });
@@ -52,25 +57,66 @@ export function LanguageSettingsMenu(props: LanguageSettingsMenuProps) {
   const sidebarCollapsed =
     variant === "settings-sidebar" ? (props.sidebarCollapsed ?? false) : false;
   const { t } = useTranslation();
+  const [isFollowingSystem, setIsFollowingSystem] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userSelected = localStorage.getItem("langbot_language_user_selected");
+    setIsFollowingSystem(userSelected !== "true");
+  }, [currentLang]);
 
   const contentSide =
     variant === "settings-sidebar"
       ? isMobile
         ? "bottom"
         : "right"
-      : isMobile
-        ? "bottom"
-        : "left";
+      : variant === "personalization"
+        ? isMobile
+          ? "bottom"
+          : "right"
+        : isMobile
+          ? "bottom"
+          : "left";
   const contentAlign =
-    variant === "settings-sidebar" ? "start" : isMobile ? "start" : "center";
+    variant === "settings-sidebar" || variant === "personalization"
+      ? "start"
+      : isMobile
+        ? "start"
+        : "center";
 
   const contentClassName =
-    variant === "settings-sidebar"
+    variant === "settings-sidebar" || variant === "personalization"
       ? "w-48"
       : cn(
           "z-[10000] rounded-lg border-border bg-surface-elevated",
           isMobile ? "w-full max-w-[calc(100vw-2rem)]" : "w-48",
         );
+
+  /**
+   * Returns the display label for each language option.
+   */
+  const getOptionLabel = (
+    code: LanguageOption["code"],
+    fallbackName: string,
+  ) => {
+    if (code === "system") {
+      return t("nav.followSystem", "Follow system");
+    }
+    return fallbackName;
+  };
+
+  /**
+   * Gets the current label to render in trigger button.
+   */
+  const currentOptionLabel = (() => {
+    if (isFollowingSystem) {
+      return t("nav.followSystem", "Follow system");
+    }
+    const matched = languages.find((lang) => lang.code === currentLang);
+    return matched
+      ? getOptionLabel(matched.code, matched.name)
+      : t("nav.languageSidebar");
+  })();
 
   return (
     <DropdownMenu>
@@ -98,6 +144,20 @@ export function LanguageSettingsMenu(props: LanguageSettingsMenuProps) {
                 />
               </>
             )}
+          </Button>
+        ) : variant === "personalization" ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full sm:w-[220px] shrink-0 self-start sm:self-center justify-between gap-2 rounded-md border border-border/80 bg-surface px-3 py-2 text-sm font-medium text-left hover:bg-surface-hover hover:text-foreground/90 transition-all duration-200"
+            aria-label={t("nav.languageSidebar")}
+          >
+            <span className="truncate">{currentOptionLabel}</span>
+            <RemixIcon
+              name="arrow_down_s"
+              size="size-4"
+              className="shrink-0 opacity-70"
+            />
           </Button>
         ) : (
           <button
@@ -132,23 +192,33 @@ export function LanguageSettingsMenu(props: LanguageSettingsMenuProps) {
         sideOffset={variant === "account-menu" && isMobile ? 4 : undefined}
         collisionPadding={variant === "account-menu" ? 16 : undefined}
       >
-        {languages.map((lang) => (
-          <DropdownMenuItem
-            key={lang.code}
-            onClick={() => {
-              onLanguageChange(lang.code);
-            }}
-            className={cn(
-              "flex items-center gap-2 cursor-pointer",
-              currentLang === lang.code && "bg-primary/10 text-primary",
-            )}
-          >
-            <span className="flex-1">{lang.name}</span>
-            {currentLang === lang.code && (
-              <div className="size-2 bg-primary rounded-full shrink-0" />
-            )}
-          </DropdownMenuItem>
-        ))}
+        {languages.map((lang) =>
+          (() => {
+            const isActive =
+              lang.code === "system"
+                ? isFollowingSystem
+                : !isFollowingSystem && currentLang === lang.code;
+            return (
+              <DropdownMenuItem
+                key={lang.code}
+                onClick={() => {
+                  onLanguageChange(lang.code);
+                }}
+                className={cn(
+                  "flex items-center gap-2 cursor-pointer",
+                  isActive && "bg-primary/10 text-primary",
+                )}
+              >
+                <span className="flex-1">
+                  {getOptionLabel(lang.code, lang.name)}
+                </span>
+                {isActive && (
+                  <div className="size-2 bg-primary rounded-full shrink-0" />
+                )}
+              </DropdownMenuItem>
+            );
+          })(),
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

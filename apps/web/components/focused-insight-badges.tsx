@@ -3,15 +3,18 @@
 import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
 import { useChatContext } from "./chat-context";
+import { useGlobalInsightDrawer } from "@/components/global-insight-drawer";
 import { cn } from "@/lib/utils";
 
 /**
- * Focused Insight Badge component displayed inside the input box
- * Displayed as rounded badge, showing only title, width limited to 80px, click to unfocus
+ * Focused Insight Badge component displayed inside the input field
+ * Displayed as rounded badge, shows only title, width limited to 160px
+ * Left side click opens insight drawer, right side X button removes focus
  */
 export function FocusedInsightBadges() {
   const { t } = useTranslation();
   const { focusedInsights, removeFocusedInsight } = useChatContext();
+  const { openDrawer } = useGlobalInsightDrawer();
 
   if (focusedInsights.length === 0) {
     return null;
@@ -20,10 +23,8 @@ export function FocusedInsightBadges() {
   return (
     <div className="flex flex-wrap gap-1.5 px-3 pt-2 pb-1">
       {focusedInsights.map((insight) => (
-        <button
+        <div
           key={insight.id}
-          type="button"
-          onClick={() => removeFocusedInsight(insight.id)}
           className={cn(
             "inline-flex items-center gap-1 rounded-[10px] px-3 py-1.5",
             "max-w-[160px] min-w-0",
@@ -34,17 +35,27 @@ export function FocusedInsightBadges() {
             "group",
           )}
           title={insight.title}
-          aria-label={t("insight.removeFocus", "Remove this focus")}
         >
-          <span className="truncate flex-1 min-w-0 text-left">
+          <button
+            type="button"
+            onClick={() => openDrawer(insight)}
+            className="truncate flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer text-foreground"
+            title={insight.title}
+          >
             {insight.title}
-          </span>
-          <RemixIcon
-            name="close"
-            size="size-3"
-            className="shrink-0 opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0"
-          />
-        </button>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeFocusedInsight(insight.id);
+            }}
+            className="shrink-0 opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0 bg-transparent border-0 p-0 cursor-pointer text-foreground"
+            aria-label={t("insight.removeFocus", "Remove this focus")}
+          >
+            <RemixIcon name="close" size="size-3" />
+          </button>
+        </div>
       ))}
     </div>
   );

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   startTelegramUserListener,
   isUserListenerRunning,
-} from "@/lib/telegram/user-listener";
+} from "@/lib/integrations/telegram/user-listener";
 import { auth } from "@/app/(auth)/auth";
 
 export async function POST(request: Request) {

@@ -7,7 +7,7 @@ import { signIn } from "./auth";
 import {
   shouldUseCloudAuth,
   getCloudApiBaseUrl,
-} from "@/lib/api/remote-client";
+} from "@/lib/auth/remote-client";
 import { getOrCreateShadowUser } from "@/lib/db/remote-user-queries";
 
 /**

@@ -7,6 +7,8 @@ import type { NextRequest } from "next/server";
 import { getUserById } from "@/lib/db/queries";
 import {
   generateToken,
+  getTokenLifetime,
+  getRefreshGracePeriod,
   verifyToken,
   extractToken,
   withErrorHandler,
@@ -31,9 +33,10 @@ export async function POST(request: NextRequest) {
 
     // Check if token is expired
     const now = Math.floor(Date.now() / 1000);
+    const gracePeriod = getRefreshGracePeriod();
 
-    // If token expired more than 24 hours ago, refuse refresh (need to re-login)
-    if (result.exp < now - 24 * 60 * 60) {
+    // If token expired more than grace period ago, refuse refresh (need to re-login)
+    if (result.exp < now - gracePeriod) {
       return createErrorResponse(
         "Token expired too long. Please login again.",
         401,
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
     const payload = {
       id: user.id,
       email: user.email,
-      exp: now + 30 * 24 * 60 * 60,
+      exp: now + getTokenLifetime(),
       iat: now,
     };
 

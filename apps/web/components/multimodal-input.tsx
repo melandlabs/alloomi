@@ -32,7 +32,7 @@ import type { Insight } from "@/lib/db/schema";
 import type { SuggestedPrompt } from "./suggested-actions";
 import { SUPPORTED_FILE_EXTENSIONS } from "@/lib/files/config";
 import { uploadFile, uploadRagFile } from "@/lib/files/upload";
-import { getFileIcon, getFileColor } from "@/lib/utils/file-icons";
+import { getFileIcon, getFileColor } from "@/components/file-icons";
 import { getSecureFileUrl } from "@/lib/files/secure-url";
 import { formatBytes } from "@/lib/utils";
 import { useChatContext } from "./chat-context";
@@ -58,7 +58,7 @@ import {
 } from "@/components/agent/model-selector";
 
 /**
- * Detect if in Tauri environment
+ * Detect if running in Tauri environment
  */
 const isTauriEnv = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -75,8 +75,9 @@ async function importTauriEvent() {
 }
 
 /**
- * Mirror layer dedicated Ref Badge: Strictly aligned with the original marker [[ref:kind:label]] placeholder in textarea.
- * Uses transparent placeholder span to expand the same width as the marker, then overlays a styled pill to achieve mention rendering similar to lexical-beautiful-mentions.
+ * Mirror layer Ref Badge: precisely aligned with the original [[ref:kind:label]] markers in the textarea.
+ * Uses transparent placeholder spans to match the same width as the markers, then overlays a styled pill,
+ * achieving similar mention rendering to lexical-beautiful-mentions.
  */
 function MirrorRefBadge({
   kind,
@@ -717,11 +718,84 @@ function UnifiedFileCard({
             : "workspace-file-card"
       }
     >
-      {/* Top-right: source label + remove button */}
+      {/* Top-right: source label, workspace ⋮ (desktop), remove */}
       <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           {sourceLabel}
         </span>
+        {variant === "workspace" && workspaceRef && isTauriEnv ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-full bg-black/50 p-1 text-white hover:bg-black/70 transition-colors"
+                aria-label={t("common.more", "More")}
+              >
+                <RemixIcon name="more_2" size="size-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="min-w-40 w-max max-w-[min(100vw-2rem,16rem)]"
+            >
+              <DropdownMenuItem
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const { openWorkspaceFileInSystemDefaultApp } =
+                    await import("@/lib/files/open-workspace-file-locally");
+                  const r = await openWorkspaceFileInSystemDefaultApp({
+                    taskId: workspaceRef.taskId,
+                    path: workspaceRef.path,
+                  });
+                  if (!r.ok && r.reason !== "not_tauri") {
+                    toast.error(
+                      r.reason === "missing_file"
+                        ? t(
+                            "library.openWithLocalAppNotFound",
+                            "File not found on this computer",
+                          )
+                        : t(
+                            "library.openWithLocalAppFailed",
+                            "Could not open the file with a default app",
+                          ),
+                    );
+                  }
+                }}
+              >
+                <RemixIcon name="folder_open" size="size-4" className="mr-2" />
+                {t("library.openWithLocalApp", "Open with default app")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const { revealWorkspaceFileInParentFolder } =
+                    await import("@/lib/files/open-workspace-file-locally");
+                  const r = await revealWorkspaceFileInParentFolder({
+                    taskId: workspaceRef.taskId,
+                    path: workspaceRef.path,
+                  });
+                  if (!r.ok && r.reason !== "not_tauri") {
+                    toast.error(
+                      r.reason === "missing_file"
+                        ? t(
+                            "library.openWithLocalAppNotFound",
+                            "File not found on this computer",
+                          )
+                        : t(
+                            "library.revealInFolderFailed",
+                            "Could not open the folder in the file manager",
+                          ),
+                    );
+                  }
+                }}
+              >
+                <RemixIcon name="folder_2" size="size-4" className="mr-2" />
+                {t("library.revealInFolder", "Show in folder")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         <button
           type="button"
           onClick={onRemove}
@@ -1259,7 +1333,6 @@ function PureMultimodalInput({
     },
     [acceptedMimeTypes],
   );
-  const previousStatusRef = useRef(status);
   /** IME composition state: when true or shortly after ending, do not respond to Enter send, to avoid accidental send during Chinese IME word selection */
   const isComposingOrJustEndedRef = useRef(false);
   const compositionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -1292,15 +1365,6 @@ function PureMultimodalInput({
   useEffect(() => {
     setLocalStorageInput(input);
   }, [input, setLocalStorageInput]);
-
-  useEffect(() => {
-    if (previousStatusRef.current === "submitted" && status === "ready") {
-      toast.success(
-        t("chat.replySent", "Delivered. Alloomi will monitor replies."),
-      );
-    }
-    previousStatusRef.current = status;
-  }, [status, t]);
 
   /** When filtered categories change, clamp the keyboard highlight index to a valid range */
   useEffect(() => {
@@ -1642,10 +1706,7 @@ function PureMultimodalInput({
         const errorMessage =
           error instanceof Error ? error.message : "Failed to upload file";
         // Use i18n to translate unsupported file type errors
-        if (
-          errorMessage.includes("Unsupported file type") ||
-          errorMessage.includes("不支持的文件类型")
-        ) {
+        if (errorMessage.includes("Unsupported file type")) {
           toast.error(t("chat.unsupportedFileType"));
         } else {
           toast.error(errorMessage);
@@ -1763,7 +1824,7 @@ function PureMultimodalInput({
 
   /**
    * Handle Tauri file drag and drop event
-   * In Tauri environment, file drag and drop passes file paths through native events
+   * In Tauri environment, file drag uses native events to pass file paths
    */
   const handleTauriFileDrop = useCallback(
     async (paths: string[]) => {
@@ -1812,9 +1873,10 @@ function PureMultimodalInput({
             mimeType = mimeTypes[ext];
           }
 
-          return new File([new Uint8Array(contents)], fileName, {
-            type: mimeType,
-          });
+          // Create proper ArrayBuffer from Uint8Array for File constructor
+          const arrayBuffer = new ArrayBuffer(contents.byteLength);
+          new Uint8Array(arrayBuffer).set(contents);
+          return new File([arrayBuffer], fileName, { type: mimeType });
         });
 
         const files = (await Promise.all(filePromises)).filter(
@@ -1897,17 +1959,6 @@ function PureMultimodalInput({
       return;
     }
 
-    // Check if AI is currently replying, prevent duplicate submissions
-    if (isAgentRunning) {
-      toast.error(
-        t(
-          "chat.alreadyRunning",
-          "Please wait for the current response to complete.",
-        ),
-      );
-      return;
-    }
-
     const messageObj = {
       role: "user",
       parts: [
@@ -1975,21 +2026,28 @@ function PureMultimodalInput({
       },
     } as any;
 
-    sendMessage(messageObj).then(() => {
-      if (currentFocusedInsights.length > 0) {
-        clearFocusedInsights();
-      }
-    });
+    sendMessage(messageObj)
+      .then(() => {
+        if (currentFocusedInsights.length > 0) {
+          clearFocusedInsights();
+        }
+        setInput("");
+        setAttachments([]);
+        setUploadedRagDocuments([]);
+        uploadedRagDocumentsRef.current = [];
+        setWorkspaceFileRefs([]);
+      })
+      .catch((error) => {
+        console.error("sendMessage failed:", error);
+        toast.error(
+          t("chat.sendMessageFailed", "Message send failed, please retry"),
+        );
+      });
 
-    setAttachments([]);
-    setUploadedRagDocuments([]);
-    uploadedRagDocumentsRef.current = [];
-    setWorkspaceFileRefs([]);
     // Close all menus when sending message
     setIsAtMentionOpen(false);
     setIsSlashOpen(false);
     setLocalStorageInput("");
-    setInput("");
 
     if (width && width > 768) {
       textareaRef.current?.focus();
@@ -2686,7 +2744,7 @@ function PureMultimodalInput({
                     return;
                   }
                   event.preventDefault();
-                  if (status === "submitted" || status === "streaming") {
+                  if (isAgentRunning) {
                     toast.error(
                       "Please wait for the model to finish its response!",
                     );
@@ -2755,36 +2813,6 @@ function PureMultimodalInput({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-
-                {/* @ button: open event selection (@events) */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="size-9 shrink-0 rounded-lg"
-                      onClick={() => {
-                        lastCursorRef.current =
-                          textareaRef.current?.selectionStart ?? input.length;
-                        atMentionRangeRef.current = null;
-                        setAtMentionQuery("");
-                        setAtMentionSelectedCategory("event");
-                        setAtMentionHighlightedIndex(0);
-                        setIsAtMentionOpen(true);
-                        setIsSlashOpen(false);
-                      }}
-                      aria-label={t("chat.addEvent", "Add event")}
-                    >
-                      @
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <span className="text-xs">
-                      {t("chat.addEventHint", "Add event, or type @ to search")}
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
 
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -2999,10 +3027,10 @@ export const MultimodalInput = memo(
 );
 
 /**
- * Stop button component: Displayed during AI response, click to interrupt generation
+ * Stop button component: displayed during AI response generation, click to interrupt
  * @param stop - Stop generation function
  * @param setMessages - Set messages function
- * @param title - Hover/accessibility hint text
+ * @param title - Hover/accessibility tooltip
  */
 function PureStopButton({
   stop,

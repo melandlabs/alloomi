@@ -1,0 +1,19 @@
+{
+  "name": "@alloomi/integrations-gmail",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./conversation-store": "./src/conversation-store.ts"
+  },
+  "dependencies": {
+    "@alloomi/ai": "workspace:*"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

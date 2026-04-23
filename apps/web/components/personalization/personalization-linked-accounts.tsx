@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { useSWRConfig } from "swr";
@@ -57,7 +57,7 @@ import { FeishuAuthForm } from "@/components/feishu-auth-form";
 import { DingTalkAuthForm } from "@/components/dingtalk-auth-form";
 import { QQBotAuthForm } from "@/components/qqbot-auth-form";
 import { WeixinAuthForm } from "@/components/weixin-auth-form";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { useIntegrations } from "@/hooks/use-integrations";
 
 /**
@@ -68,16 +68,20 @@ export function PersonalizationLinkedAccounts({
   open,
   isAddConnectorDialogOpen,
   onAddConnectorDialogOpenChange,
+  initialAddPanelTab = "apps",
 }: {
   open: boolean;
   isAddConnectorDialogOpen?: boolean;
   onAddConnectorDialogOpenChange?: (open: boolean) => void;
+  initialAddPanelTab?: "apps" | "rss";
 }) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { subscriptions: rssSubscriptions } = useRssSubscriptions();
-  const [addPanelTab, setAddPanelTab] = useState<"apps" | "rss">("apps");
+  const [addPanelTab, setAddPanelTab] = useState<"apps" | "rss">(
+    initialAddPanelTab,
+  );
   const [isGoogleAuthFormOpen, setIsGoogleAuthFormOpen] = useState(false);
   const [isWhatsAppAuthFormOpen, setIsWhatsAppAuthFormOpen] = useState(false);
   const [isOutlookAuthFormOpen, setIsOutlookAuthFormOpen] = useState(false);
@@ -101,6 +105,17 @@ export function PersonalizationLinkedAccounts({
 
   const isConnectorDialogOpen =
     isAddConnectorDialogOpen ?? internalAddConnectorDialogOpen;
+
+  /**
+   * Sync dialog tab with externally provided initial tab
+   * so deep links can open add-connector dialog in the expected tab.
+   */
+  /**
+   * Keep add-panel tab in sync with route-level intent (apps / rss).
+   */
+  useEffect(() => {
+    setAddPanelTab(initialAddPanelTab);
+  }, [initialAddPanelTab, isConnectorDialogOpen]);
 
   /**
    * Unified add-connector dialog open-state setter for controlled/uncontrolled usage.
@@ -177,7 +192,7 @@ export function PersonalizationLinkedAccounts({
    */
   const handleGoogleSubmit = useCallback(
     async ({ email, appPassword, name }: GoogleAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "gmail",
         externalId: email,
         displayName: name ?? email,
@@ -197,21 +212,6 @@ export function PersonalizationLinkedAccounts({
         },
       });
 
-      // Initialize Gmail Self Message Listener
-      try {
-        const response = await fetch("/api/gmail/init-self-listener", {
-          method: "POST",
-        });
-        if (response.ok) {
-          console.log("[Gmail] Self Message Listener initialized successfully");
-        }
-      } catch (error) {
-        console.error(
-          "[Gmail] Failed to initialize Self Message Listener:",
-          error,
-        );
-      }
-
       await mutateIntegrations();
       router.refresh();
       setIsGoogleAuthFormOpen(false);
@@ -228,7 +228,7 @@ export function PersonalizationLinkedAccounts({
       appSecret,
       verifyToken,
     }: MessengerAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "facebook_messenger",
         externalId: pageId,
         displayName: pageName ?? `Messenger · ${pageId}`,
@@ -268,7 +268,7 @@ export function PersonalizationLinkedAccounts({
    */
   const handleWhatsAppSuccess = useCallback(
     async (sessionKey: string, user: WhatsAppUserInfo) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "whatsapp",
         externalId: user.wid ?? sessionKey,
         displayName:
@@ -299,7 +299,7 @@ export function PersonalizationLinkedAccounts({
 
   const handleOutlookSubmit = useCallback(
     async ({ email, appPassword, name }: OutlookAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "outlook",
         externalId: email,
         displayName: name ?? email,
@@ -336,7 +336,19 @@ export function PersonalizationLinkedAccounts({
     <>
       {/* Main area: existing platform / RSS list */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="flex flex-col gap-6 w-full px-6 pt-0 pb-6 space-y-4">
+        <div className="flex flex-col gap-6 w-full px-6 pt-6 pb-6 space-y-4">
+          <div className="mt-0 mb-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConnectorDialogOpen(true)}
+              className="gap-1.5"
+            >
+              <i className="ri-add-line" />
+              {t("integrations.addConnector", "Add connector")}
+            </Button>
+          </div>
           <Accordion
             type="multiple"
             defaultValue={["platforms", "rss"]}
@@ -412,7 +424,7 @@ export function PersonalizationLinkedAccounts({
               className="flex h-full min-w-0 flex-1 flex-col"
             >
               {/* Dialog header: shows back button + platform name when in inline form view */}
-              <DialogTitle className="flex items-center justify-between px-6 py-4">
+              <DialogTitle className="flex items-center justify-between px-8 py-6">
                 {inlinePlatformView ? (
                   <div className="flex items-center gap-2">
                     <Button
@@ -424,14 +436,14 @@ export function PersonalizationLinkedAccounts({
                     >
                       <RemixIcon name="arrow_left" size="size-4" />
                     </Button>
-                    <span className="text-xl font-serif font-semibold text-foreground">
+                    <span className="text-2xl font-serif font-semibold text-foreground">
                       {t("integrations.connectPlatform", "Connect {{name}}", {
                         name: inlinePlatformView.platformName,
                       })}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-xl font-serif font-semibold text-foreground">
+                  <span className="text-2xl font-serif font-semibold text-foreground">
                     {t("integrations.addConnector", "Add Connectors")}
                   </span>
                 )}
@@ -439,7 +451,7 @@ export function PersonalizationLinkedAccounts({
 
               {/* Tabs navigation: hidden when showing inline form */}
               {!inlinePlatformView && (
-                <div className="px-6 py-2">
+                <div className="px-8 pt-0 pb-2">
                   <TabsList className="h-auto bg-transparent p-0 gap-4">
                     <TabsTrigger
                       value="apps"
@@ -458,7 +470,7 @@ export function PersonalizationLinkedAccounts({
               )}
 
               <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f6f6f6]">
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-0 pb-4">
+                <div className="min-h-0 flex-1 overflow-y-auto px-8 pt-0 pb-4">
                   {inlinePlatformView ? (
                     /* Inline form view: render the selected platform's form directly */
                     <div className="py-4">

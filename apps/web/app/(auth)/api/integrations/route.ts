@@ -7,6 +7,8 @@ import {
   getIntegrationAccountsByUserId,
   upsertIntegrationAccount,
   updateBot,
+  weixinBotHasValidContextToken,
+  type IntegrationAccountWithBot,
 } from "@/lib/db/queries";
 import { AppError } from "@alloomi/shared/errors";
 import { IntegrationAccountPayloadSchema } from "./schema";
@@ -22,31 +24,47 @@ export async function GET() {
       userId: session.user.id,
     });
 
-    const sanitized = accounts.map((account) => ({
-      id: account.id,
-      platform: account.platform,
-      externalId: account.externalId,
-      displayName: account.displayName,
-      status: account.status,
-      metadata: account.metadata ?? null,
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
-      bot: account.bot
-        ? {
-            id: account.bot.id,
-            name: account.bot.name,
-            description: account.bot.description,
-            adapter: account.bot.adapter,
-            enable: account.bot.enable,
-            createdAt: account.bot.createdAt,
-            updatedAt: account.bot.updatedAt,
-          }
-        : null,
-    }));
+    // For WeChat accounts, check if they have valid context tokens
+    const enhancedAccounts = await Promise.all(
+      accounts.map(async (account: IntegrationAccountWithBot) => {
+        const baseAccount = {
+          id: account.id,
+          platform: account.platform,
+          externalId: account.externalId,
+          displayName: account.displayName,
+          status: account.status,
+          metadata: account.metadata ?? null,
+          createdAt: account.createdAt,
+          updatedAt: account.updatedAt,
+          bot: account.bot
+            ? {
+                id: account.bot.id,
+                name: account.bot.name,
+                description: account.bot.description,
+                adapter: account.bot.adapter,
+                enable: account.bot.enable,
+                createdAt: account.bot.createdAt,
+                updatedAt: account.bot.updatedAt,
+              }
+            : null,
+        };
+
+        // For WeChat, check if bot has valid context token
+        if (account.platform === "weixin" && account.bot?.id) {
+          const hasValidContextToken = await weixinBotHasValidContextToken(
+            session.user.id,
+            account.bot.id,
+          );
+          (baseAccount as any).hasValidContextToken = hasValidContextToken;
+        }
+
+        return baseAccount;
+      }),
+    );
 
     return NextResponse.json(
       {
-        accounts: sanitized,
+        accounts: enhancedAccounts,
       },
       { status: 200 },
     );

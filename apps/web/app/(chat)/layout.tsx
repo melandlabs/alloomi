@@ -5,7 +5,6 @@ import { auth } from "../(auth)/auth";
 import Script from "next/script";
 import CookieConfirm from "@/components/cookie-confirm";
 import "../../i18n";
-import { OnboardingProvider } from "@/components/onboarding";
 import { SessionProvider } from "next-auth/react";
 import { isTauriMode } from "@/lib/env/constants";
 import { Suspense } from "react";
@@ -32,23 +31,21 @@ export default async function Layout({
       {/** AppSidebar needs session email info and quota usage */}
       <SessionProvider session={session}>
         <SessionAuthChecker />
-        <OnboardingProvider>
-          <SidebarProvider defaultOpen={true}>
-            <AppSidebar />
-            <SidebarInset className="relative z-10 md:h-svh md:max-h-svh md:overflow-hidden md:m-0 p-2 pl-0 sm:p-3 sm:pl-0">
-              <Suspense fallback={null}>
-                {/* SidePanelShell renders main content + temporary sidebar (flex-row) */}
-                <SidePanelProvider>
-                  <ChatContextProvider>
-                    <GlobalInsightDrawerProvider>
-                      <SidePanelShell>{children}</SidePanelShell>
-                    </GlobalInsightDrawerProvider>
-                  </ChatContextProvider>
-                </SidePanelProvider>
-              </Suspense>
-            </SidebarInset>
-          </SidebarProvider>
-        </OnboardingProvider>
+        <SidebarProvider defaultOpen={true}>
+          <AppSidebar />
+          <SidebarInset className="relative z-10 md:h-svh md:max-h-svh md:overflow-hidden md:m-0 p-2 pl-0 sm:p-3 sm:pl-0">
+            <Suspense fallback={null}>
+              {/* SidePanelShell renders main content + temporary sidebar (flex-row) */}
+              <SidePanelProvider>
+                <ChatContextProvider>
+                  <GlobalInsightDrawerProvider>
+                    <SidePanelShell>{children}</SidePanelShell>
+                  </GlobalInsightDrawerProvider>
+                </ChatContextProvider>
+              </SidePanelProvider>
+            </Suspense>
+          </SidebarInset>
+        </SidebarProvider>
       </SessionProvider>
       {!isTauriMode() && (
         <CookieConfirm userCookieConfirm={userCookieConfirm} />

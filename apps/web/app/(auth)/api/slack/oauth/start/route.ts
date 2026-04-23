@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { slackAuthConfig } from "@/app/(auth)/auth.config";
-import { getApplicationBaseUrl } from "@/lib/url";
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
+import { getApplicationBaseUrl } from "@/lib/env";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
 import { isTauriMode } from "@/lib/env/constants";
 import { getAuthUser } from "@/lib/auth/dual-auth";
 

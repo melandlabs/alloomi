@@ -17,7 +17,7 @@ interface Tip {
 
 /**
  * Insight Tips card component
- * Displays random tips in empty state to help users understand Alloomi's features and value
+ * Shows random tips in empty state, helping users understand Alloomi's features and value
  */
 export function InsightTipsCard() {
   const { t } = useTranslation();

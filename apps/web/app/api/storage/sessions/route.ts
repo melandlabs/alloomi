@@ -3,7 +3,7 @@ import {
   listSessionsWithSizes,
   deleteSessionsOlderThan,
   deleteAllSessions,
-} from "@/lib/workspace/disk-usage";
+} from "@/lib/files/workspace/disk-usage";
 
 export async function GET() {
   try {

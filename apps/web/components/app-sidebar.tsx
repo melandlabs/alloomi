@@ -20,7 +20,6 @@ import {
   startTransition,
   useDeferredValue,
 } from "react";
-import { guestRegex } from "@/lib/constants";
 import { generateUUID } from "@/lib/utils";
 import { useMobileDetection } from "@/hooks/use-mobile-detection";
 import { useCustomEvent } from "@alloomi/hooks/use-custom-event";
@@ -32,12 +31,22 @@ import useSWR from "swr";
 import { fetcher, cn, getHomePath } from "@/lib/utils";
 import { UserMenuDropdown } from "@/components/user-menu-dropdown";
 import { LanguageSettingsMenu } from "@/components/language-settings-menu";
-import { useOnboarding } from "@/components/onboarding/onboarding-context";
 import { saveLanguage } from "@/i18n";
 import dynamic from "next/dynamic";
 import ContactUs from "@/components/contact-us";
 import { useLocalStorage } from "usehooks-ts";
 import { useUserProfile } from "@/hooks/use-user-profile";
+import { guestRegex } from "@/lib/env/constants";
+
+/**
+ * Stub hook for onboarding state - returns default values since onboarding was removed
+ */
+function useOnboarding() {
+  return {
+    isOnboarding: false,
+    unlockedNavKeys: new Set<string>(),
+  };
+}
 
 /** Unified size for RemixIcon in the left sidebar (18px), paired with navigation text font-weight 400. */
 const SIDEBAR_NAV_ICON_SIZE = "size-[18px]";

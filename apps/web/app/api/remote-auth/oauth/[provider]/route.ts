@@ -13,10 +13,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { getUser, createUser, getUserTypeForService } from "@/lib/db/queries";
-import { authSessionVersion, DUMMY_PASSWORD } from "@/lib/constants";
+import { authSessionVersion, DUMMY_PASSWORD } from "@/lib/env/constants";
 import { verifyState } from "@/lib/auth/oauth-state";
 
-import { createCloudClientForRequest } from "@/lib/api/remote-client";
+import { createCloudClientForRequest } from "@/lib/auth/remote-client";
 import { isTauriMode } from "@/lib/env/constants";
 
 /**

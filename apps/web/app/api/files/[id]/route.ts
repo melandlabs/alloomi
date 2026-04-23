@@ -1,4 +1,4 @@
-import { deleteFile } from "@/lib/storage/adapters";
+import { deleteFile } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/app/(auth)/auth";

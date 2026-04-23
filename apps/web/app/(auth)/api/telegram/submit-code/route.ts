@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  ensureRedis,
   getLoginSession,
   type LoginSession,
   setLoginSession,
@@ -12,6 +13,8 @@ const MAX_WAIT_ATTEMPTS = 120;
 
 export async function POST(request: Request) {
   try {
+    await ensureRedis();
+
     const { sessionId, code } = await request.json();
 
     console.log(`[Auth] Session ${sessionId} submit code ${code}`);

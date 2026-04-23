@@ -1,26 +1,33 @@
 "use client";
 import { cn } from "@/lib/utils";
 import { RemixIcon } from "@/components/remix-icon";
+import IntegrationIcon from "@/components/integration-icon";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@alloomi/ui";
 
 /**
  * Citation Badge component
- * Displays a clickable citation marker in messages, showing a bookmark icon
+ * Displays a clickable citation marker in messages, showing platform icon or bookmark icon
  */
 export function CitationBadge({
   index,
   onClick,
   className,
+  platform,
+  tooltip,
 }: {
   index: number | string;
   onClick?: () => void;
   className?: string;
+  platform?: string | null;
+  tooltip?: string;
 }) {
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("[CitationBadge] Clicked, onClick exists:", !!onClick);
     onClick?.();
   };
 
-  return (
+  const button = (
     <button
       type="button"
       onClick={handleClick}
@@ -34,11 +41,26 @@ export function CitationBadge({
       )}
       aria-label={`View citation source ${index}`}
     >
-      <RemixIcon
-        name="bookmark"
-        size="size-3"
-        className="pointer-events-none"
-      />
+      {platform ? (
+        <IntegrationIcon platform={platform} size="size-3" />
+      ) : (
+        <RemixIcon
+          name="bookmark"
+          size="size-3"
+          className="pointer-events-none"
+        />
+      )}
     </button>
   );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }

@@ -34,7 +34,9 @@ export function ProfileOverview() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+        <div className="[&>div]:h-full"></div>
+      </div>
       <Suspense fallback={null}>
         <UsageDialogLazy />
       </Suspense>

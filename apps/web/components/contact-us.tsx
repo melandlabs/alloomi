@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "./toast";
 import { isTauri, openUrl } from "@/lib/tauri";
-import { getStoredAuthToken } from "@/lib/api/remote-client";
+import { getStoredAuthToken } from "@/lib/auth/remote-client";
 
 type ContactUsPlacement = "floating" | "inline" | "sidebar";
 

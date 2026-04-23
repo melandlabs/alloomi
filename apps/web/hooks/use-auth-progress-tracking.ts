@@ -55,6 +55,12 @@ export function useAuthProgressTracking({
       const now = Date.now();
       const stepDuration = now - stepStartTimeRef.current;
 
+      // Record duration of previous step
+      if (previousStepRef.current && previousStepRef.current !== newStep) {
+      }
+
+      // Record new step view
+
       previousStepRef.current = currentStepRef.current;
       currentStepRef.current = newStep;
       stepStartTimeRef.current = now;
@@ -67,6 +73,8 @@ export function useAuthProgressTracking({
   // ========================================
   const trackClose = useCallback(
     (extraData: Record<string, unknown> = {}) => {
+      const totalDuration = Date.now() - sessionStartTimeRef.current;
+
       // Reset
       sessionStartTimeRef.current = Date.now();
       stepStartTimeRef.current = Date.now();
@@ -80,7 +88,9 @@ export function useAuthProgressTracking({
   // Track authorization success
   // ========================================
   const trackSuccess = useCallback(
-    (extraData: Record<string, unknown> = {}) => {},
+    (extraData: Record<string, unknown> = {}) => {
+      const totalDuration = Date.now() - sessionStartTimeRef.current;
+    },
     [platform, method],
   );
 
@@ -88,7 +98,11 @@ export function useAuthProgressTracking({
   // Track authorization failure
   // ========================================
   const trackError = useCallback(
-    (error: Error | string, extraData: Record<string, unknown> = {}) => {},
+    (error: Error | string, extraData: Record<string, unknown> = {}) => {
+      const totalDuration = Date.now() - sessionStartTimeRef.current;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+    },
     [platform, method],
   );
 

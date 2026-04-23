@@ -17,7 +17,7 @@ import {
   uploadFileToNotion,
 } from "@/lib/files/notion";
 import { isTauriMode } from "@/lib/env";
-import { fileExists, readFile } from "@/lib/storage/adapters";
+import { fileExists, readFile } from "@/lib/storage";
 import { fetchWithSSRFProtection } from "@alloomi/security/url-validator";
 
 function deriveBlobPathFromUrl(source?: string | null) {

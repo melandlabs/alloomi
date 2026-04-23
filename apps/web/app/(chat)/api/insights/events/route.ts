@@ -1,6 +1,7 @@
 import { auth } from "@/app/(auth)/auth";
 import { AppError } from "@alloomi/shared/errors";
 import { computeInsightPayload } from "@/lib/insights/service";
+import { getInsightHistoryDays } from "@alloomi/billing/entitlements";
 import type { NextRequest } from "next/server";
 
 /**
@@ -40,7 +41,10 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id;
 
     // If days parameter is specified, use custom value; otherwise use default value for user type
-    const historyDays = customDays !== null ? customDays : 7;
+    const historyDays =
+      customDays !== null
+        ? customDays
+        : getInsightHistoryDays(session.user.type);
 
     const data = await computeInsightPayload(userId, {
       historyDays,

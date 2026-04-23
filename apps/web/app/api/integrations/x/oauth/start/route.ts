@@ -11,7 +11,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { encryptToken } from "@alloomi/security/token-encryption";
 import { createHash } from "node:crypto";
-import { setLoginSession } from "@/lib/session/context";
+import { ensureRedis, setLoginSession } from "@/lib/session/context";
 
 const X_SCOPES = [
   "tweet.read",
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
 
   // Create login session for polling
   const sessionId = randomUUID();
+  await ensureRedis();
   await setLoginSession(sessionId, {
     provider: "twitter",
     phone: userId,

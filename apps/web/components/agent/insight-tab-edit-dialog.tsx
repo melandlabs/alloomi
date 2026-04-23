@@ -51,7 +51,7 @@ import {
  */
 export interface InsightTabEditDialogProps {
   /**
-   * Whether dialog is open
+   * Whether the dialog is open
    */
   isOpen: boolean;
   /**
@@ -63,15 +63,15 @@ export interface InsightTabEditDialogProps {
    */
   editingTab?: InsightTab | null;
   /**
-   * Callback for creating tab
+   * Create tab callback
    */
   onCreate?: (payload: InsightTabPayload) => void;
   /**
-   * Callback for updating tab
+   * Update tab callback
    */
   onUpdate?: (tabId: string, payload: Partial<InsightTabPayload>) => void;
   /**
-   * Callback for deleting tab
+   * Delete tab callback
    */
   onDelete?: (tabId: string) => void;
   /**
@@ -523,9 +523,9 @@ export function InsightTabEditDialog({
    */
   const getStandardizedImportanceOptions = useMemo(() => {
     const options = [
-      { key: "high", labels: ["High", "Important", "重要"] },
-      { key: "medium", labels: ["Medium", "General", "一般"] },
-      { key: "low", labels: ["Low", "Not Important", "不重要"] },
+      { key: "high", labels: ["High", "Important"] },
+      { key: "medium", labels: ["Medium", "General"] },
+      { key: "low", labels: ["Low", "Not Important"] },
     ];
 
     // Merge options from data
@@ -570,10 +570,10 @@ export function InsightTabEditDialog({
     const options = [
       {
         key: "immediate",
-        labels: ["Immediate", "As soon as possible", "紧急", "尽快"],
+        labels: ["Immediate", "As soon as possible"],
       },
       { key: "within_24h", labels: ["Within 24 hours", "Last 24 hours"] },
-      { key: "not_urgent", labels: ["Not urgent", "不紧急"] },
+      { key: "not_urgent", labels: ["Not urgent"] },
     ];
 
     // Merge options from data

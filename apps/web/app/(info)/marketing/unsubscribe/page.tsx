@@ -5,7 +5,7 @@ import {
   getUserEmailPreferencesByToken,
   unsubscribeUserByToken,
 } from "@/lib/db/queries";
-import { siteMetadata } from "@/lib/seo";
+import { siteMetadata } from "@/lib/marketing/seo";
 
 export const metadata: Metadata = {
   title: "Manage email preferences",

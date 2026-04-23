@@ -105,16 +105,11 @@ export function useInsightTabs() {
           conditions: [
             {
               kind: "importance",
-              values: ["重要", "Important"],
+              values: ["Important"],
             },
             {
               kind: "urgency",
-              values: [
-                "尽快",
-                "As soon as possible",
-                "24小时内",
-                "Within 24 hours",
-              ],
+              values: ["As soon as possible", "Within 24 hours"],
             },
           ],
         };

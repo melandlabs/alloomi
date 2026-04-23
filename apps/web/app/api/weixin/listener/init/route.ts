@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { startWeixinListenersForUser } from "@/lib/weixin/ws-listener";
+import { startWeixinListenersForUser } from "@/lib/integrations/weixin/ws-listener";
 import { setCloudAuthToken } from "@/lib/auth/token-manager";
 import { isTauriMode } from "@/lib/env/constants";
 

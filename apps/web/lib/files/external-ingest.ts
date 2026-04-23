@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-
-import type { UserType } from "@/app/(auth)/auth";
 import {
   SUPPORTED_ATTACHMENT_MIME_TYPES,
   type SupportedAttachmentMediaType,
@@ -10,7 +8,7 @@ import {
   getExtensionFromContentType,
   sanitizeFilename,
 } from "@/lib/files/utils";
-import { uploadFile } from "@/lib/storage/adapters";
+import { uploadFile } from "@/lib/storage";
 
 const DEFAULT_MAX_EXTERNAL_ATTACHMENT_BYTES = 100 * 1024 * 1024; // 100MB
 
@@ -23,7 +21,6 @@ export type AttachmentDownloadPayload = {
 export type ExternalAttachmentIngestOptions = {
   source: string;
   userId: string;
-  userType: UserType;
   downloadAttachment: () => Promise<AttachmentDownloadPayload>;
   originalFileName?: string | null;
   mimeTypeHint?: string | null;
@@ -56,7 +53,6 @@ export async function ingestExternalAttachment(
 ): Promise<ExternalAttachmentIngestResult> {
   const {
     userId,
-    userType,
     downloadAttachment,
     originalFileName,
     mimeTypeHint,

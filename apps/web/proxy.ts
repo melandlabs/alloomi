@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authSessionVersion, nextAuthSessionCookies } from "./lib/constants";
+import {
+  authSessionVersion,
+  nextAuthSessionCookies,
+} from "@/lib/env/constants";
 import { createTauriProductionAuthModule } from "./app/(auth)/tauri";
 
 // Initialize auth module (reuses file storage logic)
@@ -27,6 +30,7 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/stripe")) return NextResponse.next();
   if (pathname.startsWith("/api/billing")) return NextResponse.next();
   if (pathname.startsWith("/api/subscription")) return NextResponse.next();
+  if (pathname.startsWith("/api/admin")) return NextResponse.next();
   if (
     pathname.startsWith("/api/slack/callback") ||
     pathname.startsWith("/api/discord/callback") ||
@@ -104,7 +108,6 @@ export async function proxy(request: NextRequest) {
     "/terms",
     "/privacy",
     "/landing",
-    "/events/spark",
     "/support",
     "/tos",
     "/api/landing",

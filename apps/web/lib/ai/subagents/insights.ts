@@ -4,9 +4,12 @@ import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import type { Platform } from "@alloomi/integrations/channels/sources/types";
 import { writeFileSync } from "node:fs";
-import { isDevelopmentEnvironment } from "@/lib/constants";
+import { isDevelopmentEnvironment } from "@/lib/env/constants";
 import { extractJsonFromMarkdown } from "@alloomi/ai";
 import { isTauriMode } from "@/lib/env";
+
+// Re-export InsightTaskItem for backward compatibility with existing imports
+export type { InsightTaskItem } from "@alloomi/insights";
 
 const maxConversationRounds = 5;
 const maxInputChunkLength = 40000;
@@ -89,12 +92,12 @@ You are a professional multi-platform message aggregation engine responsible for
   - **Name Normalization Rules**: When extracting people names from messages, ALWAYS normalize to avoid duplicates:
     - **Case Insensitive**: Treat "H8h8ge8", "HH 8GE8", "hh8ge8" as the SAME person
     - **Space Normalization**: Remove extra spaces, treat "John Doe" and "John  Doe" as the same person
-    - **Special Characters**: Standardize formats (e.g., "Tim" vs "TITim" may be the same person - use context to determine)
+    - **Special Characters**: Standardize formats (e.g., "Timi" vs "TITimi" may be the same person - use context to determine)
     - **Display Name vs Username**: If someone appears as both "John Smith" and "johnsmith", treat as one person
   - **Context-Based Similarity Detection**:
     - **String Similarity**: Names with ≥85% similarity (character-level) are likely the same person
       - Example: "H8h8ge8" vs "HH 8GE8" (high similarity) → Same person
-      - Example: "TITim" vs "Yang" (low similarity) → Different people
+      - Example: "TITimi" vs "qiuyang" (low similarity) → Different people
     - **Context Validation** (CRITICAL - Use message context to verify):
       - **Platform Overlap**: If similar names appear on the SAME platform, they're likely the same person
       - **Mutual Exclusivity**: If two similar names NEVER appear together in the same conversation thread, they might be the same person using different formats
@@ -117,7 +120,7 @@ You are a professional multi-platform message aggregation engine responsible for
     - Output ONLY canonical names in the \`people\` array
   - **Examples**:
     - ["H8h8ge8", "HH 8GE8"] + same platform → Output: ["HH 8GE8"] (merged, pick formal version)
-    - ["TITim", "Yang"] + low similarity → Output: ["TITim", "Yang"] (different people)
+    - ["TITimi", "qiuyang"] + low similarity → Output: ["TITimi", "qiuyang"] (different people)
     - ["john", "John", "JOHN"] + same Slack channel → Output: ["John"] (merged, use proper capitalization)
     - ["Mike Johnson", "mike.j"] + Discord messages → Output: ["Mike Johnson"] (merged, display name preferred)
     - ["Alice", "alice@company.com"] + Email context → Output: ["Alice"] (extract display name)
@@ -273,9 +276,9 @@ You are a professional multi-platform message aggregation engine responsible for
   - **Step 2: User Action Item Matching (After Objective Analysis)**:
     - After completing the objective extraction, NOW match action items to the user (me) based on {{userInfo}}
     - Only after confirming the user's identity in the task, assign to myTasks or waitingForOthers
-    - **myTasks**: Matters that the user (me) needs to follow up on personally (e.g., I'm Tim and Tim said that "I will reissue the report")
+    - **myTasks**: Matters that the user (me) needs to follow up on personally (e.g., I'm Timi and Timi said that "I will reissue the report")
     - **waitingForOthers**: Commitments made by others to the user (e.g., "Julie will fix the account before the weekend")
-  - myTasks: Matters that the I needs to follow up on personally (e.g., I'm Tim and Tim said that "I will reissue the report").
+  - myTasks: Matters that the I needs to follow up on personally (e.g., I'm Timi and Timi said that "I will reissue the report").
     - **Request = My Task**: If I (the user) actively make a request to someone else (e.g., "Can you share X?", "Please send me Y"), I need to follow up on getting their response. This IS a myTask, NOT waitingForOthers.
     - **Promise = Waiting**: waitingForOthers is ONLY for when someone else INITIATIVELY makes a commitment to me (e.g., "I'll send it to you", "Let me handle that"). If they are just RESPONDING to my request, do NOT mark as waitingForOthers.
     - **Importance != Task**: Even if the message is critical (e.g., "System Down"), if I am not assigned and does not claim it, do **NOT** generate \`myTasks\`. Reflect this via Insight's \`importance: "high"\` instead of creating a fake task.
@@ -289,7 +292,7 @@ You are a professional multi-platform message aggregation engine responsible for
         - Look for explicit completion indicators: "completed", "confirmed", "finished", "done", "no problem", "ready", "OK", "it's done", "meeting scheduled", etc.
         - Look for confirmation messages that indicate task is done: "confirmed meeting at 8pm", "appointment completed", "already sent", etc.
         - Example scenarios:
-          * Task: "Meeting with Yang on 9th" → Completion: "Confirmed meeting at 8pm on 10th" → Mark task as completed
+          * Task: "Meeting with qiuyang on 9th" → Completion: "Confirmed meeting at 8pm on 10th" → Mark task as completed
           * Task: "Send file to B" → Completion: "Already sent to B" → Mark task as completed
           * Task: "Arrange meeting" → Completion: "Meeting is already scheduled" → Mark task as completed
       - **Step 2: Update Task Status**:
@@ -308,7 +311,7 @@ You are a professional multi-platform message aggregation engine responsible for
       - If a message contains a request like "Send me", "DM me", "and me", the "me" refers to the **SENDER**, not me, unless I am explicitly @mentioned or replied to, **strictly forbid** generating a task.
     - **Booking Link Provider**: If others send their own booking link (e.g., Calendly/Cal.com), it means they are **waiting for others** to book. **Strictly forbid** generating a "Schedule meeting" task for me.
     - **False Mention Prevention**: Generic terms in groups (e.g., "Team", "Everyone", "Builders") do **NOT** constitute a mention of me. Only explicit @mentions (e.g., @Jacky) or direct replies count.
-    - **Subject-Object Clarity**: When generating Event Description, accurately identify "Who requested Whom". The sender is the "Requester", and the @mentioned people are the "Requested". **Strictly forbid** reversing the relationship (e.g., writing "A requested B" as "B asked A"). If uncertain about the user's involvement, do NOT force the user (Jacky, etc.) into the summary.
+    - **Subject-Object Clarity**: When generating Event Description, accurately identify "Who requested Whom". The sender is the "Requester", and the @mentioned people are the "Requested". **Strictly forbid** reversing the relationship (e.g., writing "A requested B" as "B asked A"). If uncertain about the user's involvement, do NOT force the user (Jacky D/Ethan, etc.) into the summary.
     - Be careful to distinguish between group chats and private chats; don't assume that messages in a group chat are messages sent directly to me.
     - If someone mentions me directly in the group chat, assign me the corresponding task.
     - **Contextual Reference Rule**: If a message contains "you" without an @mention and follows another person's message, you **MUST** assume "you" refers to the **sender of the previous message**, NOT me.
@@ -496,58 +499,63 @@ Judge based on impact scope and business value, output one of the following valu
   "insights": [
     {
       "taskLabel": "Matter Label 1",         // Aggregated topic label, e.g., "CRM System Optimization"
-      "title": "Summary Title 1",            // ⭐ CRITICAL: Must include [People] + [Matter] + [Objects]
+      "title": "Summary Title 1",            // ⭐ CRITICAL: Must follow [Result/Conclusion] - [Who] [Action] format
                                                 // Core summary within 30 words. Use CONVERSATIONAL, NATURAL language.
-                                                // **MANDATORY ELEMENTS**:
-                                                // 1. People: MUST mention key people involved
-                                                // 2. Matter: MUST describe what happened/what's the topic
-                                                // 3. Objects: MUST mention key items (documents, files, links, products) if relevant
+                                                // **STRUCTURE (MANDATORY)**:
+                                                // 1. First: Lead with RESULT/CONCLUSION (what happened or status)
+                                                // 2. Second: WHO did WHAT (key person and action)
                                                 //
                                                 // Based on my identity, if my name appears in title, use "you" to refer to that person.
                                                 //
                                                 // Examples:
-                                                // - Good: "John deployed API docs v2, Sarah reviewing"
-                                                // - Good: "Mike shared Q4 roadmap PDF, needs Friday confirmation"
-                                                // - Good: "New logo Figma file updated, waiting for Amy feedback"
-                                                // - Bad: "Deployed API docs" (missing people)
-      "description": "Executive Brief",       // ⭐ CRITICAL: Must clearly describe [People] + [Matter] + [Objects]
+                                                // - Good: "API docs v2 deployed, awaiting Sarah's review"
+                                                // - Good: "Q4 roadmap shared, confirmation needed by Friday"
+                                                // - Good: "New logo updated, Amy to provide feedback"
+                                                // - Bad: "John deployed API docs v2, Sarah reviewing" (result not first)
+                                                // - Bad: "Deployed API docs" (missing people and result)
+      "description": "Executive Brief",       // ⭐ CRITICAL: Must follow [Who] + [Did What] + [Result] format
                                                 // Max 100 words total. Write like a smart co-founder texting a busy CEO.
-                                                    // **GOAL**: The "So What?" and "Now What?" - immediate business impact.
-                                                    // **FORMAT**: Use NEWLINE to separate DISTINCT topics.
+                                                    // **STRUCTURE (MANDATORY)**:
+                                                    // 1. Lead with the CONCLUSION/RESULT first
+                                                    // 2. Then explain WHO did WHAT
+                                                    // 3. End with current status or next step
+                                                    //
+                                                    // **FORMAT STYLE**:
+                                                    // - First line: [Result/Outcome] - this is the headline
+                                                    // - Second line: [Who] + [Action]
+                                                    // - Use NEWLINE to separate distinct topics
+                                                    //
                                                     // **CRITICAL FORMATTING RULE**:
                                                     // - Different topics MUST be on SEPARATE LINES
                                                     // - Do NOT use periods to connect multiple topics into one long paragraph
                                                     // - Each line should be a complete, independent description
-                                                    // - Format: "Person + Matter + Object"
-                                                    //
-                                                    // **MANDATORY ELEMENTS**:
-                                                    // 1. People: WHO did what
-                                                    // 2. Matter: WHAT happened - specific event/topic
-                                                    // 3. Objects: SPECIFIC items - file names, doc titles, links, tools, not vague references
                                                     //
                                                     // **STYLE GUIDE**:
                                                     // - Skip "This update includes..." or "We have completed...". Go straight to the point.
-                                                    // - Each topic line: [Who] + [What matter] + [Specific object] + [Status/Next step]
                                                     // - Use shorthand and direct language.
                                                     // - MUST use NEWLINE (\n) between different topics.
                                                     //
                                                     // **Examples**:
-                                                    // Good (multi-topic with newlines):
-                                                    // "You merged iMessage integration PR (object), can send but sometimes uses SMS (matter). Receiving works.
-                                                    // Mike shared Q4 roadmap PDF (object), needs confirmation by Friday (matter).
-                                                    // h k shared Firefiles.ai meeting notes (object), covering product features, dashboard design, search optimization (matter)."
+                                                    // Good (conclusion first, multi-topic):
+                                                    // "Deployment complete, API v2 now live. John pushed the update this morning.
+                                                    // Sarah approved the changes yesterday, no issues reported.
+                                                    // Next: Monitor performance for 24 hours."
                                                     //
-                                                    // Good (single topic):
-                                                    // "You merged iMessage integration PR (object), can send but sometimes uses SMS (matter). Receiving works.
-                                                    // You also submitted multiple optimizations (object): conversation creation events, local insight focus, daily report display logic (matter)."
+                                                    // Good (single topic conclusion first):
+                                                    // "iMessage integration merged, can now send but sometimes falls back to SMS. You merged the PR this afternoon.
+                                                    // Receiving works correctly."
                                                     //
-                                                    // Bad (no newlines, vague objects):
+                                                    // Bad (action first, no result):
+                                                    // "You merged iMessage integration code, can send but sometimes uses SMS. Receiving and display normal."
+                                                    // (Issue: leads with action instead of result)
+                                                    //
+                                                    // Bad (no newlines, vague):
                                                     // "You merged iMessage integration code, can send but sometimes uses SMS. Receiving and display normal. You also submitted multiple optimizations..."
-                                                    // (Issues: multiple topics connected by periods without newlines, objects not specific)
+                                                    // (Issues: multiple topics connected by periods without newlines, action first)
                                                     //
                                                     // **ANTI-PATTERNS**:
+                                                    // - Do NOT lead with action (who did what) - lead with RESULT
                                                     // - Do NOT merge multiple topics into one paragraph separated by periods - USE NEWLINES!
-                                                    // - Do NOT be vague about objects - say "Q4 roadmap PDF" not "document"
                                                     // - Do NOT use passive voice.
                                                     // - Do NOT list action items (use myTasks/waitingForOthers instead)
       "importance": "Importance Level",        // high/medium/low
@@ -716,12 +724,12 @@ Judge based on impact scope and business value, output one of the following valu
 **Scenario**: User's preferred language is English, but messages are in Chinese
 
 **Input Message (Chinese)**:
-"请在明天之前完成代码审查，我们需要在周五发布新版本。"
+"Please complete the code review by tomorrow, we need to release the new version on Friday."
 
 **Correct Output**:
 {
   "content": "Please complete the code review by tomorrow, we need to release the new version on Friday.",  // Translated to English
-  "originalContent": "请在明天之前完成代码审查，我们需要在周五发布新版本。"  // Original Chinese preserved
+  "originalContent": "Please complete the code review by tomorrow, we need to release the new version on Friday."  // Original Chinese preserved
 }
 
 **Key Points**:
@@ -745,10 +753,10 @@ Previous Insight:
 New Messages:
 "Design mockups completed by Sarah. John approved the final design. Development starts next week."
 
-Correct Output (CONVERSATIONAL FORMAT):
+Correct Output (CONCLUSION-FIRST FORMAT):
 {
-  "title": "Website redesign - design done, starting dev",
-  "description": "Website redesign project. Sarah finished the design and John approved it, so we're starting development next week. We're still on track for the original 2-week deadline."
+  "title": "Design complete, development starts next week",
+  "description": "Design phase finished, on track for 2-week deadline. Sarah completed the mockups and John approved the final design. Development kicks off next week."
 }
 
 **Example 2: Salary Negotiation Insight (Competitive Situation)**
@@ -763,10 +771,10 @@ Previous Insight:
 New Messages:
 "Mike received counter-offer from competitor with 25% increase and no conditions. He's considering both options."
 
-Correct Output (CONVERSATIONAL FORMAT):
+Correct Output (CONCLUSION-FIRST FORMAT):
 {
-  "title": "Mike's salary - got a competitor offer",
-  "description": "Mike's salary negotiation. He's got two offers now: Sarah's 20% raise but he needs to finish kernel dev first, and a competitor's 25% with no strings attached. Mike's weighing both options."
+  "title": "Two offers on the table, Mike deciding",
+  "description": "Mike's got a competitor counter-offer: 25% raise with no conditions, versus Sarah's 20% tied to kernel dev completion. He's weighing both options now."
 }
 
 **Example 3: System Issue Insight (Ongoing Problem)**
@@ -781,10 +789,10 @@ Previous Insight:
 New Messages:
 "David found the issue - missing authentication token. Will fix by end of day."
 
-Correct Output (CONVERSATIONAL FORMAT):
+Correct Output (CONCLUSION-FIRST FORMAT):
 {
-  "title": "API integration blocked - found the issue",
-  "description": "API integration issue. David figured out what's wrong - it's a missing auth token. He's gonna fix it by EOD, then we can resume the integration."
+  "title": "Root cause found, fix by EOD",
+  "description": "API integration unblocked soon. David identified the issue: missing auth token. He'll have it fixed by end of day, then we can resume."
 }
 
 **Example 4: Hiring Process Insight (Status Evolution)**
@@ -799,10 +807,10 @@ Previous Insight:
 New Messages:
 "Interviews completed. 2 candidates rejected. 1 candidate (Jane) passed all rounds. HR preparing offer."
 
-Correct Output (CONVERSATIONAL FORMAT):
+Correct Output (CONCLUSION-FIRST FORMAT):
 {
-  "title": "Frontend dev hiring - offering to Jane",
-  "description": "Frontend developer hiring. Jane passed all her interview rounds, so HR's preparing her offer letter. We rejected 2 other candidates during the process."
+  "title": "Offer letter in preparation for Jane",
+  "description": "Frontend dev hire incoming. Jane passed all interview rounds, HR's drafting her offer. Two other candidates were rejected after the process."
 }
 
 **Key Takeaways for Conversational Descriptions**:
@@ -1124,7 +1132,6 @@ export type DetailData = z.infer<typeof DetailSchema>;
 export type TimelineData = z.infer<typeof TimelineSchema>;
 export type InsightSource = z.infer<typeof SourceSchema>;
 export type ActionRequirementDetails = z.infer<typeof ActionRequirementSchema>;
-export type InsightTaskItem = z.infer<typeof TaskItemSchema>;
 export type ExperimentIdeaData = z.infer<typeof ExperimentIdeaSchema>;
 export type RiskFlagData = z.infer<typeof RiskFlagSchema>;
 export type StrategicData = z.infer<typeof StrategicSchema>;
@@ -1342,7 +1349,7 @@ const multiRoundCompletion = async (
     }
 
     const repairPrompt = `
-1. Please only output the missing JSON fragment so that the overall拼接后 is complete and valid JSON. For example, the previous round output up to
+1. Please only output the missing JSON fragment so that the overall combined result is complete and valid JSON. For example, the previous round output up to
 {
     "insights": [
         {
@@ -1408,8 +1415,8 @@ When connected together, they form a JSON output that meets the requirements, do
     // Add new model response to conversation history
     conversation.push({ role: "assistant", content: repairResponse.text });
     if (
-      repairResponse.text.includes("由于上一轮") ||
-      repairResponse.text.includes("以上输出")
+      repairResponse.text.includes("due to the previous round") ||
+      repairResponse.text.includes("above output")
     ) {
       break;
     }

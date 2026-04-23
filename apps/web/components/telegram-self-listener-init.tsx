@@ -24,6 +24,7 @@ export function TelegramSelfListenerInit() {
   const { data: session } = useSession();
   const userIdRef = useRef<string | undefined>(session?.user?.id);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     userIdRef.current = session?.user?.id;
@@ -92,6 +93,10 @@ export function TelegramSelfListenerInit() {
 
     // Delay execution to ensure app is fully loaded
     initTimeoutRef.current = setTimeout(async () => {
+      // Guard against running after component unmounts
+      if (!isMountedRef.current) {
+        return;
+      }
       const userId = session?.user?.id;
       const isAuthenticated = session !== null && !!userId;
       if (!isAuthenticated) {
@@ -134,6 +139,8 @@ export function TelegramSelfListenerInit() {
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
       }
+      // Mark as unmounted to prevent pending timeout callbacks from running
+      isMountedRef.current = false;
       // window.removeEventListener("beforeunload", handleBeforeUnload);
       // // @ts-ignore
       // window.removeEventListener("tauri://close-requested", handleBeforeUnload);

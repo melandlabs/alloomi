@@ -960,7 +960,7 @@ pub fn try_start_nextjs(
         env_path.to_string()
     };
 
-    // Secrets should be provided via environment variables, not hardcoded
+    // Double-base64 encoded secrets (format: base64(base64(value)))
     let encoded_secrets: Vec<(&str, &str)> = vec![];
 
     let decode_double_base64 = |encoded: &str| -> Option<String> {
@@ -1014,14 +1014,12 @@ pub fn try_start_nextjs(
         .env("NEXT_PUBLIC_APP_URL", "http://localhost:3415")
         .env("LLM_BASE_URL", "https://openrouter.ai/api/v1")
         .env("LLM_MODEL", "google/gemini-3-flash-preview")
-        .env("LLM_REASONING_MODEL", "google/gemini-3-flash-preview")
         .env("LLM_VISION_LANGUAGE_MODEL", "google/gemini-3-flash-preview")
         .env("LLM_IMAGE_MODEL", "openai/gpt-5-image")
         .env("LLM_EMBEDDING_MODEL", "qwen/qwen3-embedding-4b")
         .env("LLM_EMBEDDING_BASE_URL", "https://openrouter.ai/api/v1")
         .env("TELEGRAM_MODE", "pooling")
         .env("ANTHROPIC_BASE_URL", "http://localhost:3415/api/ai")
-        .env("ANTHROPIC_AUTH_TOKEN", "********")
         .env("API_TIMEOUT_MS", "3000000")
         .env("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
         .env("CLAUDE_CODE_TMPDIR", code_tmpdir)

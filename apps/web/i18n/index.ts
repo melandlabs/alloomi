@@ -22,6 +22,8 @@ const languageMap: Record<string, string> = {
   "zh-HK": "zh-Hans",
   "zh-SG": "zh-Hans",
 };
+const LS_KEY_LANGUAGE = "langbot_language";
+const LS_KEY_LANGUAGE_USER_SELECTED = "langbot_language_user_selected";
 
 // Convert detected language code to supported language code
 const convertLanguage = (lng: string): string => {
@@ -67,24 +69,45 @@ i18n
 
 // Manually detect and set language (called after client mount)
 export const detectAndSetLanguage = () => {
-  // Get saved language from localStorage
-  const savedLanguage = localStorage.getItem("langbot_language");
-  if (savedLanguage && languageMap[savedLanguage]) {
+  // If user has actively selected a language, prioritize their choice.
+  const hasUserSelected =
+    localStorage.getItem(LS_KEY_LANGUAGE_USER_SELECTED) === "true";
+  const savedLanguage = localStorage.getItem(LS_KEY_LANGUAGE);
+  if (hasUserSelected && savedLanguage && languageMap[savedLanguage]) {
     i18n.changeLanguage(languageMap[savedLanguage]);
     return;
   }
 
-  // Detect from browser language
+  // Default to system language (browser language), and write to cache.
   const browserLang = navigator.language;
   const detectedLanguage = convertLanguage(browserLang);
 
-  localStorage.setItem("langbot_language", detectedLanguage);
+  localStorage.setItem(LS_KEY_LANGUAGE, detectedLanguage);
   i18n.changeLanguage(detectedLanguage);
 };
 
+/**
+ * Gets the mapped language from the current browser locale.
+ */
+export const getSystemLanguage = (): string => {
+  if (typeof window === "undefined") {
+    return "en-US";
+  }
+  return convertLanguage(navigator.language);
+};
+
+/**
+ * Persists language choice; passing "system" enables follow-system mode.
+ */
 export const saveLanguage = (languageCode: string) => {
   if (typeof window !== "undefined") {
-    localStorage.setItem("langbot_language", languageCode);
+    if (languageCode === "system") {
+      localStorage.removeItem(LS_KEY_LANGUAGE);
+      localStorage.setItem(LS_KEY_LANGUAGE_USER_SELECTED, "false");
+      return;
+    }
+    localStorage.setItem(LS_KEY_LANGUAGE, languageCode);
+    localStorage.setItem(LS_KEY_LANGUAGE_USER_SELECTED, "true");
   }
 };
 

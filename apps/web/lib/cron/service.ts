@@ -4,11 +4,12 @@
  * Compatible with both PostgreSQL (web) and SQLite (Tauri) modes
  */
 
-import { eq, and, desc, asc, lt, isNull, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, lt, isNull, or, sql, inArray } from "drizzle-orm";
 import { db } from "../db/index";
 import {
   scheduledJobs,
   jobExecutions,
+  characters,
   type InsertScheduledJob,
   type InsertJobExecution,
 } from "../db/schema";
@@ -20,7 +21,7 @@ import type {
 } from "./types";
 import { computeNextRun } from "./scheduler";
 import { deserializeJson, serializeJson } from "../db/queries";
-import { DEFAULT_JOB_TIMEOUT_MS } from "../config/constants";
+import { DEFAULT_JOB_TIMEOUT_MS } from "../env/config/constants";
 
 /**
  * List all jobs for a user
@@ -69,7 +70,40 @@ export async function listJobs(
     .where(conditions)
     .orderBy(asc(scheduledJobs.nextRunAt));
 
-  return jobs;
+  // Fetch character names for jobs that have characterId in jobConfig
+  const characterIds = jobs
+    .map((job: typeof scheduledJobs.$inferSelect) => {
+      const config =
+        typeof job.jobConfig === "string"
+          ? JSON.parse(job.jobConfig)
+          : job.jobConfig;
+      return config?.characterId as string | undefined;
+    })
+    .filter((id: string | undefined): id is string => Boolean(id));
+
+  let characterNames: Record<string, string> = {};
+  if (characterIds.length > 0) {
+    const chars = await db
+      .select({ id: characters.id, name: characters.name })
+      .from(characters)
+      .where(inArray(characters.id, characterIds));
+    characterNames = Object.fromEntries(
+      chars.map((c: { id: string; name: string }) => [c.id, c.name]),
+    );
+  }
+
+  // Attach characterName to each job
+  return jobs.map((job: typeof scheduledJobs.$inferSelect) => {
+    const config =
+      typeof job.jobConfig === "string"
+        ? JSON.parse(job.jobConfig)
+        : job.jobConfig;
+    const characterId = config?.characterId as string | undefined;
+    return {
+      ...job,
+      characterName: characterId ? (characterNames[characterId] ?? null) : null,
+    };
+  });
 }
 
 /**
@@ -118,7 +152,11 @@ export async function createJob(
     cronExpression:
       input.schedule.type === "cron" ? input.schedule.expression : null,
     intervalMinutes:
-      input.schedule.type === "interval" ? input.schedule.minutes : null,
+      input.schedule.type === "interval-minutes"
+        ? input.schedule.minutes
+        : input.schedule.type === "interval-hours"
+          ? (input.schedule.hours ?? 1) * 60
+          : null,
     scheduledAt:
       input.schedule.type === "once"
         ? input.schedule.at instanceof Date
@@ -175,7 +213,11 @@ export async function updateJob(
     if (updates.schedule.type === "cron") {
       updateData.cronExpression = updates.schedule.expression;
       updateData.intervalMinutes = null; // Clear old interval value when switching to cron
-    } else if (updates.schedule.type === "interval") {
+    } else if (updates.schedule.type === "interval-hours") {
+      updateData.intervalMinutes = (updates.schedule.hours ?? 1) * 60;
+      updateData.cronExpression = null; // Clear old cron expression when switching to interval
+      updateData.scheduledAt = null; // Clear old once time when switching to interval
+    } else if (updates.schedule.type === "interval-minutes") {
       updateData.intervalMinutes = updates.schedule.minutes;
       updateData.cronExpression = null; // Clear old cron expression when switching to interval
       updateData.scheduledAt = null; // Clear old once time when switching to interval
@@ -248,12 +290,20 @@ export async function toggleJob(
           expression,
           timezone: job.timezone,
         };
-      } else if (job.scheduleType === "interval") {
+      } else if (
+        job.scheduleType === "interval-hours" ||
+        job.scheduleType === "interval-minutes" ||
+        job.scheduleType === "interval"
+      ) {
+        // Legacy "interval" is converted to interval-hours or interval-minutes
         const minutes = job.intervalMinutes;
         if (typeof minutes !== "number") {
           throw new Error("Interval minutes is required for interval jobs");
         }
-        schedule = { type: "interval", minutes };
+        const hours = minutes % 60 === 0 ? minutes / 60 : undefined;
+        schedule = hours
+          ? { type: "interval-hours", hours: Math.floor(hours) }
+          : { type: "interval-minutes", minutes };
       } else {
         const scheduledAt = job.scheduledAt;
         if (!scheduledAt) {
@@ -346,6 +396,8 @@ export async function startJobExecution(context: JobExecutionContext) {
 
 /**
  * Record job execution completion
+ * IMPORTANT: This function has error handling to ensure job status is never left stuck in "running" state.
+ * If any database operation fails, it will attempt to at least mark the job as completed with an error.
  */
 export async function completeJobExecution(
   context: JobExecutionContext,
@@ -362,67 +414,105 @@ export async function completeJobExecution(
     chatId: result.result?.chatId,
   });
 
-  await db
-    .update(jobExecutions)
-    .set({
-      status: result.status,
-      completedAt,
-      durationMs: result.duration,
-      output: result.output,
-      error: result.error,
-      result: result.result ? JSON.stringify(result.result) : null,
-    })
-    .where(eq(jobExecutions.id, context.executionId));
-
-  // Update job state
-  const job = await db
-    .select()
-    .from(scheduledJobs)
-    .where(eq(scheduledJobs.id, context.jobId))
-    .limit(1);
-  if (job[0]) {
-    const nextRun = job[0].nextRunAt;
-    let newNextRun = nextRun;
-
-    // Compute next run if this is a recurring job
-    if (job[0].scheduleType === "cron" && job[0].cronExpression) {
-      const expression = job[0].cronExpression;
-      if (expression) {
-        const schedule: ScheduleConfig = {
-          type: "cron",
-          expression,
-          timezone: job[0].timezone,
-        };
-        newNextRun = computeNextRun(schedule, completedAt);
-      }
-    } else if (job[0].scheduleType === "interval" && job[0].intervalMinutes) {
-      const minutes = job[0].intervalMinutes;
-      if (typeof minutes === "number") {
-        const schedule: ScheduleConfig = {
-          type: "interval",
-          minutes,
-        };
-        newNextRun = computeNextRun(schedule, completedAt);
-      }
-    } else if (job[0].scheduleType === "once") {
-      // One-time jobs should not run again
-      newNextRun = null;
-    }
-
+  // Step 1: Update execution record
+  try {
     await db
-      .update(scheduledJobs)
+      .update(jobExecutions)
       .set({
-        lastStatus: result.status,
-        lastError: result.error,
-        nextRunAt: newNextRun,
-        runCount: (job[0].runCount || 0) + 1,
-        failureCount:
-          result.status === "error"
-            ? (job[0].failureCount || 0) + 1
-            : job[0].failureCount || 0,
-        updatedAt: completedAt,
+        status: result.status,
+        completedAt,
+        durationMs: result.duration,
+        output: result.output,
+        error: result.error,
+        result: result.result ? JSON.stringify(result.result) : null,
       })
-      .where(eq(scheduledJobs.id, context.jobId));
+      .where(eq(jobExecutions.id, context.executionId));
+  } catch (error) {
+    console.error(
+      "[completeJobExecution] Failed to update execution record:",
+      error,
+    );
+    // Continue anyway - the execution record failure should not block job status update
+  }
+
+  // Step 2: Update job state - wrapped in try-catch to ensure status is always updated
+  try {
+    const job = await db
+      .select()
+      .from(scheduledJobs)
+      .where(eq(scheduledJobs.id, context.jobId))
+      .limit(1);
+
+    if (job[0]) {
+      const nextRun = job[0].nextRunAt;
+      let newNextRun = nextRun;
+
+      // Compute next run if this is a recurring job
+      if (job[0].scheduleType === "cron" && job[0].cronExpression) {
+        const expression = job[0].cronExpression;
+        if (expression) {
+          const schedule: ScheduleConfig = {
+            type: "cron",
+            expression,
+            timezone: job[0].timezone,
+          };
+          newNextRun = computeNextRun(schedule, completedAt);
+        }
+      } else if (
+        (job[0].scheduleType === "interval-hours" ||
+          job[0].scheduleType === "interval-minutes" ||
+          job[0].scheduleType === "interval") &&
+        job[0].intervalMinutes
+      ) {
+        const minutes = job[0].intervalMinutes;
+        if (typeof minutes === "number") {
+          const hours = minutes % 60 === 0 ? minutes / 60 : undefined;
+          const schedule: ScheduleConfig = hours
+            ? { type: "interval-hours", hours: Math.floor(hours) }
+            : { type: "interval-minutes", minutes };
+          newNextRun = computeNextRun(schedule, completedAt);
+        }
+      } else if (job[0].scheduleType === "once") {
+        // One-time jobs should not run again
+        newNextRun = null;
+      }
+
+      await db
+        .update(scheduledJobs)
+        .set({
+          lastStatus: result.status,
+          lastError: result.error,
+          nextRunAt: newNextRun,
+          runCount: (job[0].runCount || 0) + 1,
+          failureCount:
+            result.status === "error"
+              ? (job[0].failureCount || 0) + 1
+              : job[0].failureCount || 0,
+          updatedAt: completedAt,
+        })
+        .where(eq(scheduledJobs.id, context.jobId));
+    }
+  } catch (error) {
+    console.error("[completeJobExecution] Failed to update job status:", error);
+    // Last resort: try to at least mark the job as error to prevent permanent stuck state
+    try {
+      await db
+        .update(scheduledJobs)
+        .set({
+          lastStatus: "error",
+          lastError: `Completion handler failed: ${error instanceof Error ? error.message : String(error)}`,
+          updatedAt: completedAt,
+        })
+        .where(eq(scheduledJobs.id, context.jobId));
+      console.log(
+        "[completeJobExecution] Force-updated job status to error as fallback",
+      );
+    } catch (fallbackError) {
+      console.error(
+        "[completeJobExecution] FATAL: Even fallback status update failed:",
+        fallbackError,
+      );
+    }
   }
 }
 
@@ -458,8 +548,16 @@ export async function getJobExecutions(
 const RECOVERY_TIMEOUT_MS = DEFAULT_JOB_TIMEOUT_MS;
 
 /**
- * Recover stuck jobs that were left in "running" state due to app crash or unexpected shutdown
- * This should be called on app startup
+ * Cleanup timeout in milliseconds
+ * Jobs running longer than this are considered zombie stuck jobs
+ * These are cleaned up (deleted) without recovery
+ */
+const CLEANUP_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+/**
+ * Recover stuck jobs that were left in "running" state due to app crash or unexpected shutdown.
+ * Instead of just marking as error, this creates a new execution so the job can auto-recover.
+ * Called periodically by the scheduler (every minute via checkAndExecuteDueJobs).
  */
 export async function recoverStuckJobs(): Promise<number> {
   const now = new Date();
@@ -477,7 +575,6 @@ export async function recoverStuckJobs(): Promise<number> {
     );
 
   if (stuckExecutions.length === 0) {
-    console.log("[CronService] No stuck jobs to recover");
     return 0;
   }
 
@@ -488,17 +585,29 @@ export async function recoverStuckJobs(): Promise<number> {
   let recoveredCount = 0;
 
   for (const execution of stuckExecutions) {
-    // Mark execution as failed
+    // 1. Mark original execution as interrupted
     await db
       .update(jobExecutions)
       .set({
-        status: "error",
+        status: "interrupted",
         completedAt: now,
-        error: "Job was interrupted due to app shutdown or crash (recovered)",
+        error: "Job was interrupted (computer sleep/crash), auto-recovered",
       })
       .where(eq(jobExecutions.id, execution.id));
 
-    // Update job status
+    // 2. Create new execution with status "running" so scheduler picks it up
+    const newExecutionId = crypto.randomUUID();
+    await db.insert(jobExecutions).values({
+      id: newExecutionId,
+      jobId: execution.jobId,
+      status: "running",
+      startedAt: now,
+      triggeredBy: "scheduler",
+    });
+
+    // 3. Update job status - set lastStatus so getDueJobs can find it
+    //    Don't increase failureCount (interrupted is not a failure)
+    //    Don't recalculate nextRunAt - let the scheduler handle it naturally
     const jobs = await db
       .select()
       .from(scheduledJobs)
@@ -506,46 +615,61 @@ export async function recoverStuckJobs(): Promise<number> {
       .limit(1);
 
     if (jobs[0]) {
-      // Recalculate next run for recurring jobs
-      let newNextRun = jobs[0].nextRunAt;
-
-      if (jobs[0].scheduleType === "cron" && jobs[0].cronExpression) {
-        const schedule = {
-          type: "cron" as const,
-          expression: jobs[0].cronExpression,
-          timezone: jobs[0].timezone,
-        };
-        newNextRun = computeNextRun(schedule, now);
-      } else if (
-        jobs[0].scheduleType === "interval" &&
-        jobs[0].intervalMinutes
-      ) {
-        const schedule = {
-          type: "interval" as const,
-          minutes: jobs[0].intervalMinutes,
-        };
-        newNextRun = computeNextRun(schedule, now);
-      }
-
       await db
         .update(scheduledJobs)
         .set({
-          lastStatus: "error",
+          lastStatus: "error", // Allow scheduler to pick this job up
           lastError:
-            "Job was interrupted due to app shutdown or crash (recovered)",
-          nextRunAt: newNextRun,
-          failureCount: (jobs[0].failureCount || 0) + 1,
+            "Job was interrupted (computer sleep/crash), auto-recovered",
+          // failureCount intentionally NOT increased
           updatedAt: now,
         })
         .where(eq(scheduledJobs.id, execution.jobId));
 
       console.log(
-        `[CronService] Recovered job: ${jobs[0].name} (ID: ${execution.jobId})`,
+        `[CronService] Auto-recovered job: ${jobs[0].name} (ID: ${execution.jobId}), new execution: ${newExecutionId}`,
       );
       recoveredCount++;
     }
   }
 
-  console.log(`[CronService] Recovered ${recoveredCount} stuck jobs`);
+  console.log(`[CronService] Auto-recovered ${recoveredCount} stuck jobs`);
   return recoveredCount;
+}
+
+/**
+ * Cleanup zombie job executions that have been stuck in "running" state for too long.
+ * Unlike recoverStuckJobs(), this function does NOT recover or restart the jobs -
+ * it simply deletes the stuck execution records.
+ * Use case: Jobs that were started but never completed due to crash/sleep/force-quit
+ * and are now beyond any reasonable recovery window.
+ */
+export async function cleanupStuckJobs(): Promise<number> {
+  const now = new Date();
+  const timeoutThreshold = new Date(now.getTime() - CLEANUP_TIMEOUT_MS);
+
+  // Find running executions that started before the timeout threshold
+  const stuckExecutions = await db
+    .select()
+    .from(jobExecutions)
+    .where(
+      and(
+        eq(jobExecutions.status, "running"),
+        lt(jobExecutions.startedAt, timeoutThreshold),
+      ),
+    );
+
+  if (stuckExecutions.length === 0) {
+    return 0;
+  }
+
+  // Directly delete these zombie records without modifying scheduled_jobs
+  for (const execution of stuckExecutions) {
+    await db.delete(jobExecutions).where(eq(jobExecutions.id, execution.id));
+  }
+
+  console.log(
+    `[CronService] Cleaned up ${stuckExecutions.length} stuck job executions`,
+  );
+  return stuckExecutions.length;
 }

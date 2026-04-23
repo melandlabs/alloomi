@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useTranslation } from "react-i18next";
-import { inlineResources } from "@alloomi/shared/inline-resources";
+import { inlineResources } from "@/lib/files/inline-resources";
 import { RemixIcon } from "@/components/remix-icon";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
 
 const WebsitePreview = dynamic(
   () =>
@@ -25,6 +26,9 @@ interface WebsitePreviewDrawerProps {
   onClose: () => void;
 }
 
+/**
+ * Fetches HTML from disk/API and renders WebsitePreview inside a drawer; loading and error state header bar is consistent with library list cards.
+ */
 export function WebsitePreviewDrawer({
   file,
   taskId,
@@ -246,17 +250,17 @@ export function WebsitePreviewDrawer({
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full bg-white">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="font-medium truncate">{file.name}</span>
+      <div className="flex h-full min-h-0 flex-col bg-white">
+        <FilePreviewDrawerHeader fileName={file.name}>
           <button
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
+            aria-label={t("common.close", "Close")}
           >
             <RemixIcon name="close" size="size-4" />
           </button>
-        </div>
+        </FilePreviewDrawerHeader>
         <div className="flex-1 flex items-center justify-center">
           <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
         </div>
@@ -266,17 +270,17 @@ export function WebsitePreviewDrawer({
 
   if (error || !htmlContent) {
     return (
-      <div className="flex flex-col h-full bg-white">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="font-medium truncate">{file.name}</span>
+      <div className="flex h-full min-h-0 flex-col bg-white">
+        <FilePreviewDrawerHeader fileName={file.name}>
           <button
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-md p-1 hover:bg-muted transition-colors"
+            aria-label={t("common.close", "Close")}
           >
             <RemixIcon name="close" size="size-4" />
           </button>
-        </div>
+        </FilePreviewDrawerHeader>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <p className="text-6xl mb-4">❌</p>
           <p className="text-lg font-medium mb-2">

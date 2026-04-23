@@ -116,6 +116,9 @@ export function SkillEventInput({
   const [atMentionHighlightedIndex, setAtMentionHighlightedIndex] = useState(0);
   const atMentionListRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Detect platform after client mount; use queueMicrotask to avoid sync setState in effect (eslint react-hooks/set-state-in-effect).
+   */
   // Track whether mouse is in menu area
   const isMenuMouseOverRef = useRef(false);
 
@@ -490,7 +493,7 @@ export function SkillEventInput({
             const relatedTarget = e.relatedTarget as HTMLElement | null;
             const isFocusInMenu =
               relatedTarget?.closest('[role="option"]') ||
-              relatedTarget?.closest('input[placeholder*="搜索"]') ||
+              relatedTarget?.closest('input[placeholder*="Search"]') ||
               relatedTarget?.closest(".skill-event-menu");
 
             if (isFocusInMenu) {

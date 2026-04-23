@@ -8,8 +8,11 @@ import {
   getMessageById,
 } from "@/lib/db/queries";
 import { auth } from "@/app/(auth)/auth";
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
-import { parseRawEmail, type ParsedEmailResult } from "@/lib/email/parser";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
+import {
+  parseRawEmail,
+  type ParsedEmailResult,
+} from "@/lib/integrations/email/parser";
 
 const COOKIE_CONFIRMATION_MAX_AGE = 60 * 24 * 60 * 60; // 60 days
 

@@ -4,6 +4,7 @@ import { useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
 import { useChatContext } from "./chat-context";
+import { useGlobalInsightDrawer } from "@/components/global-insight-drawer";
 import { InsightBadge } from "./insight-badge";
 import { Button } from "@alloomi/ui";
 import {
@@ -31,6 +32,7 @@ export const FocusedInsightCard = memo(function FocusedInsightCard({
 }: FocusedInsightCardProps) {
   const { t } = useTranslation();
   const { focusedInsights, removeFocusedInsight } = useChatContext();
+  const { openDrawer } = useGlobalInsightDrawer();
 
   if (focusedInsights.length === 0) {
     return null;
@@ -69,12 +71,14 @@ export const FocusedInsightCard = memo(function FocusedInsightCard({
       >
         <div className={cn(cardClassName, "bg-white", "gap-1")}>
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span
-              className="text-sm font-normal text-primary-700 line-clamp-2 min-w-0"
+            <button
+              type="button"
+              onClick={() => openDrawer(insight)}
+              className="text-sm font-normal text-primary-700 line-clamp-2 min-w-0 text-left hover:underline cursor-pointer bg-transparent border-0 p-0"
               title={insight.title}
             >
               {insight.title}
-            </span>
+            </button>
             {insight.groups && insight.groups.length > 0 && (
               <InsightBadge
                 type="channel"
@@ -159,12 +163,14 @@ export const FocusedInsightCard = memo(function FocusedInsightCard({
                     className={cn(itemClassName, "gap-1 pr-3")}
                   >
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span
-                        className="text-sm font-normal text-primary-700 line-clamp-2 min-w-0"
+                      <button
+                        type="button"
+                        onClick={() => openDrawer(insight)}
+                        className="text-sm font-normal text-primary-700 line-clamp-2 min-w-0 text-left hover:underline cursor-pointer bg-transparent border-0 p-0"
                         title={insight.title}
                       >
                         {insight.title}
-                      </span>
+                      </button>
                       {insight.groups && insight.groups.length > 0 && (
                         <InsightBadge
                           type="channel"

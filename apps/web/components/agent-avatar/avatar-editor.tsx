@@ -122,6 +122,7 @@ export function AvatarEditor({
             config={config}
             className="w-[120px] sm:w-[200px] md:w-[200px]"
             enableInteractions={true}
+            defaultBottomRight
           />
         </div>
         <p className="text-sm text-muted-foreground text-center max-w-xs">

@@ -5,8 +5,8 @@
  */
 
 import type { NextRequest } from "next/server";
-import { getAgentRegistry } from "@alloomi/agent/registry";
-import { claudePlugin } from "@/lib/extensions";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
+import { claudePlugin } from "@/lib/ai/extensions";
 
 // Set max duration for long-running agent tasks
 // This prevents "TypeError: Load failed" when tool calls take a long time
@@ -18,20 +18,33 @@ import type {
   AgentOptions,
   FileAttachment,
   ImageAttachment,
-} from "@alloomi/agent/types";
-import type { SandboxConfig } from "@alloomi/agent/sandbox/types";
+} from "@alloomi/ai/agent/types";
+import type { SandboxConfig } from "@alloomi/ai/agent/sandbox/types";
 import { auth } from "@/app/(auth)/auth";
 import { promises as fs } from "node:fs";
 import { getUserInsightSettings } from "@/lib/db/queries";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import os from "node:os";
-import { getDocument, getDocumentChunks } from "@/lib/rag/langchain-service";
-import { readFile } from "@/lib/storage/adapters";
+import { getDocument, getDocumentChunks } from "@/lib/ai/rag/langchain-service";
+import { readFile } from "@/lib/storage";
 import { permissionResponses } from "./permission/route";
 
 // Register Claude Agent plugin
 getAgentRegistry().register(claudePlugin);
+
+/**
+ * Detects if the output contains a sudo password prompt
+ */
+function detectSudoPasswordPrompt(output: string): boolean {
+  if (!output || typeof output !== "string") return false;
+  const lowerOutput = output.toLowerCase();
+  return (
+    lowerOutput.includes("sudo") ||
+    lowerOutput.includes("password") ||
+    lowerOutput.includes("authentication")
+  );
+}
 
 interface AgentRequest {
   prompt: string;
@@ -322,7 +335,6 @@ export async function POST(req: NextRequest) {
     let body: AgentRequest;
     try {
       body = JSON.parse(rawBodyText) as AgentRequest;
-      console.log(`[AgentAPI] body.images:`, JSON.stringify(body.images));
     } catch (parseError) {
       console.error(
         "[AgentAPI] ERROR: Failed to parse request body:",
@@ -690,7 +702,15 @@ ${insightsContent}
       blockedPath?: string;
     }> = [];
 
+    // Track pending sudo commands for password input flow
+    const pendingSudoCommands = new Map<
+      string,
+      { command: string; cwd?: string }
+    >();
+
     let generator: AsyncGenerator<AgentMessage>;
+
+    // Track if the generator completed normally
     let generatorCompletedNormally = false;
 
     // Route based on phase
@@ -835,6 +855,23 @@ ${insightsContent}
             },
             onPermissionRequest: async (request) => {
               console.log("[AgentAPI] Permission request (run mode):", request);
+
+              // Check if this is a Bash command that needs sudo
+              if (request.toolName === "Bash") {
+                const command = request.toolInput?.command as string;
+                if (command && /\bsudo\b/.test(command)) {
+                  // Store the command for potential re-execution
+                  pendingSudoCommands.set(request.toolUseID, {
+                    command,
+                    cwd: request.toolInput?.cwd as string | undefined,
+                  });
+                  console.log(
+                    "[AgentAPI] Stored sudo command for toolUseID:",
+                    request.toolUseID,
+                  );
+                }
+              }
+
               // Add to event queue and wait for user response
               permissionRequestEventQueue.push(request);
 
@@ -872,6 +909,32 @@ ${insightsContent}
           });
 
           for await (const message of innerGenerator) {
+            // Check for password prompt in tool results
+            if (
+              message.type === "tool_result" &&
+              message.output &&
+              message.toolUseId
+            ) {
+              if (detectSudoPasswordPrompt(message.output)) {
+                const pendingCmd = pendingSudoCommands.get(message.toolUseId);
+                if (pendingCmd) {
+                  console.log(
+                    "[AgentAPI] Detected sudo password prompt for toolUseID:",
+                    message.toolUseId,
+                  );
+                  // Emit password_input message to frontend
+                  yield {
+                    type: "password_input" as const,
+                    toolUseId: message.toolUseId,
+                    passwordInput: {
+                      toolUseID: message.toolUseId,
+                      originalCommand: pendingCmd.command,
+                    },
+                  };
+                }
+              }
+            }
+
             // Yield the original message
             yield message;
 

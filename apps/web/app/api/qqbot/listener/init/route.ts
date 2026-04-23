@@ -5,7 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { startQQListenersForUser } from "@/lib/qqbot/ws-listener";
+import { startQQListenersForUser } from "@/lib/integrations/qqbot/ws-listener";
 import { setCloudAuthToken } from "@/lib/auth/token-manager";
 import { isTauriMode } from "@/lib/env/constants";
 import { createLogger } from "@/lib/utils/logger";

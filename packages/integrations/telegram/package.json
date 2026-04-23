@@ -1,0 +1,29 @@
+{
+  "name": "@alloomi/integrations-telegram",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapter": "./src/adapter.ts",
+    "./markdown": "./src/markdown.ts",
+    "./conversation-store": "./src/conversation-store.ts",
+    "./tdata-decrypter": "./src/tdata-decrypter/index.ts",
+    "./tdata-converter": "./src/tdata-converter.ts"
+  },
+  "dependencies": {
+    "@alloomi/ai": "workspace:*",
+    "@alloomi/integrations": "workspace:*",
+    "@alloomi/shared": "workspace:*",
+    "big-integer": "^1.6.52",
+    "markdown-it": "^14.1.1",
+    "telegram": "^2.26.22"
+  },
+  "devDependencies": {
+    "@alloomi/config": "workspace:*",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "build": "echo no build needed"
+  }
+}

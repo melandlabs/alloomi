@@ -4,6 +4,7 @@ import {
   WebsitePreviewDrawer,
   FilePreviewPanel,
 } from "@/components/agent/dynamic-panels";
+import { FilePreviewDrawerShell } from "@/components/file-preview-drawer-shell";
 
 export interface FilePreviewData {
   path: string;
@@ -12,6 +13,9 @@ export interface FilePreviewData {
   taskId?: string;
 }
 
+/**
+ * Full-screen mask + right-side file preview; mounted to body via {@link FilePreviewDrawerShell} to avoid being clipped by main content area.
+ */
 export function FilePreviewOverlay({
   file,
   onClose,
@@ -20,32 +24,19 @@ export function FilePreviewOverlay({
   onClose: () => void;
 }) {
   return (
-    <>
-      {/* Overlay */}
-      <div
-        role="button"
-        tabIndex={0}
-        className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-        onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-      />
-      {/* Drawer */}
-      <div className="fixed top-0 right-0 z-[1001] h-full max-h-screen min-w-0 flex flex-col border-l border-border/60 bg-white shadow-2xl transition-transform duration-300 ease-out md:w-[600px] lg:w-[800px] w-full">
-        {file.type === "html" || file.type === "htm" ? (
-          <WebsitePreviewDrawer file={file} onClose={onClose} />
-        ) : (
-          <FilePreviewPanel
-            file={file}
-            taskId={file.taskId}
-            onClose={onClose}
-          />
-        )}
-      </div>
-    </>
+    <FilePreviewDrawerShell
+      onClose={onClose}
+      drawerClassName="sm:w-[min(100vw,40rem)] md:w-[min(100vw,50rem)] lg:w-[min(100vw,56.25rem)]"
+    >
+      {file.type === "html" || file.type === "htm" ? (
+        <WebsitePreviewDrawer
+          file={file}
+          taskId={file.taskId}
+          onClose={onClose}
+        />
+      ) : (
+        <FilePreviewPanel file={file} taskId={file.taskId} onClose={onClose} />
+      )}
+    </FilePreviewDrawerShell>
   );
 }

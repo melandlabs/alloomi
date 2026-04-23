@@ -11,7 +11,7 @@ import type { GoogleAuthSubmission } from "@/components/google-auth";
 import type { OutlookAuthSubmission } from "@/components/outlook-auth";
 import type { MessengerAuthSubmission } from "@/components/messenger-auth-form";
 import type { WhatsAppUserInfo } from "@/components/whatsapp-auth";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { useIntegrations } from "@/hooks/use-integrations";
 import type { IntegrationId } from "@/hooks/use-integrations";
 
@@ -92,7 +92,7 @@ export function useEventsPanelAuth() {
 
   const handleWhatsAppSuccess = useCallback(
     async (sessionKey: string, user: WhatsAppUserInfo) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "whatsapp",
         externalId: user.wid ?? sessionKey,
         displayName:

@@ -13,7 +13,7 @@ import {
 } from "@alloomi/ui";
 import { Button, Input, Label } from "@alloomi/ui";
 import { RemixIcon } from "@/components/remix-icon";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { DingTalkStepsDialog } from "@/components/dingtalk-steps-dialog";
 import { DingTalkConnectSuccessAlert } from "@/components/dingtalk-connect-success-alert";
 import { getAuthToken } from "@/lib/auth/token-manager";

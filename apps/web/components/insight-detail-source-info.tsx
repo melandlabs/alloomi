@@ -62,15 +62,15 @@ interface InsightDetailSourceInfoProps {
   /** Callback when the number of displayed messages changes */
   onDisplayMessageCountChange?: (count: number) => void;
   /**
-   * Prepend @name to the beginning of the quick reply footer input box (without opening the reply detail panel)
-   * When provided, clicking "Reply" on message bubbles will call this callback instead of opening the reply view
+   * Prepend @name to the quick reply footer input field (without opening the reply detail panel)
+   * When passed, clicking "Reply" on message bubbles will call this callback instead of opening the reply view
    */
   onPrependToReplyInput?: (name: string) => void;
 }
 
 /**
  * Insight detail page source info component
- * Displays all original messages for this insight in IM conversation bubble form, supports inline viewing of original messages and quick emoji replies
+ * Displays all original messages of the insight in IM conversation bubble form, supports inline viewing of original messages and quick emoji replies
  */
 export function InsightDetailSourceInfo({
   insight,
@@ -189,9 +189,9 @@ export function InsightDetailSourceInfo({
   }, [mergedDetails]);
 
   /**
-   * Get channel messages (supports pagination, queried from IndexedDB)
-   * Initial load gets latest messages (reverse order), load more gets older messages (forward order)
-   * @param loadMore - Whether in load more mode (append data instead of replace)
+   * Get channel messages (supports pagination, query from IndexedDB)
+   * First load gets latest messages (reverse order), load more gets older messages (forward order)
+   * @param loadMore Whether it's load more mode (append data instead of replace)
    */
   const fetchChannelMessages = useCallback(
     async (loadMore = false): Promise<void> => {
@@ -397,7 +397,7 @@ export function InsightDetailSourceInfo({
   const topAnchorRef = useRef<HTMLDivElement>(null);
 
   /**
-   * Handle reply button click: prefill recipient/account and open reply view
+   * Handle reply button click: pre-fill recipient/account and open reply view
    */
   const handleReplyClick = useCallback(
     (detail?: DetailData) => {
@@ -444,14 +444,14 @@ export function InsightDetailSourceInfo({
   }, []);
 
   /**
-   * Handle message search input change: used to filter list by message content
+   * Handle message search input change: used to filter list based on message content
    */
   const handleMessageSearchChange = useCallback((value: string) => {
     setMessageSearch(value);
   }, []);
 
   /**
-   * Quick emoji reply: derive recipient and account from detail and send message containing only emoji
+   * Quick emoji reply: infer recipient and account from detail and send message containing only emoji
    */
   const handleQuickEmojiReply = useCallback(
     (detail: DetailData, emoji: string) => {
@@ -488,8 +488,8 @@ export function InsightDetailSourceInfo({
   );
 
   /**
-   * Get pending/in-progress messages
-   * Filter messages containing pendingId from mergedDetails (messages added via optimistic updates)
+   * Get messages to send/in progress
+   * Filter messages containing pendingId from mergedDetails (messages added by optimistic update)
    */
   const pendingMessages = useMemo(() => {
     return (mergedDetails ?? []).filter(
@@ -498,7 +498,7 @@ export function InsightDetailSourceInfo({
   }, [mergedDetails]);
 
   /**
-   * Handle retry for failed messages
+   * Handle retry for failed message sending
    */
   const handleRetryMessage = useCallback(
     async (pendingMessage: any) => {
@@ -606,7 +606,7 @@ export function InsightDetailSourceInfo({
   }, [isRssSource, filteredAndSortedDetails.length]);
 
   /**
-   * When component first mounts, automatically load the first page of messages
+   * When component first mounts, automatically load first page of messages
    */
   useEffect(() => {
     if (showAllChannelMessages && allChannelMessages.length === 0) {
@@ -617,7 +617,7 @@ export function InsightDetailSourceInfo({
 
   /**
    * After initial load completes, scroll to bottom
-   * Executes when isLoadingChannelMessages changes from true to false and message count is greater than 0
+   * Executed when isLoadingChannelMessages changes from true to false and message count is greater than 0
    */
   useEffect(() => {
     const el = listContainerRef.current;

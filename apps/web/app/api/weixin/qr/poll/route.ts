@@ -3,8 +3,8 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { advanceWeixinQrPoll } from "@/lib/weixin/qr-login";
-import { completeWeixinIntegrationAfterQr } from "@/lib/weixin/complete-weixin-integration";
+import { advanceWeixinQrPoll } from "@alloomi/integrations/weixin/qr-login";
+import { completeWeixinIntegrationAfterQr } from "@/lib/integrations/weixin/complete-weixin-integration";
 
 export async function POST(request: Request) {
   const session = await auth();

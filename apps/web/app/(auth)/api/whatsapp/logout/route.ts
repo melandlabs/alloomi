@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { WhatsAppAdapter } from "@/lib/integration/sources/whatsapp";
+import { WhatsAppAdapter } from "@/lib/integrations/whatsapp";
 
 export async function POST(request: Request) {
   try {

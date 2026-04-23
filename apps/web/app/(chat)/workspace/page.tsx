@@ -11,8 +11,6 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { RemixIcon } from "@/components/remix-icon";
 import { Button, Input, Textarea } from "@alloomi/ui";
@@ -32,40 +30,43 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@alloomi/ui";
-import { getFileColor } from "@/lib/utils/file-icons";
 import { getToolDisplayName } from "@/lib/utils/tool-names";
 import { FilePreviewPanel } from "@/components/file-preview-panel";
+import { FilePreviewDrawerShell } from "@/components/file-preview-drawer-shell";
+import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
+import { MarkdownWithCitations } from "@/components/markdown-with-citations";
 import type { KnowledgeFile } from "@/hooks/use-knowledge-files";
 import type { LibraryMetaResponse } from "@/app/(chat)/api/library/meta/route";
 import type { LibraryNoteItem } from "@/app/(chat)/api/library/notes/route";
 import { Spinner } from "@/components/spinner";
+import {
+  usePdfPreview,
+  PdfPreviewHeaderToolbar,
+  PdfPreviewScrollBody,
+} from "@/components/artifacts/pdf-preview";
+import { Button as DrawerHeaderIconButton } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  useSpreadsheetPreview,
+  SpreadsheetPreviewHeaderToolbar,
+  SpreadsheetPreviewScrollBody,
+} from "@/components/artifacts/spreadsheet-preview";
 import { uploadRagFile } from "@/lib/files/upload";
 import { useGlobalInsightDrawerOptional } from "@/components/global-insight-drawer";
 import { toast } from "@/components/toast";
 import "../../../i18n";
 import { getAuthToken } from "@/lib/auth/token-manager";
+import { useDiskUsage, useSessions } from "@/hooks/use-disk-usage";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@alloomi/ui";
-import {
-  useDiskUsage,
-  useSessions,
-  invalidateDiskUsage,
-  invalidateSessions,
-} from "@/hooks/use-disk-usage";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@alloomi/ui";
+  LibraryItemRow,
+  getExtFromItem,
+  type LibraryItem,
+  type ToolExecution,
+} from "@/components/library/library-item-row";
 
 /** Library top-level tabs: My notes, My files, Chat Vault */
 export type LibraryTab = "mynotes" | "myfiles" | "stuff";
@@ -115,29 +116,6 @@ interface WorkspaceFileItem {
   modifiedTime?: string;
 }
 
-/** Tool execution item */
-interface ToolExecution {
-  id: string;
-  name: string;
-  status: "pending" | "running" | "completed" | "error";
-  timestamp: Date;
-}
-
-/** Unified item type within library */
-type LibraryItemKind = "workspace_file" | "knowledge_file" | "tool";
-
-interface LibraryItem {
-  id: string;
-  kind: LibraryItemKind;
-  title: string;
-  subtitle?: string;
-  date: Date;
-  groupKey: string;
-  workspaceFile?: { taskId: string; path: string; name: string; type?: string };
-  toolExecution?: ToolExecution;
-  knowledgeFile?: KnowledgeFile;
-}
-
 /** Paginated response type */
 interface PaginatedResponse<T> {
   items: T[];
@@ -179,182 +157,26 @@ function getFileTypeCategory(
   return "other";
 }
 
-/** Get extension from filename or type */
-function getExtFromItem(item: LibraryItem): string {
-  if (item.workspaceFile?.type) return item.workspaceFile.type;
-  if (item.kind === "workspace_file" && item.title.includes(".")) {
-    return item.title.split(".").pop()?.toLowerCase() ?? "";
-  }
-  if (item.kind === "knowledge_file" && item.title.includes(".")) {
-    return item.title.split(".").pop()?.toLowerCase() ?? "";
-  }
-  return "";
-}
-
 /**
- * Resolve preview priority kind for card mode.
- * html/htm/h5 -> website preview, md -> markdown preview, others -> generic.
+ * Determine if a knowledge base document is spreadsheet-type (requires SheetJS to parse binary, cannot treat chunk as Markdown).
  */
-function getLibraryPreviewKind(
-  ext: string,
-): "website" | "markdown" | "generic" {
-  const e = ext.toLowerCase();
-  if (["html", "htm", "h5"].includes(e)) return "website";
-  if (e === "md") return "markdown";
-  return "generic";
-}
-
-/**
- * Build display lines for preview cards when file content is unavailable.
- */
-function getLibraryPreviewLines(item: LibraryItem): {
-  titleLine: string;
-  bodyLine: string;
-} {
-  const titleLine = item.title;
-  const bodyLine =
-    item.subtitle ||
-    item.workspaceFile?.name ||
-    item.workspaceFile?.path ||
-    item.knowledgeFile?.fileName ||
-    "";
-  return { titleLine, bodyLine };
-}
-
-/**
- * Turn raw text into a compact single-paragraph snapshot for cards.
- */
-function toSnapshotText(raw: string): string {
-  return raw.replace(/\s+/g, " ").trim();
-}
-
-/**
- * Build a markdown preview snapshot that only keeps rendered-readable text.
- * Removes frontmatter and common markdown syntax noise for concise card display.
- */
-function toMarkdownSnapshotText(raw: string): string {
-  const withoutFrontmatter = raw.replace(/^---[\s\S]*?---\s*/m, "");
-  const withoutScripts = withoutFrontmatter.replace(
-    /<script[\s\S]*?<\/script>/gi,
-    " ",
-  );
-  const withoutStyles = withoutScripts.replace(
-    /<style[\s\S]*?<\/style>/gi,
-    " ",
-  );
-  const withoutHtmlTags = withoutStyles.replace(/<[^>]+>/g, " ");
-  const withoutCodeBlock = withoutHtmlTags.replace(/```[\s\S]*?```/g, " ");
-  const withoutInlineCode = withoutCodeBlock.replace(/`([^`]+)`/g, "$1");
-  const withoutImages = withoutInlineCode.replace(
-    /!\[([^\]]*)\]\([^)]+\)/g,
-    "$1",
-  );
-  const withoutLinks = withoutImages.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-  const withoutMdTokens = withoutLinks.replace(/[#>*_\-\[\]\(\)]/g, " ");
-  return withoutMdTokens.replace(/\s+/g, " ").trim();
-}
-
-interface LibraryPreviewSnapshot {
-  text: string;
-  html?: string;
-  updatedAt: number;
-}
-
-const LIBRARY_PREVIEW_SNAPSHOT_STORAGE_KEY = "library_preview_snapshot_v1";
-const previewSnapshotMemoryCache = new Map<string, LibraryPreviewSnapshot>();
-
-/**
- * Convert HTML content to readable plain-text snapshot, avoid iframe runtime rendering.
- */
-function toHtmlSnapshotText(raw: string): string {
-  const withoutScripts = raw.replace(/<script[\s\S]*?<\/script>/gi, " ");
-  const withoutStyles = withoutScripts.replace(
-    /<style[\s\S]*?<\/style>/gi,
-    " ",
-  );
-  const withoutTags = withoutStyles.replace(/<[^>]+>/g, " ");
-  return withoutTags.replace(/\s+/g, " ").trim();
-}
-
-/**
- * Build safe html snapshot for iframe preview.
- * Remove script tags to prevent runtime script execution warnings.
- */
-function toSafeHtmlSnapshot(raw: string): string {
-  return raw.replace(/<script[\s\S]*?<\/script>/gi, " ");
-}
-
-/**
- * Build stable snapshot cache key for one library item.
- */
-function getLibraryPreviewCacheKey(item: LibraryItem): string | null {
-  if (item.kind === "workspace_file" && item.workspaceFile) {
-    return `wf:${item.workspaceFile.taskId}:${item.workspaceFile.path}`;
-  }
-  if (item.kind === "knowledge_file" && item.knowledgeFile?.id) {
-    return `kf:${item.knowledgeFile.id}`;
-  }
-  return null;
-}
-
-/**
- * Read snapshot from memory/local cache.
- */
-function readLibraryPreviewSnapshot(
-  key: string,
-  updatedAt: number,
-): LibraryPreviewSnapshot | null {
-  const memory = previewSnapshotMemoryCache.get(key);
+function isKnowledgeSpreadsheetDocument(
+  contentType: string | undefined,
+  fileName: string,
+): boolean {
+  const ct = (contentType ?? "").toLowerCase();
   if (
-    memory &&
-    memory.updatedAt === updatedAt &&
-    typeof memory.text === "string"
+    ct.includes("spreadsheetml") ||
+    ct.includes("spreadsheet") ||
+    ct.includes("excel") ||
+    ct.includes("ms-excel") ||
+    ct.includes("csv") ||
+    ct.includes("opendocument.spreadsheet")
   ) {
-    return memory;
+    return true;
   }
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(
-      LIBRARY_PREVIEW_SNAPSHOT_STORAGE_KEY,
-    );
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Record<string, LibraryPreviewSnapshot>;
-    const snapshot = parsed[key];
-    if (!snapshot || snapshot.updatedAt !== updatedAt) return null;
-    if (typeof snapshot.text !== "string") {
-      return null;
-    }
-    previewSnapshotMemoryCache.set(key, snapshot);
-    return snapshot;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Persist snapshot to memory/local cache.
- */
-function writeLibraryPreviewSnapshot(
-  key: string,
-  snapshot: LibraryPreviewSnapshot,
-): void {
-  previewSnapshotMemoryCache.set(key, snapshot);
-  if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(
-      LIBRARY_PREVIEW_SNAPSHOT_STORAGE_KEY,
-    );
-    const parsed = raw
-      ? (JSON.parse(raw) as Record<string, LibraryPreviewSnapshot>)
-      : {};
-    parsed[key] = snapshot;
-    window.localStorage.setItem(
-      LIBRARY_PREVIEW_SNAPSHOT_STORAGE_KEY,
-      JSON.stringify(parsed),
-    );
-  } catch {
-    // Ignore storage write failures.
-  }
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return ["xlsx", "xls", "csv", "ods"].includes(ext);
 }
 
 /**
@@ -1249,94 +1071,51 @@ export default function LibraryPage() {
   return (
     <>
       <div className="h-full flex-1 flex flex-col min-w-0">
-        <header className="shrink-0 px-6 py-6 bg-card">
-          {/* Desktop: same row, mobile: vertical (gap takes effect at sm and above) */}
-          <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-            <h1 className="text-3xl font-serif font-semibold tracking-tight text-foreground flex-1 min-w-0 leading-10">
-              {t("agent.panels.workspacePanel.title", "Library")}
-            </h1>
-            {chatId && activeTab === "stuff" ? (
-              <button
-                type="button"
-                onClick={() => {
-                  router.push(
-                    `/?page=chat&chatId=${encodeURIComponent(chatId)}`,
-                  );
-                }}
-                className="text-sm text-primary hover:underline inline-flex items-center gap-1 w-fit bg-transparent border-0 p-0 cursor-pointer text-left shrink-0"
-              >
-                <RemixIcon name="chat" size="size-4" />
-                <span className="hidden sm:inline">
-                  {t("workspace.openChat", "Open in chat")}
-                </span>
-                <span className="sm:hidden">{t("common.chat", "Chat")}</span>
-              </button>
-            ) : null}
-            {/* Desktop: tabs and title on same row, mobile: wrap */}
-            <div className="flex gap-1 rounded-lg border border-border/60 p-1 bg-surface-muted/50 overflow-x-auto no-scrollbar w-full sm:w-auto sm:shrink-0">
-              <button
-                type="button"
-                onClick={() => setLibraryTab("mynotes")}
-                className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0",
-                  activeTab === "mynotes"
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
-                )}
-              >
-                <RemixIcon
-                  name="file_text"
-                  size="size-4"
-                  filled={activeTab === "mynotes"}
-                />
-                <span className="hidden xs:inline">
-                  {t("library.tabMyNotes", "My notes")}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLibraryTab("myfiles")}
-                className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0",
-                  activeTab === "myfiles"
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
-                )}
-              >
-                <RemixIcon
-                  name="attachment"
-                  size="size-4"
-                  filled={activeTab === "myfiles"}
-                />
-                <span className="hidden xs:inline">
-                  {t("library.tabMyFiles", "My files")}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLibraryTab("stuff")}
-                className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0",
-                  activeTab === "stuff"
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
-                )}
-              >
-                <RemixIcon
-                  name="folder_4_line"
-                  size="size-4"
-                  filled={activeTab === "stuff"}
-                />
-                <span className="hidden xs:inline">
-                  {t("library.tabChatVault", "Chat Vault")}
-                </span>
-              </button>
-            </div>
+        <div className="px-6 py-6">
+          <div className="flex gap-1 rounded-lg border border-border/60 p-1 bg-surface-muted/50 overflow-x-auto no-scrollbar w-fit sm:shrink-0">
+            <button
+              type="button"
+              onClick={() => setLibraryTab("myfiles")}
+              className={cn(
+                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0",
+                activeTab === "myfiles"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
+              )}
+            >
+              <RemixIcon
+                name="attachment"
+                size="size-4"
+                filled={activeTab === "myfiles"}
+              />
+              <span className="hidden xs:inline">
+                {t("library.tabMyFiles", "My files")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLibraryTab("stuff")}
+              className={cn(
+                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0",
+                activeTab === "stuff"
+                  ? "bg-card text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-hover",
+              )}
+            >
+              <RemixIcon
+                name="folder_4_line"
+                size="size-4"
+                filled={activeTab === "stuff"}
+              />
+              <span className="hidden xs:inline">
+                {t("library.tabChatVault", "Chat Vault")}
+              </span>
+            </button>
           </div>
-        </header>
+        </div>
 
         {/* One row: view switch on left, search/filter/upload on right (shared layout for My notes, My files, Chat Vault) */}
-        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-6 py-2">
+        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-6 py-0">
           <div className="flex rounded-md border border-border/60 overflow-hidden shrink-0">
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -1564,8 +1343,8 @@ export default function LibraryPage() {
                     <ul
                       className={cn(
                         viewMode === "grid"
-                          ? "grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0"
-                          : "space-y-1 min-w-0",
+                          ? "grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-3 min-w-0"
+                          : "space-y-3 min-w-0",
                       )}
                     >
                       {items.map((note) => (
@@ -1606,8 +1385,8 @@ export default function LibraryPage() {
                   <ul
                     className={cn(
                       viewMode === "grid"
-                        ? "grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 min-w-0"
-                        : "space-y-1 min-w-0",
+                        ? "grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-3 min-w-0"
+                        : "space-y-3 min-w-0",
                     )}
                   >
                     {items.map((item) => (
@@ -1672,37 +1451,20 @@ export default function LibraryPage() {
       </div>
 
       {isPreviewPanelOpen && selectedFile && (
-        <>
-          <div
-            role="button"
-            tabIndex={0}
-            className="fixed inset-0 z-[1000] bg-slate-950/30 transition-opacity duration-300 ease-out pointer-events-none md:pointer-events-auto"
-            onClick={() => setIsPreviewPanelOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setIsPreviewPanelOpen(false);
-              }
+        <FilePreviewDrawerShell
+          open={isPreviewPanelOpen}
+          onClose={() => setIsPreviewPanelOpen(false)}
+        >
+          <FilePreviewPanel
+            file={{
+              path: selectedFile.path,
+              name: selectedFile.name,
+              type: selectedFile.type,
             }}
-            style={{ opacity: isPreviewPanelOpen ? 1 : 0 }}
+            taskId={selectedFile.taskId}
+            onClose={() => setIsPreviewPanelOpen(false)}
           />
-          <div
-            className={cn(
-              "fixed top-0 right-0 z-[1001] h-full max-h-screen min-w-0 flex-col border-l border-border/60 bg-background shadow-2xl transition-transform duration-300 ease-out md:w-[800px] lg:w-[900px] w-full",
-              isPreviewPanelOpen ? "translate-x-0" : "translate-x-full",
-            )}
-          >
-            <FilePreviewPanel
-              file={{
-                path: selectedFile.path,
-                name: selectedFile.name,
-                type: selectedFile.type,
-              }}
-              taskId={selectedFile.taskId}
-              onClose={() => setIsPreviewPanelOpen(false)}
-            />
-          </div>
-        </>
+        </FilePreviewDrawerShell>
       )}
 
       {/* My files: knowledge base document preview sidebar */}
@@ -1777,211 +1539,45 @@ function formatBytes(bytes: number): string {
 /** Storage space footer display component */
 function StorageFooter() {
   const { t } = useTranslation();
-  const {
-    data: overview,
-    isLoading: loadingOverview,
-    refresh: refreshOverview,
-  } = useDiskUsage();
-  const { data: sessions, isLoading: loadingSessions } = useSessions();
-
-  const [confirmClean, setConfirmClean] = useState<string | null>(null);
-  const [cleaning, setCleaning] = useState(false);
-
-  const handleClean = async (category: string) => {
-    setCleaning(true);
-    try {
-      const res = await fetch("/api/storage/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category }),
-      });
-      if (res.ok) {
-        refreshOverview();
-        invalidateSessions();
-        toast({
-          type: "success",
-          description: t("workspace.storageDeleted", "Deleted successfully"),
-        });
-      } else {
-        throw new Error("Cleanup failed");
-      }
-    } catch {
-      toast({
-        type: "error",
-        description: t("workspace.storageCleanupFailed", "Cleanup failed"),
-      });
-    } finally {
-      setCleaning(false);
-      setConfirmClean(null);
-    }
-  };
-
-  const handleDeleteAllSessions = async () => {
-    setCleaning(true);
-    try {
-      const res = await fetch("/api/storage/sessions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deleteAll: true }),
-      });
-      if (res.ok) {
-        invalidateSessions();
-        invalidateDiskUsage();
-        toast({
-          type: "success",
-          description: t("workspace.storageDeleted", "Deleted successfully"),
-        });
-      } else {
-        throw new Error("Delete failed");
-      }
-    } catch {
-      toast({
-        type: "error",
-        description: t("workspace.storageCleanupFailed", "Cleanup failed"),
-      });
-    } finally {
-      setCleaning(false);
-      setConfirmClean(null);
-    }
-  };
+  const router = useRouter();
+  const { data: overview } = useDiskUsage();
+  const { data: sessions } = useSessions();
 
   const isLoading = !overview;
   const totalBytes = overview?.totalBytes ?? 0;
-  const categories = overview?.categories ?? [];
-
-  const catLabel = (key: string) => {
-    const labels: Record<string, string> = {
-      sessions: t("workspace.storageCategory.sessions", "Sessions"),
-      logs: t("workspace.storageCategory.logs", "Logs"),
-      cache: t("workspace.storageCategory.cache", "Cache"),
-      storage: t("workspace.storageCategory.storage", "Storage"),
-      database: t("workspace.storageCategory.database", "Database"),
-      skills: t("workspace.storageCategory.skills", "Skills"),
-      "agent-browser": t(
-        "workspace.storageCategory.agent-browser",
-        "Agent browser",
-      ),
-    };
-    return labels[key] ?? key;
-  };
 
   return (
-    <>
-      <div className="shrink-0 px-6 py-2 border-t border-border/60 bg-muted/20">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <RemixIcon name="hard_drive_2_line" size="size-3.5" />
+    <div className="shrink-0 border-t border-border/60 bg-muted/20 px-6 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <RemixIcon name="hard_drive_3_line" size="size-3.5" />
             <span>
               {t("workspace.storage", "Storage")}:{" "}
               {isLoading ? "..." : formatBytes(totalBytes)}
             </span>
           </div>
-          {categories
-            .filter((cat) => cat.key !== "agent-browser")
-            .map((cat) => {
-              if (cat.sizeBytes === 0) return null;
-              return (
-                <div
-                  key={cat.key}
-                  className="flex items-center gap-1 text-xs text-muted-foreground"
-                >
-                  <span className="font-medium">{catLabel(cat.key)}</span>
-                  <span>{formatBytes(cat.sizeBytes)}</span>
-                  {["sessions", "logs", "cache"].includes(cat.key) && (
-                    <button
-                      type="button"
-                      className="ml-0.5 text-xs text-primary/60 hover:text-primary underline"
-                      onClick={() => setConfirmClean(cat.key)}
-                      disabled={cleaning}
-                    >
-                      {t("workspace.storageCleanup", "Cleanup")}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          {sessions.length > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{sessions.length}</span>
-              <span>{t("workspace.storageCategory.sessions", "Sessions")}</span>
-              <button
-                type="button"
-                className="ml-0.5 text-xs text-primary/60 hover:text-primary underline"
-                onClick={() => setConfirmClean("browser-temp")}
-                disabled={cleaning}
-              >
-                {t("workspace.storageCleanBrowserTemp", "Clear browser cache")}
-              </button>
-              <span className="text-muted-foreground/40">|</span>
-              <button
-                type="button"
-                className="text-xs text-destructive/60 hover:text-destructive underline"
-                onClick={() => setConfirmClean("sessions")}
-                disabled={cleaning}
-              >
-                {t("workspace.storageDeleteAllSessions", "Delete all")}
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span>{t("workspace.storageCategory.sessions", "Sessions")}:</span>
+            <span>{sessions.length}</span>
+          </div>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => router.push("/?page=storage-management")}
+        >
+          {t("workspace.storageManagement", "Manage")}
+        </Button>
       </div>
-
-      <AlertDialog
-        open={confirmClean !== null}
-        onOpenChange={(o) => !o && setConfirmClean(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("workspace.storageCleanup", "Cleanup")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmClean === "sessions"
-                ? t(
-                    "workspace.storageConfirmDeleteAll",
-                    "Are you sure you want to delete all sessions? This action cannot be undone.",
-                  )
-                : confirmClean === "browser-temp"
-                  ? t(
-                      "workspace.storageConfirmBrowserTemp",
-                      "Are you sure you want to clear browser temp files from all sessions? This action cannot be undone.",
-                    )
-                  : t(
-                      "workspace.storageConfirmClean",
-                      "Are you sure you want to cleanup? This action cannot be undone.",
-                    )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("common.cancel", "Cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (confirmClean === "sessions") {
-                  handleDeleteAllSessions();
-                } else if (confirmClean) {
-                  handleClean(confirmClean);
-                }
-              }}
-              disabled={cleaning}
-            >
-              {cleaning ? (
-                <Spinner size={16} />
-              ) : (
-                t("workspace.storageCleanup", "Cleanup")
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    </div>
   );
 }
 
 /**
- * Knowledge base document preview side panel: fetch document details and display filename and chunked content
+ * Knowledge base document sidebar preview: shares {@link FilePreviewDrawerShell} and {@link FilePreviewDrawerHeader} with "My Files"; content area uses Pdf / Table / Markdown components consistent with library preview.
  */
 function KnowledgeDocumentPreviewPanel({
   documentId,
@@ -1994,6 +1590,8 @@ function KnowledgeDocumentPreviewPanel({
 }) {
   const [doc, setDoc] = useState<{
     fileName: string;
+    contentType?: string;
+    blobPath?: string | null;
     chunks: Array<{ content: string; chunkIndex: number }>;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2012,6 +1610,8 @@ function KnowledgeDocumentPreviewPanel({
         (data: {
           document?: {
             fileName: string;
+            contentType?: string;
+            blobPath?: string | null;
             chunks?: Array<{ content: string; chunkIndex: number }>;
           };
         }) => {
@@ -2020,6 +1620,8 @@ function KnowledgeDocumentPreviewPanel({
           if (d) {
             setDoc({
               fileName: d.fileName,
+              contentType: d.contentType,
+              blobPath: d.blobPath ?? null,
               chunks: (d.chunks ?? []).sort(
                 (a, b) => a.chunkIndex - b.chunkIndex,
               ),
@@ -2038,479 +1640,97 @@ function KnowledgeDocumentPreviewPanel({
     };
   }, [documentId]);
 
+  const displayName = doc?.fileName ?? documentId;
+
+  const pdfBinaryUrl =
+    doc?.contentType?.includes("pdf") && doc.blobPath
+      ? `/api/rag/documents/${encodeURIComponent(documentId)}/binary`
+      : null;
+
+  const pdfDrawerModel = usePdfPreview(pdfBinaryUrl, {
+    downloadFileName: doc?.fileName ?? "document.pdf",
+    enabled: Boolean(pdfBinaryUrl),
+  });
+
+  const spreadsheetBinaryUrl =
+    doc &&
+    isKnowledgeSpreadsheetDocument(doc.contentType, doc.fileName) &&
+    doc.blobPath
+      ? `/api/rag/documents/${encodeURIComponent(documentId)}/binary`
+      : null;
+
+  const spreadsheetModel = useSpreadsheetPreview(spreadsheetBinaryUrl, {
+    enabled: Boolean(spreadsheetBinaryUrl),
+  });
+
   return (
-    <>
-      <div
-        role="button"
-        tabIndex={0}
-        className="fixed inset-0 z-40 bg-slate-950/30 transition-opacity duration-300 ease-out"
-        onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-      />
-      <div className="fixed top-0 right-0 z-50 h-full max-h-screen w-full min-w-0 flex flex-col border-l border-border/60 bg-background shadow-2xl md:w-[800px] lg:w-[900px]">
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-          <h2 className="truncate text-sm font-medium">
-            {doc?.fileName ?? documentId}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={onClose}
-            aria-label={t("common.close", "Close")}
-          >
-            <RemixIcon name="close" size="size-4" />
-          </Button>
-        </div>
-        <ScrollArea className="flex-1 min-h-0 px-4 py-3">
+    <FilePreviewDrawerShell onClose={onClose}>
+      <div className="bg-background flex h-full min-h-0 flex-col">
+        <FilePreviewDrawerHeader fileName={displayName}>
+          {pdfBinaryUrl ? (
+            <PdfPreviewHeaderToolbar model={pdfDrawerModel} />
+          ) : null}
+          {spreadsheetBinaryUrl ? (
+            <SpreadsheetPreviewHeaderToolbar model={spreadsheetModel} />
+          ) : null}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DrawerHeaderIconButton
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={onClose}
+                aria-label={t("common.close", "Close")}
+              >
+                <RemixIcon name="close" size="size-4" />
+              </DrawerHeaderIconButton>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{t("common.close", "Close")}</p>
+            </TooltipContent>
+          </Tooltip>
+        </FilePreviewDrawerHeader>
+        <div className="flex min-h-0 flex-1 flex-col">
           {loading ? (
-            <div className="flex flex-row items-center p-2 text-muted-foreground justify-center">
+            <div className="flex flex-row items-center justify-center gap-2 p-2 text-muted-foreground">
               <Spinner size={20} />
               <div>{t("common.loading")}</div>
             </div>
           ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="px-4 py-3 text-sm text-destructive">{error}</p>
           ) : doc ? (
-            <div className="space-y-4 text-sm text-foreground whitespace-pre-wrap break-words">
-              {doc.chunks.length === 0 ? (
-                <p className="text-muted-foreground">
-                  {t("workspace.previewNoContent", "No content")}
-                </p>
-              ) : (
-                doc.chunks.map((chunk, i) => (
-                  <div
-                    key={`chunk-${i}-${String(chunk.content).slice(0, 40)}`}
-                    className="rounded-md bg-muted/50 p-3"
-                  >
-                    {chunk.content}
-                  </div>
-                ))
-              )}
-            </div>
-          ) : null}
-        </ScrollArea>
-      </div>
-    </>
-  );
-}
-
-function LibraryItemRow({
-  item,
-  viewMode,
-  t,
-  onOpenFile,
-  onLocateToChat,
-  onOpenEvent,
-  onPreviewKnowledgeFile,
-  onDeleteKnowledgeFile,
-  onDeleteWorkspaceFile,
-}: {
-  item: LibraryItem;
-  viewMode: "list" | "grid";
-  t: (key: string, fallback?: string) => string;
-  onOpenFile: (wf: {
-    taskId: string;
-    path: string;
-    name: string;
-    type?: string;
-  }) => void;
-  /** Locate to source conversation (show "Open in chat" when taskId exists) */
-  onLocateToChat?: (chatId: string) => void;
-  /** Open associated event in My files */
-  onOpenEvent?: (insightId: string) => void;
-  /** Preview knowledge base file in My files */
-  onPreviewKnowledgeFile?: (documentId: string) => void;
-  /** Delete knowledge base file in My files */
-  onDeleteKnowledgeFile?: (documentId: string) => void;
-  /** Delete workspace file in Chat vault */
-  onDeleteWorkspaceFile?: (wf: { taskId: string; path: string }) => void;
-}) {
-  const iconName = item.kind === "tool" ? "layers" : "file_text";
-  const ext = getExtFromItem(item);
-  const previewKind = getLibraryPreviewKind(ext);
-  const { titleLine, bodyLine } = getLibraryPreviewLines(item);
-  const [snapshotText, setSnapshotText] = useState<string>("");
-  const [snapshotHtml, setSnapshotHtml] = useState<string>("");
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const color =
-    item.kind === "workspace_file"
-      ? getFileColor(item.title)
-      : item.kind === "knowledge_file"
-        ? "text-blue-500"
-        : "text-amber-500";
-
-  const handleClick = () => {
-    if (item.workspaceFile) {
-      onOpenFile(item.workspaceFile);
-      return;
-    }
-    if (
-      item.kind === "knowledge_file" &&
-      item.knowledgeFile?.id &&
-      onPreviewKnowledgeFile
-    ) {
-      onPreviewKnowledgeFile(item.knowledgeFile.id);
-    }
-  };
-
-  /** Unified time format and style (consistent with notes, file cards) */
-  const dateLabel = item.date.toLocaleString(undefined, {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    if (viewMode !== "grid") return;
-    if (!["website", "markdown"].includes(previewKind)) return;
-    const updatedAt = item.date.getTime();
-    const cacheKey = getLibraryPreviewCacheKey(item);
-    if (cacheKey) {
-      const cached = readLibraryPreviewSnapshot(cacheKey, updatedAt);
-      if (cached) {
-        setSnapshotText(cached.text);
-        setSnapshotHtml(cached.html ?? "");
-        setSnapshotLoading(false);
-        return;
-      }
-    }
-
-    const loadSnapshot = async () => {
-      setSnapshotLoading(true);
-      try {
-        let content = "";
-        if (item.kind === "workspace_file" && item.workspaceFile) {
-          const { taskId, path } = item.workspaceFile;
-          const res = await fetch(
-            `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(path)}`,
-          );
-          if (res.ok) {
-            const data = (await res.json()) as { content?: string };
-            content = data.content ?? "";
-          }
-        } else if (item.kind === "knowledge_file" && item.knowledgeFile?.id) {
-          const res = await fetch(
-            `/api/rag/documents/${encodeURIComponent(item.knowledgeFile.id)}`,
-          );
-          if (res.ok) {
-            const data = (await res.json()) as {
-              document?: {
-                chunks?: Array<{ content: string; chunkIndex: number }>;
-              };
-            };
-            const chunks = (data.document?.chunks ?? []).sort(
-              (a, b) => a.chunkIndex - b.chunkIndex,
-            );
-            content = chunks.map((c) => c.content).join("\n");
-          }
-        }
-
-        if (!cancelled) {
-          const textSnapshot =
-            previewKind === "website"
-              ? toHtmlSnapshotText(content)
-              : toMarkdownSnapshotText(content);
-          const htmlSnapshot =
-            previewKind === "website" ? toSafeHtmlSnapshot(content) : "";
-          setSnapshotText(textSnapshot);
-          setSnapshotHtml(htmlSnapshot);
-          if (cacheKey) {
-            writeLibraryPreviewSnapshot(cacheKey, {
-              text: textSnapshot,
-              html: htmlSnapshot,
-              updatedAt,
-            });
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setSnapshotText("");
-          setSnapshotHtml("");
-        }
-      } finally {
-        if (!cancelled) setSnapshotLoading(false);
-      }
-    };
-
-    void loadSnapshot();
-    return () => {
-      cancelled = true;
-    };
-  }, [item, previewKind, viewMode]);
-
-  /** Grid card menu: only show destructive actions (e.g., delete) in title-right menu */
-  const titleMenu = (
-    <>
-      {item.workspaceFile && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={(e) => e.stopPropagation()}
-              aria-label={t("common.more", "More")}
-            >
-              <RemixIcon name="more_2" size="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            {item.workspaceFile.taskId && onLocateToChat && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const taskId = item.workspaceFile?.taskId;
-                  if (!taskId) return;
-                  onLocateToChat(taskId);
-                }}
-              >
-                <RemixIcon name="external_link" size="size-4" />
-                <span>{t("library.openChat", "Open chat")}</span>
-              </DropdownMenuItem>
-            )}
-            {onDeleteWorkspaceFile && (
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const wf = item.workspaceFile;
-                  if (!wf) return;
-                  onDeleteWorkspaceFile({ taskId: wf.taskId, path: wf.path });
-                }}
-              >
-                <RemixIcon name="delete_bin" size="size-4" />
-                <span>{t("common.delete", "Delete")}</span>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      {item.kind === "knowledge_file" &&
-        item.knowledgeFile &&
-        onDeleteKnowledgeFile && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={t("common.more", "More")}
-              >
-                <RemixIcon name="more_2" size="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const id = item.knowledgeFile?.id;
-                  if (id) onDeleteKnowledgeFile(id);
-                }}
-              >
-                <RemixIcon name="delete_bin" size="size-4" />
-                <span>{t("common.delete", "Delete")}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-    </>
-  );
-
-  /** Non-preview actions only; preview is handled by clicking card */
-  const actionButtons = (
-    <div className="shrink-0 flex items-center gap-1">
-      {item.workspaceFile?.taskId && onLocateToChat && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            const taskId = item.workspaceFile?.taskId;
-            if (taskId) onLocateToChat(taskId);
-          }}
-          aria-label={t("library.openChat", "Open chat")}
-        >
-          <RemixIcon name="external_link" size="size-4" />
-        </Button>
-      )}
-      {item.kind === "knowledge_file" &&
-        item.knowledgeFile?.insightId &&
-        onOpenEvent && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={(e) => {
-              e.stopPropagation();
-              const insightId = item.knowledgeFile?.insightId;
-              if (insightId) onOpenEvent(insightId);
-            }}
-            aria-label={t("library.openEvent", "Open event")}
-          >
-            <RemixIcon name="external_link" size="size-4" />
-          </Button>
-        )}
-    </div>
-  );
-
-  if (viewMode === "grid") {
-    return (
-      <li className="w-full min-w-0">
-        <div
-          className="w-full min-w-0 flex flex-col items-stretch gap-1.5 p-0 rounded-lg border border-border/60 bg-card text-left overflow-hidden cursor-pointer"
-          onClick={handleClick}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleClick();
-            }
-          }}
-        >
-          <div className="relative w-full h-24 rounded-none border-0 overflow-hidden bg-muted/35">
-            {previewKind === "website" ? (
-              <div className="absolute inset-0 overflow-hidden bg-background">
-                {snapshotHtml ? (
-                  <iframe
-                    title={`${item.title}-snapshot`}
-                    sandbox=""
-                    scrolling="no"
-                    className="h-full w-full scale-[0.62] origin-top-left pointer-events-none [scrollbar-width:none]"
-                    style={{ width: "161%", height: "161%" }}
-                    srcDoc={snapshotHtml}
-                  />
-                ) : (
-                  <div className="absolute inset-0 p-0">
-                    <div className="h-full w-full rounded p-2">
-                      <p className="text-[10px] leading-snug text-foreground line-clamp-5 whitespace-pre-wrap">
-                        {snapshotLoading
-                          ? t("common.loading", "Loading")
-                          : snapshotText || titleLine}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : previewKind === "markdown" ? (
-              <div className="absolute inset-0 p-0">
-                <div className="h-full w-full rounded p-2 overflow-hidden">
-                  {snapshotLoading ? (
-                    <p className="text-[10px] leading-snug text-foreground line-clamp-5 whitespace-pre-wrap">
-                      {t("common.loading", "Loading")}
-                    </p>
-                  ) : (
-                    <div className="h-full overflow-hidden text-[10px] leading-snug text-foreground">
-                      <div className="h-full overflow-hidden">
-                        <ReactMarkdown
-                          className="h-full"
-                          remarkPlugins={[remarkGfm]}
-                          skipHtml
-                          components={{
-                            h1: ({ children }) => (
-                              <p className="font-semibold mb-1 line-clamp-1">
-                                {children}
-                              </p>
-                            ),
-                            h2: ({ children }) => (
-                              <p className="font-semibold mb-1 line-clamp-1">
-                                {children}
-                              </p>
-                            ),
-                            h3: ({ children }) => (
-                              <p className="font-semibold mb-1 line-clamp-1">
-                                {children}
-                              </p>
-                            ),
-                            p: ({ children }) => (
-                              <p className="mb-1 line-clamp-2">{children}</p>
-                            ),
-                            li: ({ children }) => (
-                              <li className="line-clamp-1">{children}</li>
-                            ),
-                            ul: ({ children }) => (
-                              <ul className="list-disc ml-3 mb-1">
-                                {children}
-                              </ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-decimal ml-3 mb-1">
-                                {children}
-                              </ol>
-                            ),
-                            a: ({ children }) => <span>{children}</span>,
-                            code: ({ children }) => <span>{children}</span>,
-                            pre: ({ children }) => (
-                              <div className="line-clamp-2">{children}</div>
-                            ),
-                            blockquote: ({ children }) => (
-                              <blockquote className="pl-2 border-l border-border/60 line-clamp-2">
-                                {children}
-                              </blockquote>
-                            ),
-                          }}
-                        >
-                          {snapshotText || titleLine}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  )}
-                </div>
+            pdfBinaryUrl ? (
+              <PdfPreviewScrollBody
+                model={pdfDrawerModel}
+                maxHeight="100%"
+                className="min-h-0 flex-1"
+              />
+            ) : spreadsheetBinaryUrl ? (
+              <div className="flex min-h-[420px] flex-1 flex-col px-4 py-3">
+                <SpreadsheetPreviewScrollBody
+                  model={spreadsheetModel}
+                  maxHeight="calc(100vh - 200px)"
+                  className="min-h-0 flex-1"
+                />
               </div>
             ) : (
-              <div className="absolute inset-0 p-2 flex items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20">
-                <div
-                  className={cn(
-                    "rounded-md flex items-center justify-center size-10 shrink-0",
-                    color,
-                  )}
-                >
-                  <RemixIcon name={iconName} size="size-6" />
-                </div>
+              <div className="min-w-0 flex-1 overflow-auto break-words px-4 py-3 text-sm text-foreground">
+                {doc.chunks.length === 0 ? (
+                  <p className="text-muted-foreground">
+                    {t("workspace.previewNoContent", "No content")}
+                  </p>
+                ) : (
+                  <MarkdownWithCitations insights={[]}>
+                    {doc.chunks.map((c) => c.content).join("\n\n")}
+                  </MarkdownWithCitations>
+                )}
               </div>
-            )}
-          </div>
-          <div className="flex items-center justify-between gap-2 px-2">
-            <p className="text-sm font-medium truncate min-w-0 text-left">
-              {item.title}
-            </p>
-            {titleMenu}
-          </div>
-          <p className="text-xs text-muted-foreground shrink-0">{dateLabel}</p>
-          <div className="flex items-center gap-2 w-full flex-wrap shrink-0">
-            {actionButtons}
-          </div>
+            )
+          ) : null}
         </div>
-      </li>
-    );
-  }
-
-  return (
-    <li className="w-full min-w-0">
-      <div className="w-full min-w-0 flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-lg border border-border/60 bg-card text-left overflow-hidden">
-        <div
-          className={cn(
-            "shrink-0 rounded-md flex items-center justify-center size-9",
-            color,
-          )}
-        >
-          <RemixIcon name={iconName} size="size-5" />
-        </div>
-        <div className="min-w-0 flex-1 text-left overflow-hidden space-y-0.5">
-          <p className="text-sm font-medium truncate">{item.title}</p>
-          <p className="text-xs text-muted-foreground truncate">{dateLabel}</p>
-        </div>
-        {actionButtons}
       </div>
-    </li>
+    </FilePreviewDrawerShell>
   );
 }
 
@@ -2594,7 +1814,7 @@ function LibraryNoteRow({
   return (
     <li className="w-full min-w-0">
       <div className="w-full min-w-0 flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-lg border border-border/60 bg-card text-left overflow-hidden">
-        <div className="shrink-0 rounded-md flex items-center justify-center size-9 text-amber-500">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[8px] border border-border/60 p-0.5 text-amber-500">
           <RemixIcon name="file_text" size="size-5" />
         </div>
         <div className="min-w-0 flex-1 text-left space-y-0.5 overflow-hidden">

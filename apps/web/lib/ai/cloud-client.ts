@@ -7,7 +7,10 @@
  * - Error handling and retries
  */
 
-import { getCloudApiClient, getStoredAuthToken } from "@/lib/api/remote-client";
+import {
+  getCloudApiClient,
+  getStoredAuthToken,
+} from "@/lib/auth/remote-client";
 import { isTauriMode } from "@/lib/env/constants";
 
 export interface CloudAIRequest {

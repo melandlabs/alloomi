@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateCloudRequest } from "@/lib/api/cloud-auth";
+import { authenticateCloudRequest } from "@/lib/auth/cloud-auth";
 
 const SLACK_API_BASE = "https://slack.com/api";
 

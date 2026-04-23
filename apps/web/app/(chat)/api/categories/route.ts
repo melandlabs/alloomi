@@ -8,11 +8,11 @@ import { AppError } from "@alloomi/shared/errors";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  dbCategoryToApiCategory,
+  type CategoryCreatePayload,
   getDefaultCategoryTemplates,
   getDefaultCategoryTemplateByName,
-} from "@/lib/config/default-categories";
-import { dbCategoryToApiCategory } from "@/lib/types/categories";
-import type { CategoryCreatePayload } from "@/lib/types/categories";
+} from "@/lib/types/categories";
 
 /**
  * Request body validation schema for creating category

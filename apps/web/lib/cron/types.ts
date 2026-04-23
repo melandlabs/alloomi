@@ -9,7 +9,9 @@ import type { ScheduledJob } from "../db/schema";
  */
 export type ScheduleConfig =
   | { type: "cron"; expression: string; timezone?: string }
-  | { type: "interval"; minutes: number }
+  | { type: "interval-hours"; hours: number }
+  | { type: "interval-minutes"; minutes: number }
+  | { type: "interval"; hours?: number; minutes?: number } // Legacy support
   | { type: "once"; at: Date | string };
 
 /**
@@ -23,8 +25,6 @@ export type JobConfig = {
     baseUrl?: string;
     model?: string;
   };
-  /** Character soul/personality injected into system prompt */
-  soul?: string;
   /** Back-link to character that owns this job */
   characterId?: string;
 };
@@ -44,6 +44,8 @@ export interface JobExecutionContext {
   };
   /** Back-link to character that owns this job */
   characterId?: string;
+  /** User's timezone for date/time operations */
+  timezone?: string;
 }
 
 /**

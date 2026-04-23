@@ -1,5 +1,5 @@
 /**
- * Initiate WeChat iLink QR code login: Fetch QR code and create server session
+ * Initiate WeChat iLink QR code login: Fetch QR code and create server session.
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
@@ -7,7 +7,7 @@ import {
   DEFAULT_WEIXIN_QR_BOT_TYPE,
   fetchWeixinBotQrCode,
   startWeixinQrSession,
-} from "@/lib/weixin/qr-login";
+} from "@alloomi/integrations/weixin/qr-login";
 
 const DEFAULT_BASE = "https://ilinkai.weixin.qq.com";
 

@@ -25,12 +25,16 @@ export function getPresetTabsConfig(t: TFunction): InsightTab[] {
           {
             kind: "urgency",
             values: [
-              "As soon as possible",
               "ASAP",
-              "asap",
+              "As soon as possible",
               "Within 24 hours",
+              "Within 24 hours",
+              "Handle ASAP",
+              "Urgent",
               "Urgent",
               "urgent",
+              "ASAP",
+              "asap",
               "Immediate",
               "immediate",
             ],

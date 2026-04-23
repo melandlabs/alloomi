@@ -413,31 +413,9 @@ export function ExcelPreview({ artifact }: ExcelPreviewProps) {
         </table>
       </div>
 
-      {/* Status bar */}
-      <div className="border-border bg-background shrink-0 border-t px-3 py-1.5">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {t("common.excelPreview.rowColCount", { rowCount, colCount })}
-          </span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleShowInFolder}
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-            >
-              <RemixIcon name="folder_open" size="size-3" />
-              {t("common.preview.showInFolder", "Show in Folder")}
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenExternal}
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-            >
-              <RemixIcon name="external_link" size="size-3" />
-              {t("common.excelPreview.openInExcel")}
-            </button>
-          </div>
-        </div>
+      {/* Row count statistics; "Show in Folder / Open in Excel" provided by {@link FilePreviewDrawerHeader} */}
+      <div className="border-border bg-background shrink-0 border-t px-3 py-1.5 text-xs text-muted-foreground">
+        {t("common.excelPreview.rowColCount", { rowCount, colCount })}
       </div>
     </div>
   );

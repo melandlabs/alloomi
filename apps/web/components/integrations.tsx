@@ -19,7 +19,7 @@ import {
 } from "./messenger-auth-form";
 import { IMessageAuthForm } from "./imessage-auth-form";
 import { FeishuAuthForm } from "./feishu-auth-form";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { getAuthToken } from "@/lib/auth/token-manager";
 
 const SectionDivider = () => (
@@ -39,7 +39,7 @@ export function Integrations() {
 
   const handleGoogleSubmit = useCallback(
     async ({ email, appPassword, name }: GoogleAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "gmail",
         externalId: email,
         displayName: name ?? email,
@@ -59,26 +59,6 @@ export function Integrations() {
         },
       });
 
-      // Initialize Gmail Self Message Listener
-      try {
-        const cloudAuthToken = getAuthToken() || undefined;
-        const response = await fetch("/api/gmail/init-self-listener", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            cloudAuthToken ? { authToken: cloudAuthToken } : {},
-          ),
-        });
-        if (response.ok) {
-          console.log("[Gmail] Self Message Listener initialized successfully");
-        }
-      } catch (error) {
-        console.error(
-          "[Gmail] Failed to initialize Self Message Listener:",
-          error,
-        );
-      }
-
       router.refresh();
       setIsGoogleAuthFormOpen(false);
     },
@@ -87,7 +67,7 @@ export function Integrations() {
 
   const handleWhatsAppSuccess = useCallback(
     async (sessionKey: string, user: WhatsAppUserInfo) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "whatsapp",
         externalId: user.wid ?? sessionKey,
         displayName:
@@ -150,7 +130,7 @@ export function Integrations() {
 
   const handleOutlookSubmit = useCallback(
     async ({ email, appPassword, name }: OutlookAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "outlook",
         externalId: email,
         displayName: name ?? email,
@@ -191,7 +171,7 @@ export function Integrations() {
       appSecret,
       verifyToken,
     }: MessengerAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "facebook_messenger",
         externalId: pageId,
         displayName: pageName ?? `Messenger · ${pageId}`,

@@ -9,9 +9,9 @@
 
 import type { NextRequest } from "next/server";
 import { isTauriMode } from "@/lib/env/constants";
-import { authenticateCloudRequest } from "@/lib/api/cloud-auth";
+import { authenticateCloudRequest } from "@/lib/auth/cloud-auth";
 import { withRateLimit, RateLimitPresets } from "@/lib/rate-limit/middleware";
-import { db, createBot } from "@/lib/db/queries";
+import { db, createBot, weixinBotHasValidContextToken } from "@/lib/db/queries";
 import { integrationAccounts, bot } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
@@ -305,13 +305,59 @@ async function handleLocalMode(request: NextRequest) {
       .from(integrationAccounts)
       .where(eq(integrationAccounts.userId, localUserId));
 
+    // Enhance accounts with hasValidContextToken for WeChat
+    const enhancedAccounts = await Promise.all(
+      localAccounts.map(
+        async (acc: {
+          id: string;
+          platform: string;
+          externalId: string;
+          displayName: string;
+          status: string;
+          metadata: string | null;
+          createdAt: Date;
+          updatedAt: Date;
+        }) => {
+          const account: {
+            id: string;
+            platform: string;
+            externalId: string;
+            displayName: string;
+            status: string;
+            metadata: Record<string, unknown> | null;
+            createdAt: Date;
+            updatedAt: Date;
+            hasValidContextToken?: boolean;
+          } = {
+            ...acc,
+            metadata: acc.metadata
+              ? typeof acc.metadata === "string"
+                ? JSON.parse(acc.metadata)
+                : acc.metadata
+              : null,
+          };
+
+          // For WeChat, check if bot has valid context token
+          if (account.platform === "weixin") {
+            const hasValidContextToken = await checkWeixinContextToken(
+              localUserId,
+              acc.id,
+            );
+            account.hasValidContextToken = hasValidContextToken;
+          }
+
+          return account;
+        },
+      ),
+    );
+
     if (DEBUG) {
       console.log(
         "[Integrations Accounts] Returning local accounts:",
-        localAccounts.length,
+        enhancedAccounts.length,
         [
           ...new Set(
-            localAccounts.map((a: { platform: string }) => a.platform),
+            enhancedAccounts.map((a: { platform: string }) => a.platform),
           ),
         ],
         syncedCount > 0 ? `(synced ${syncedCount} new)` : "",
@@ -320,25 +366,7 @@ async function handleLocalMode(request: NextRequest) {
 
     return new Response(
       JSON.stringify({
-        accounts: localAccounts.map(
-          (acc: {
-            id: string;
-            platform: string;
-            externalId: string;
-            displayName: string;
-            status: string;
-            metadata: string | null;
-            createdAt: Date;
-            updatedAt: Date;
-          }) => ({
-            ...acc,
-            metadata: acc.metadata
-              ? typeof acc.metadata === "string"
-                ? JSON.parse(acc.metadata)
-                : acc.metadata
-              : null,
-          }),
-        ),
+        accounts: enhancedAccounts,
       }),
       {
         status: 200,
@@ -351,6 +379,37 @@ async function handleLocalMode(request: NextRequest) {
       status: 503,
       headers: { "Content-Type": "application/json" },
     });
+  }
+}
+
+/**
+ * Check if WeChat account has valid context token
+ */
+async function checkWeixinContextToken(
+  userId: string,
+  platformAccountId: string,
+): Promise<boolean> {
+  try {
+    // Find the bot associated with this platform account
+    const botRecord = await db
+      .select({ id: bot.id })
+      .from(bot)
+      .where(eq(bot.platformAccountId, platformAccountId))
+      .limit(1);
+
+    if (botRecord.length === 0) {
+      return false;
+    }
+
+    const botId = botRecord[0].id;
+    const hasValidToken = await weixinBotHasValidContextToken(userId, botId);
+    return hasValidToken;
+  } catch (error) {
+    console.error(
+      "[Integrations Accounts] Failed to check WeChat context token:",
+      error,
+    );
+    return false;
   }
 }
 
@@ -375,29 +434,47 @@ async function handleCloudMode(user: { id: string }) {
       .from(integrationAccounts)
       .where(eq(integrationAccounts.userId, user.id));
 
-    return new Response(
-      JSON.stringify({
-        accounts: accounts.map(
-          (acc: {
-            id: string;
-            userId: string;
-            platform: string;
-            externalId: string;
-            displayName: string;
-            status: string;
-            metadata: string | null;
-            credentialsEncrypted: string;
-            createdAt: Date;
-            updatedAt: Date;
-          }) => ({
+    // Enhance accounts with hasValidContextToken for WeChat
+    const enhancedAccounts = await Promise.all(
+      accounts.map(
+        async (acc: {
+          id: string;
+          userId: string;
+          platform: string;
+          externalId: string;
+          displayName: string;
+          status: string;
+          metadata: string | null;
+          credentialsEncrypted: string;
+          createdAt: Date;
+          updatedAt: Date;
+        }) => {
+          const account = {
             ...acc,
             metadata: acc.metadata
               ? typeof acc.metadata === "string"
                 ? JSON.parse(acc.metadata)
                 : acc.metadata
               : null,
-          }),
-        ),
+          };
+
+          // For WeChat, check if bot has valid context token
+          if (account.platform === "weixin") {
+            const hasValidContextToken = await checkWeixinContextToken(
+              user.id,
+              acc.id,
+            );
+            (account as any).hasValidContextToken = hasValidContextToken;
+          }
+
+          return account;
+        },
+      ),
+    );
+
+    return new Response(
+      JSON.stringify({
+        accounts: enhancedAccounts,
       }),
       {
         status: 200,

@@ -6,10 +6,15 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import type { Session } from "next-auth";
 import { RemixIcon } from "@/components/remix-icon";
-import { DropdownMenuItem } from "@alloomi/ui";
+import {
+  DropdownMenuItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@alloomi/ui";
 import { Button } from "@alloomi/ui";
 import { cn } from "@/lib/utils";
-import { guestRegex } from "@/lib/constants";
+import { guestRegex } from "@/lib/env/constants";
 import { isTauri, openUrl } from "@/lib/tauri";
 import {
   LanguageSettingsMenu,
@@ -17,6 +22,12 @@ import {
 } from "@/components/language-settings-menu";
 
 export { languages };
+
+/**
+ * Documentation URL for onboarding tooltip style reference.
+ */
+const ONBOARDING_TOOLTIP_DOC_URL =
+  "https://alloomi.ai/docs/alloomi/connectors#platform-setup-details";
 
 /**
  * Props for the user menu content component.
@@ -28,6 +39,13 @@ interface UserMenuContentProps {
   isLoadingCredit: boolean;
   /** User plan type */
   plan: string | null;
+  /** Credit data */
+  creditData?: {
+    remaining: number;
+    total: number;
+  } | null;
+  /** Credit usage percentage */
+  creditPercentage?: number | null;
   /** Current language code */
   currentLang: string;
   /** Whether in mobile mode */
@@ -42,6 +60,8 @@ interface UserMenuContentProps {
   onLanguageChange: (code: string) => void;
   /** Logout handler */
   onLogout: () => void;
+  /** Callback to request logout confirmation (opens dialog in parent) */
+  onRequestLogout?: () => void;
   /** Login handler */
   onLogin: () => void;
   /** Menu item click handler */
@@ -52,6 +72,8 @@ interface UserMenuContentProps {
   onPersonalSettingsClick?: () => void;
   /** Callback when clicking the user card to navigate to subscription management page */
   onGoToSubscriptionManagement?: () => void;
+  /** Open mandatory onboarding modal in development mode */
+  onOpenMandatoryOnboardingDebug?: () => void;
 }
 
 /**
@@ -63,6 +85,8 @@ export function UserMenuContent({
   session,
   isLoadingCredit,
   plan,
+  creditData,
+  creditPercentage,
   currentLang,
   isMobile,
   isFullscreen = false,
@@ -70,11 +94,13 @@ export function UserMenuContent({
   userAvatarUrl,
   onLanguageChange,
   onLogout,
+  onRequestLogout,
   onLogin,
   onMenuItemClick,
   onOpenContactUs,
   onPersonalSettingsClick,
   onGoToSubscriptionManagement,
+  onOpenMandatoryOnboardingDebug,
 }: UserMenuContentProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -96,11 +122,18 @@ export function UserMenuContent({
   };
 
   /**
-   * Open onboarding guide panel from account menu.
+   * Open mandatory onboarding modal from development-only menu item.
    */
-  const handleOpenOnboardingGuide = () => {
+  const handleOpenMandatoryOnboardingDebug = () => {
     onMenuItemClick();
-    window.dispatchEvent(new CustomEvent("alloomi:open-onboarding"));
+    onOpenMandatoryOnboardingDebug?.();
+  };
+
+  /**
+   * Navigate to component dev page from development tools group.
+   */
+  const handleOpenDevComponents = () => {
+    onMenuItemClick();
   };
 
   // Set style variables based on mode
@@ -257,6 +290,37 @@ export function UserMenuContent({
             >
               {t("nav.creditsUsed")}
             </span>
+            {!isLoadingCredit && creditData && (
+              <span
+                className={cn(
+                  "font-bold text-foreground",
+                  styles.creditTextSize,
+                )}
+              >
+                {creditData.remaining.toLocaleString()}
+                <span
+                  className={cn(
+                    "font-normal text-muted-foreground",
+                    styles.creditSubTextSize,
+                  )}
+                >
+                  /{creditData.total.toLocaleString()}
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div
+            className={cn(
+              "relative w-full overflow-hidden rounded-full bg-muted",
+              styles.progressHeight,
+            )}
+          >
+            <div
+              className="h-full rounded-full bg-primary shadow-sm transition-all duration-500 ease-out"
+              style={{ width: `${creditPercentage}%` }}
+            />
           </div>
         </div>
 
@@ -322,20 +386,90 @@ export function UserMenuContent({
         <RemixIcon name="brain_ai_3" size={styles.iconSize} />
         <span>{t("settings.personalization")}</span>
       </Link>
-      <button
-        type="button"
-        onClick={handleOpenOnboardingGuide}
-        className={cn(
-          "flex items-center w-full rounded-sm text-foreground cursor-pointer bg-transparent border-none",
-          styles.itemGap,
-          styles.itemPadding,
-          styles.itemTextSize,
-          styles.itemHover,
-        )}
-      >
-        <RemixIcon name="booklet" size={styles.iconSize} />
-        <span>{t("nav.onboardingGuide", "Onboarding guide")}</span>
-      </button>
+      {process.env.NODE_ENV === "development" && (
+        <>
+          <div className={cn("border-t border-border", styles.dividerMargin)} />
+          <button
+            type="button"
+            onClick={handleOpenMandatoryOnboardingDebug}
+            className={cn(
+              "flex items-center w-full rounded-sm text-foreground cursor-pointer bg-transparent border-none",
+              styles.itemGap,
+              styles.itemPadding,
+              styles.itemTextSize,
+              styles.itemHover,
+            )}
+          >
+            <RemixIcon name="bug_2" size={styles.iconSize} />
+            <span>
+              {t(
+                "sidebar.onboardingGuide.openMandatoryDebug",
+                "Open new onboarding modal",
+              )}
+            </span>
+          </button>
+          <Link
+            href="/dev/components"
+            onClick={handleOpenDevComponents}
+            className={cn(
+              "flex items-center justify-between w-full rounded-sm text-foreground",
+              styles.itemGap,
+              styles.itemPadding,
+              styles.itemTextSize,
+              styles.itemHover,
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <RemixIcon name="code" size={styles.iconSize} />
+              <span>{t("nav.devComponents", "Component-dev")}</span>
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center text-muted-foreground"
+                  aria-label={t(
+                    "sidebar.onboardingGuide.collectInfo.tooltip.iconLabel",
+                    "Task details",
+                  )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                >
+                  <i className="ri-question-line text-base leading-none" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="right"
+                className="max-w-64 border border-border bg-card text-card-foreground"
+              >
+                <p className="text-xs leading-relaxed">
+                  {t(
+                    "sidebar.onboardingGuide.collectInfo.tooltip.linkPlatform",
+                    "Connect Slack, Gmail, Telegram and more. Alloomi reads your conversations and surfaces what needs follow-up — before you have to ask.",
+                  )}
+                </p>
+                <a
+                  href={ONBOARDING_TOOLTIP_DOC_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  {t(
+                    "sidebar.onboardingGuide.collectInfo.tooltip.openDocButton",
+                    "learn more",
+                  )}
+                  <i className="ri-external-link-line text-xs" />
+                </a>
+              </TooltipContent>
+            </Tooltip>
+          </Link>
+        </>
+      )}
 
       {/* Divider */}
       <div className={cn("border-t border-border", styles.dividerMargin)} />
@@ -495,11 +629,46 @@ export function UserMenuContent({
   );
 
   /**
-   * Render login button for guests only.
+   * Render log out / login button.
    */
   const renderAuthButton = () => {
     if (!isGuest) {
-      return null;
+      if (isFullscreen) {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onMenuItemClick();
+              onRequestLogout?.();
+            }}
+            className={cn(
+              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
+              styles.itemGap,
+              styles.itemPadding,
+              styles.itemTextSize,
+            )}
+          >
+            <RemixIcon name="logout_box_r" size={styles.iconSize} />
+            <span>{t("nav.logout")}</span>
+          </Button>
+        );
+      }
+      return (
+        <DropdownMenuItem
+          onClick={() => {
+            onMenuItemClick();
+            onRequestLogout?.();
+          }}
+          className="cursor-pointer border border-border bg-card text-card-foreground data-[highlighted]:bg-card data-[highlighted]:text-card-foreground focus:bg-card focus:text-card-foreground"
+        >
+          <RemixIcon
+            name="logout_box_r"
+            size={styles.iconSize}
+            className="mr-2"
+          />
+          <span>{t("nav.logout")}</span>
+        </DropdownMenuItem>
+      );
     }
 
     if (isFullscreen) {
@@ -548,7 +717,7 @@ export function UserMenuContent({
             onClick={handleGoToBillingAndUsage}
             role="button"
             className="cursor-pointer"
-          />
+          ></div>
         )}
       </div>
 

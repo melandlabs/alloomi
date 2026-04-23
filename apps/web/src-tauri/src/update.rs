@@ -6,8 +6,8 @@
 //! Auto-update module — version checking, download, install, and relaunch.
 
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::Emitter;
 
 // ============ Types ============
 
@@ -35,6 +35,29 @@ pub struct DownloadProgress {
 pub struct UpdateInstallResult {
     pub auto_installed: bool,
     pub message: String,
+}
+
+// ============ Global Progress State ============
+
+/// Global download progress state — shared across command calls via Arc<Mutex>
+static DOWNLOAD_PROGRESS: std::sync::OnceLock<Arc<Mutex<DownloadProgressState>>> =
+    std::sync::OnceLock::new();
+
+#[derive(Default)]
+struct DownloadProgressState {
+    downloaded: u64,
+    total: u64,
+    percent: u8,
+    error: Option<String>,
+    done: bool,
+    download_path: Option<String>,
+}
+
+/// Get or init the global download progress state
+fn get_progress_state() -> Arc<Mutex<DownloadProgressState>> {
+    DOWNLOAD_PROGRESS
+        .get_or_init(|| Arc::new(Mutex::new(DownloadProgressState::default())))
+        .clone()
 }
 
 // ============ Version Utilities ============
@@ -197,8 +220,6 @@ fn auto_install_platform(download_path: &std::path::Path) -> Result<(), String> 
 /// Windows: silent install via /S flag
 #[cfg(target_os = "windows")]
 fn auto_install_platform(download_path: &std::path::Path) -> Result<(), String> {
-    use std::fs;
-
     let exe_str = download_path.to_string_lossy().to_string();
     let ok = Command::new(&exe_str)
         .args(["/S"])
@@ -384,13 +405,305 @@ pub async fn do_check_for_update() -> Result<UpdateCheckResult, String> {
     })
 }
 
-/// Tauri command: download update and auto-install (emits progress events)
+/// Tauri command: start downloading update (non-blocking, returns immediately)
+#[tauri::command]
+pub async fn start_update_download(download_url: String, file_size: u64) -> Result<(), String> {
+    // Reset global progress state
+    let state = get_progress_state();
+    {
+        let mut s = state.lock().unwrap();
+        *s = DownloadProgressState::default();
+    }
+
+    let filename = download_url
+        .split('/')
+        .last()
+        .ok_or("Invalid download URL")?
+        .to_string();
+
+    let temp_dir = std::env::temp_dir();
+    let download_path = temp_dir.join(&filename);
+
+    println!(
+        "📥 Starting update download: {} -> {:?}",
+        download_url, download_path
+    );
+
+    let client = reqwest::Client::builder()
+        .user_agent("Alloomi-App")
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    // Build request with optional GitHub token to avoid rate limits
+    let mut req = client
+        .get(&download_url)
+        .header("Accept", "application/octet-stream");
+    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+        if !token.is_empty() {
+            req = req.header("Authorization", format!("Bearer {}", token));
+        }
+    }
+
+    // Spawn the download task in background
+    let state_clone = state.clone();
+    let filename_clone = filename.clone();
+
+    tokio::spawn(async move {
+        let result = download_file(&state_clone, req, file_size, &filename_clone).await;
+        if let Err(e) = result {
+            let mut s = state_clone.lock().unwrap();
+            s.error = Some(e);
+            s.done = true;
+        }
+    });
+
+    Ok(())
+}
+
+/// Internal: performs the actual file download with progress tracking
+async fn download_file(
+    state: &Arc<Mutex<DownloadProgressState>>,
+    req: reqwest::RequestBuilder,
+    file_size: u64,
+    filename: &str,
+) -> Result<(), String> {
+    let temp_dir = std::env::temp_dir();
+    let download_path = temp_dir.join(filename);
+
+    // Retry with exponential backoff for transient network errors.
+    let mut last_err = String::new();
+    for attempt in 0..3 {
+        if attempt > 0 {
+            let delay = Duration::from_secs(1 << attempt); // 2s, 4s
+            println!("⏳ Retry {} after {:?}...", attempt, delay);
+            tokio::time::sleep(delay).await;
+        }
+
+        // Delete any partial file from a previous attempt
+        let _ = tokio::fs::remove_file(&download_path).await;
+
+        let mut response = match req.try_clone().expect("request cloneable").send().await {
+            Ok(r) => r,
+            Err(e) => {
+                last_err = format_err(&e);
+                eprintln!("⚠️  Download attempt {} failed: {}", attempt + 1, last_err);
+                continue;
+            }
+        };
+
+        if !response.status().is_success() {
+            last_err = format!("HTTP {}, redirect path", response.status());
+            eprintln!("⚠️  Download attempt {} failed: {}", attempt + 1, last_err);
+            break;
+        }
+
+        // Use content_length if available, otherwise fall back to known file_size
+        let total_size = response
+            .content_length()
+            .unwrap_or(file_size)
+            .max(file_size);
+
+        // Update total in progress state
+        {
+            let mut s = state.lock().unwrap();
+            s.total = total_size;
+        }
+
+        let mut file = match tokio::fs::File::create(&download_path).await {
+            Ok(f) => f,
+            Err(e) => {
+                last_err = format!("Failed to create file: {}", e);
+                eprintln!("⚠️  {}", last_err);
+                break;
+            }
+        };
+
+        use tokio::io::AsyncWriteExt;
+        let mut stream_error = false;
+
+        loop {
+            // Check if already done (aborted by frontend) - must drop guard before await
+            let should_abort = {
+                let s = state.lock().unwrap();
+                s.done
+            };
+
+            if should_abort {
+                eprintln!("⚠️  Download aborted by frontend");
+                let _ = tokio::fs::remove_file(&download_path).await;
+                return Ok(());
+            }
+
+            // Read chunk with timeout to detect connection issues
+            let chunk_result =
+                tokio::time::timeout(Duration::from_secs(30), response.chunk()).await;
+
+            let chunk = match chunk_result {
+                Ok(Ok(Some(c))) => c,
+                Ok(Ok(None)) => break, // Stream finished normally
+                Ok(Err(e)) => {
+                    // Network/decode error — likely interrupted download
+                    last_err = if e.is_decode() {
+                        "Network error: connection interrupted (check your internet)".to_string()
+                    } else {
+                        format!("Failed to read chunk: {}", e)
+                    };
+                    eprintln!("⚠️  Stream error: {}", last_err);
+                    stream_error = true;
+                    break;
+                }
+                Err(_) => {
+                    // Timeout waiting for chunk
+                    last_err = "Download timeout: connection stalled (check internet)".to_string();
+                    eprintln!("⚠️  Chunk read timeout");
+                    stream_error = true;
+                    break;
+                }
+            };
+
+            let chunk = chunk;
+            let downloaded = chunk.len() as u64;
+
+            if let Err(e) = file.write_all(&chunk).await {
+                last_err = format!("Failed to write chunk: {}", e);
+                eprintln!("⚠️  {}", last_err);
+                stream_error = true;
+                break;
+            }
+
+            // Update progress
+            let (new_downloaded, new_total, percent) = {
+                let mut s = state.lock().unwrap();
+                s.downloaded += downloaded;
+                let total = s.total;
+                let downloaded = s.downloaded;
+                let percent = if total > 0 {
+                    ((downloaded as f64 / total as f64) * 100.0).min(100.0) as u8
+                } else {
+                    0
+                };
+                s.percent = percent;
+                (downloaded, total, percent)
+            };
+
+            // Emit progress every 5%
+            if percent % 5 == 0 || percent == 100 {
+                println!(
+                    "📥 Download: {} / {} ({}%)",
+                    new_downloaded, new_total, percent
+                );
+            }
+        }
+
+        if stream_error {
+            continue;
+        }
+
+        if file.shutdown().await.is_err() {
+            last_err = "Failed to flush file".to_string();
+            continue;
+        }
+
+        // Download completed successfully
+        let downloaded_size = std::fs::metadata(&download_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        println!(
+            "✅ Download complete: {:?} ({}MB)",
+            download_path,
+            downloaded_size / 1024 / 1024
+        );
+
+        // Mark done and store download path
+        {
+            let mut s = state.lock().unwrap();
+            s.downloaded = downloaded_size;
+            s.total = downloaded_size;
+            s.percent = 100;
+            s.done = true;
+            s.download_path = Some(download_path.to_string_lossy().to_string());
+        }
+
+        return Ok(());
+    }
+
+    Err(format!("Download failed after 3 attempts: {}", last_err))
+}
+
+/// Tauri command: poll download progress (called by frontend via setInterval)
+#[derive(serde::Serialize)]
+pub struct PollProgressResult {
+    pub downloaded: u64,
+    pub total: u64,
+    pub percent: u8,
+    pub done: bool,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub fn poll_update_download_progress() -> PollProgressResult {
+    let state = get_progress_state();
+    let s = state.lock().unwrap();
+    PollProgressResult {
+        downloaded: s.downloaded,
+        total: s.total,
+        percent: s.percent,
+        done: s.done,
+        error: s.error.clone(),
+    }
+}
+
+/// Tauri command: finish update (install the downloaded file, called after poll shows done)
+#[tauri::command]
+pub async fn finish_update_download() -> Result<UpdateInstallResult, String> {
+    let state = get_progress_state();
+    let (download_path, _error_msg) = {
+        let s = state.lock().unwrap();
+        (s.download_path.clone(), s.error.clone())
+    };
+
+    let path_str = download_path.ok_or("No downloaded file found")?;
+    let download_path = std::path::PathBuf::from(&path_str);
+
+    if !download_path.exists() {
+        return Err(format!("Downloaded file not found: {}", path_str));
+    }
+
+    println!("📦 Installing update from: {:?}", download_path);
+
+    match auto_install_platform(&download_path) {
+        Ok(()) => Ok(UpdateInstallResult {
+            auto_installed: true,
+            message: "Update installed, restarting...".to_string(),
+        }),
+        Err(e) => {
+            println!("⚠️  Auto-install failed: {}, falling back to manual", e);
+            fallback_open_installer(&download_path);
+            Ok(UpdateInstallResult {
+                auto_installed: false,
+                message: format!(
+                    "Auto-install failed ({}). Installer opened, please install manually.",
+                    e
+                ),
+            })
+        }
+    }
+}
+
+/// Tauri command: download update and auto-install (legacy, kept for compatibility)
 #[tauri::command]
 pub async fn download_and_install_update(
-    app_handle: tauri::AppHandle,
     download_url: String,
     file_size: u64,
 ) -> Result<UpdateInstallResult, String> {
+    // Reset global progress state
+    let state = get_progress_state();
+    {
+        let mut s = state.lock().unwrap();
+        *s = DownloadProgressState::default();
+    }
+
     let filename = download_url
         .split('/')
         .last()
@@ -473,11 +786,34 @@ pub async fn download_and_install_update(
 
         use tokio::io::AsyncWriteExt;
         let mut stream_error = false;
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|e| format!("Failed to read chunk: {}", e))?
-        {
+
+        // Read chunk with timeout to detect connection issues
+        loop {
+            let chunk_result =
+                tokio::time::timeout(Duration::from_secs(30), response.chunk()).await;
+
+            let chunk = match chunk_result {
+                Ok(Ok(Some(c))) => c,
+                Ok(Ok(None)) => break, // Stream finished normally
+                Ok(Err(e)) => {
+                    last_err = if e.is_decode() {
+                        "Network error: connection interrupted (check your internet)".to_string()
+                    } else {
+                        format!("Failed to read chunk: {}", e)
+                    };
+                    eprintln!("⚠️  Stream error: {}", last_err);
+                    stream_error = true;
+                    break;
+                }
+                Err(_) => {
+                    last_err = "Download timeout: connection stalled (check internet)".to_string();
+                    eprintln!("⚠️  Chunk read timeout");
+                    stream_error = true;
+                    break;
+                }
+            };
+
+            let chunk = chunk;
             downloaded += chunk.len() as u64;
             if let Err(e) = file.write_all(&chunk).await {
                 last_err = format!("Failed to write chunk: {}", e);
@@ -494,14 +830,13 @@ pub async fn download_and_install_update(
 
             if percent != last_emitted_percent {
                 last_emitted_percent = percent;
-                let _ = app_handle.emit(
-                    "update-download-progress",
-                    DownloadProgress {
-                        downloaded,
-                        total: total_size,
-                        percent,
-                    },
-                );
+                // Update global progress state for polling
+                {
+                    let mut s = state.lock().unwrap();
+                    s.downloaded = downloaded;
+                    s.total = total_size;
+                    s.percent = percent;
+                }
             }
         }
 
@@ -515,18 +850,16 @@ pub async fn download_and_install_update(
         }
 
         // Download completed successfully
-        let _ = app_handle.emit(
-            "update-download-progress",
-            DownloadProgress {
-                downloaded,
-                total: if total_size == 0 {
-                    downloaded
-                } else {
-                    total_size
-                },
-                percent: 100,
-            },
-        );
+        let _ = {
+            let mut s = state.lock().unwrap();
+            s.downloaded = downloaded;
+            s.total = if total_size == 0 {
+                downloaded
+            } else {
+                total_size
+            };
+            s.percent = 100;
+        };
 
         let downloaded_size = std::fs::metadata(&download_path)
             .map(|m| m.len())

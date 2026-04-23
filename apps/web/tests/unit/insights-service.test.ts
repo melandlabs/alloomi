@@ -12,6 +12,18 @@ vi.mock("@/lib/db/queries");
 vi.mock("@/lib/session/context");
 vi.mock("@/lib/cache/insight");
 
+// Prevent actual database initialization
+vi.mock("@/lib/env/constants", () => ({
+  isTauriMode: vi.fn(() => false),
+  DEPLOYMENT_MODE: "server",
+  maxChunkSummaryCount: 10,
+}));
+
+vi.mock("@/lib/db/adapters", () => ({
+  initDb: vi.fn(() => ({})),
+  getDb: vi.fn(() => ({})),
+}));
+
 describe("Insights Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();

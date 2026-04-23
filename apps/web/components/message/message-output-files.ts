@@ -4,13 +4,24 @@ import {
   extractArtifactPathsFromText,
   normalizeExtractedArtifactPath,
   sanitizeArtifactFileExtension,
-} from "@/lib/extract-artifact-paths";
+} from "@/lib/files/extract-artifact-paths";
+
+/**
+ * Checks if a file path is under the temp/ subdirectory (temporary file)
+ */
+export function isTemporaryFile(path: string): boolean {
+  // Check if path contains /temp/ subdirectory
+  // Matches: xxx/temp/xxx or xxx/temp/xxx.ext
+  const normalizedPath = path.replace(/\\/g, "/");
+  return /\/temp\//i.test(normalizedPath);
+}
 
 /** Single tool output file display reference (consistent with LibraryItemRow / preview panel) */
 export type ToolOutputFileRef = {
   name: string;
   path: string;
   type: string;
+  isTemporary?: boolean;
 };
 
 type ToolNativePart = {
@@ -52,7 +63,12 @@ export function collectToolOutputFilesFromParts(
           f.type || f.language || name.split(".").pop() || "",
         ) || "unknown";
       if (!byPath.has(path)) {
-        byPath.set(path, { name, path, type });
+        byPath.set(path, {
+          name,
+          path,
+          type,
+          isTemporary: isTemporaryFile(path),
+        });
       }
     }
   }
@@ -72,7 +88,12 @@ export function collectToolOutputFilesFromParts(
     const ext =
       sanitizeArtifactFileExtension(name.split(".").pop() || "") || "unknown";
     if (!byPath.has(path)) {
-      byPath.set(path, { name, path, type: ext });
+      byPath.set(path, {
+        name,
+        path,
+        type: ext,
+        isTemporary: isTemporaryFile(path),
+      });
     }
   }
 

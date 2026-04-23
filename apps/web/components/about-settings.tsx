@@ -61,6 +61,7 @@ const SOCIAL_LINKS = [
     name: "Wechat",
     href: "/wechat.jpg",
     iconSrc: "/images/apps/WeChat.png",
+    isWechat: true,
   },
 ] as const;
 
@@ -96,6 +97,7 @@ const AboutSettingsButton = memo(function AboutSettingsButton({
 export function AboutSettings() {
   const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState("Web");
+  const [showWechatQR, setShowWechatQR] = useState(false);
   const isTauriEnv = useMemo(() => isTauri(), []);
   const websiteLink = "https://alloomi.ai";
 
@@ -172,9 +174,7 @@ export function AboutSettings() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() =>
-                  openUrl("https://alloomi.ai/docs/changelog/alloomi-0.3.0")
-                }
+                onClick={() => openUrl("https://alloomi.ai/docs/changelog")}
                 className="shrink-0 text-sm font-normal"
               >
                 <RemixIcon
@@ -250,24 +250,52 @@ export function AboutSettings() {
         <p className="px-0 text-base font-semibold text-foreground-secondary">
           {t("about.communityAndInfo", "Follow Us")}
         </p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {SOCIAL_LINKS.map((item) => (
-            <AboutSettingsButton
-              key={item.name}
-              type="button"
-              variant="social"
-              onClick={() => openUrl(item.href)}
-            >
-              <Image
-                src={item.iconSrc}
-                alt=""
-                width={20}
-                height={20}
-                className="size-5 shrink-0 object-contain"
-              />
-              <span className="truncate">{item.name}</span>
-            </AboutSettingsButton>
-          ))}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 relative">
+          {SOCIAL_LINKS.map((item) => {
+            const isWechat = "isWechat" in item && item.isWechat;
+            return (
+              <div key={item.name} className={isWechat ? "relative group" : ""}>
+                <AboutSettingsButton
+                  type="button"
+                  variant="social"
+                  onClick={() =>
+                    isWechat
+                      ? setShowWechatQR(!showWechatQR)
+                      : openUrl(item.href)
+                  }
+                >
+                  <Image
+                    src={item.iconSrc}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="size-5 shrink-0 object-contain"
+                  />
+                  <span className="truncate">{item.name}</span>
+                </AboutSettingsButton>
+                {isWechat && (
+                  <div
+                    className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 ${
+                      showWechatQR ? "block" : "hidden"
+                    } group-hover:block`}
+                  >
+                    <div
+                      className="bg-white p-3 rounded-lg shadow-xl border border-gray-200 relative"
+                      style={{ width: "160px", height: "160px" }}
+                    >
+                      <Image
+                        src="/images/wechat.jpg"
+                        alt="Wechat QR Code"
+                        fill
+                        sizes="160px"
+                        className="object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 

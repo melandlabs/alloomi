@@ -16,6 +16,7 @@ import {
   deriveActivityTier,
   ensureUserInsightSettings,
 } from "@/lib/insights/service";
+import { getInsightHistoryDays } from "@alloomi/billing/entitlements";
 import { filterInsights } from "@/lib/insights/filter-utils";
 import { getUserCategoryOverrides } from "@/lib/insights/brief-category-override";
 import type { NextRequest } from "next/server";
@@ -55,7 +56,10 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id;
     let settings = await ensureUserInsightSettings(userId);
     // If days parameter is specified, use custom value; otherwise use default value for user type
-    const historyDays = customDays !== null ? customDays : 7;
+    const historyDays =
+      customDays !== null
+        ? customDays
+        : getInsightHistoryDays(session.user.type);
     const nowRef = new Date();
     const now = nowRef;
     const derivedTier = deriveActivityTier(now, settings.lastActiveAt);

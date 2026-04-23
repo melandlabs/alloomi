@@ -1,18 +1,12 @@
 import Redis from "ioredis";
-import RedisMock from "ioredis-mock";
 import { isTauriMode } from "@/lib/env";
-import { getTauriStoragePath } from "@/lib/env/tauri-paths";
+import { getTauriStoragePath } from "@/lib/utils/path";
 import path from "node:path";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
-if (!OAUTH_STATE_SECRET) {
-  console.warn(
-    "[session/context] OAUTH_STATE_SECRET env var not set. OAuth state signing is insecure.",
-  );
-}
 
 function base64url(data: string | Buffer): string {
   return Buffer.from(data)
@@ -71,63 +65,136 @@ export function decodeOAuthState(token: string): OAuthStatePayload | null {
   }
 }
 
-// Type alias for type compatibility - ioredis-mock is API-compatible with ioredis
-type InMemoryRedis = InstanceType<typeof RedisMock>;
+// Type alias for type compatibility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PipelineCommands = {
+  incr(key: string): PipelineCommands;
+  expire(key: string, seconds: number): PipelineCommands;
+  set(key: string, value: string, ...args: any[]): PipelineCommands;
+  getBuffer(key: string): PipelineCommands;
+  exec(): Promise<any[]>;
+};
+
+export type InMemoryRedis = {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ...args: any[]): Promise<any>;
+  del(...keys: string[]): Promise<number>;
+  incr(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+  keys(pattern: string): Promise<string[]>;
+  multi(): PipelineCommands;
+  pipeline(): PipelineCommands;
+  on(event: string, callback: (...args: any[]) => void): void;
+  status: string;
+};
 
 // Redis is optional in development - graceful degradation if not configured
 let redis: Redis | InMemoryRedis | null = null;
 let isRedisEnabled = false;
 let redisReady = false;
+// Promise that resolves when Redis initialization completes and connection is ready
+let redisInitPromise: Promise<void> | null = null;
 
-if (isTauriMode()) {
-  // Tauri mode: use in-memory Redis mock for operations that require Redis
-  isRedisEnabled = true;
-  redisReady = true;
-  redis = new RedisMock();
-} else if (process.env.REDIS_URL) {
-  isRedisEnabled = true;
-  console.log(
-    "[Redis] Connecting with URL:",
-    process.env.REDIS_URL.replace(/:[^:@]+@/, ":***@"),
-  );
-  redis = new Redis(process.env.REDIS_URL, {
-    connectTimeout: 10000,
-    maxRetriesPerRequest: 3,
-    retryStrategy: (times) => {
-      const delay = Math.min(times * 100, 3000);
-      if (times > 3) return null;
-      return delay;
-    },
-  });
-
-  redis.on("error", (err: Error) => {
-    console.error("[Redis] Connection error:", err.message);
-    redisReady = false;
-  });
-
-  redis.on("connect", () => {
-    console.log("[Redis] Connected successfully");
+async function initRedis(): Promise<void> {
+  if (isTauriMode()) {
+    // Tauri mode: use in-memory Redis mock for operations that require Redis
+    isRedisEnabled = true;
     redisReady = true;
-  });
+    // Dynamically import ioredis-mock to avoid bundling issues with fengari
+    const RedisMock = (await import("ioredis-mock")).default;
+    redis = new RedisMock();
+  } else if (process.env.REDIS_URL) {
+    isRedisEnabled = true;
+    console.log(
+      "[Redis] Connecting with URL:",
+      process.env.REDIS_URL.replace(/:[^:@]+@/, ":***@"),
+    );
+    redis = new Redis(process.env.REDIS_URL, {
+      connectTimeout: 10000,
+      maxRetriesPerRequest: 3,
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 100, 3000);
+        if (times > 3) return null;
+        return delay;
+      },
+    });
 
-  redis.on("ready", () => {
-    console.log("[Redis] Ready");
+    redis.on("error", (err: Error) => {
+      console.error("[Redis] Connection error:", err.message);
+      redisReady = false;
+    });
+
+    redis.on("connect", () => {
+      console.log("[Redis] Connected successfully");
+      redisReady = true;
+    });
+
+    redis.on("ready", () => {
+      console.log("[Redis] Ready");
+      redisReady = true;
+    });
+
+    redis.on("close", () => {
+      console.warn("[Redis] Connection closed");
+      redisReady = false;
+    });
+
+    redis.on("reconnecting", () => {
+      console.log("[Redis] Reconnecting...");
+    });
+
+    // Wait for connection to be established before resolving
+    // This ensures redis is truly ready when initRedis() resolves
+    if (!redisReady) {
+      await new Promise<void>((resolve) => {
+        (redis as Redis).once("ready", () => {
+          redisReady = true;
+          resolve();
+        });
+      });
+    }
+  } else {
+    isRedisEnabled = true;
     redisReady = true;
-  });
-
-  redis.on("close", () => {
-    console.warn("[Redis] Connection closed");
-    redisReady = false;
-  });
-
-  redis.on("reconnecting", () => {
-    console.log("[Redis] Reconnecting...");
-  });
-} else {
-  isRedisEnabled = true;
-  redisReady = true;
-  redis = new RedisMock();
+    // Dynamically import ioredis-mock to avoid bundling issues with fengari
+    const RedisMock = (await import("ioredis-mock")).default;
+    redis = new RedisMock();
+  }
 }
+
+/**
+ * Ensure Redis is initialized and ready. Call this before any critical operation.
+ * Returns the Redis instance or throws if unavailable.
+ */
+export async function ensureRedis(): Promise<Redis | InMemoryRedis> {
+  // If we have a ready instance, return it
+  if (redis && redisReady) {
+    return redis;
+  }
+
+  // If init hasn't been called yet, call it
+  if (!redisInitPromise) {
+    redisInitPromise = initRedis();
+    // For in-memory/mock mode, initRedis resolves immediately
+    // For cloud mode, it resolves after connection
+    await redisInitPromise;
+  } else {
+    // Wait for existing init to complete
+    await redisInitPromise;
+  }
+
+  if (!redis) {
+    throw new Error("[Redis] Initialization failed: redis is null");
+  }
+  if (!redisReady) {
+    throw new Error("[Redis] Initialization failed: redis not ready");
+  }
+  return redis;
+}
+
+// Redis initialization is now lazy: first call to ensureRedis() triggers init.
+// For serverless/Vercel, cold start will trigger init on first request.
 
 export const LOGIN_SESSION_KEY_PREFIX = "login_session:";
 export const INSIGHTS_KEY_PREFIX = "insights_session:";
@@ -136,10 +203,6 @@ export const INSIGHTS_LOCK_PREFIX = "insights_lock:";
 export const SESSION_EXPIRE_MS = 1800000;
 
 // ============ File-based storage for Tauri mode ============
-
-function getFileStorageDir(subDir: string): string {
-  return path.join(getTauriStoragePath(), subDir);
-}
 
 async function ensureDir(dir: string): Promise<void> {
   if (!existsSync(dir)) {
@@ -294,11 +357,7 @@ export async function getLoginSession(
   }
   try {
     const key = `${LOGIN_SESSION_KEY_PREFIX}${sessionId}`;
-    console.log(
-      `[getLoginSession] key=${key} redis=${!!redis} redisStatus=${redis?.status}`,
-    );
     const sessionStr = await redis?.get(key);
-    console.log(`[getLoginSession] result=${sessionStr ? "found" : "null"}`);
     if (!sessionStr) return null;
     return JSON.parse(sessionStr) as Omit<LoginSession, "adapter">;
   } catch (err) {

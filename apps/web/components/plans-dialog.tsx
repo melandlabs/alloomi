@@ -21,7 +21,7 @@ import {
 } from "@alloomi/ui";
 import { RemixIcon } from "@/components/remix-icon";
 import { cn } from "@/lib/utils";
-import { getStoredAuthToken } from "@/lib/api/remote-client";
+import { getStoredAuthToken } from "@/lib/auth/remote-client";
 import { toast } from "@/components/toast";
 import { openUrl, isTauri } from "@/lib/tauri";
 import {
@@ -175,7 +175,7 @@ export function PlansDialog({ open, onOpenChange }: PlansDialogProps) {
   const handleUpgrade = async (planId: string) => {
     if (!session) {
       toast({ type: "success", description: t("plans.needLogin") });
-      router.push("/");
+      router.push("/login?redirect=/subscription");
       return;
     }
     if (plan === planId) {
@@ -202,7 +202,7 @@ export function PlansDialog({ open, onOpenChange }: PlansDialogProps) {
       if (!response.ok) {
         if (response.status === 401) {
           toast({ type: "error", description: t("plans.needLogin") });
-          router.push("/");
+          router.push("/login?redirect=/subscription");
           return;
         }
         const errData = await response.json().catch(() => null);
@@ -311,13 +311,13 @@ export function PlansDialog({ open, onOpenChange }: PlansDialogProps) {
           className="!fixed !top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2 !w-[95vw] sm:!w-[90vw] md:!max-w-[1000px] lg:!max-w-[1200px] !h-[90vh] !max-h-[800px] overflow-hidden flex flex-col p-0 gap-0 !z-[1000] !opacity-100 !visibility-visible"
           overlayClassName="!z-[999]"
         >
-          <DialogHeader className="px-3 pt-3 border-b border-border md:px-6 md:pt-4 gap-0 shrink-0">
-            <DialogTitle className="text-base font-semibold text-foreground md:text-xl mb-2">
+          <DialogHeader className="px-3 pt-3 md:px-8 md:pt-6 md:pb-6 gap-0 shrink-0">
+            <DialogTitle className="text-base font-semibold text-foreground md:text-2xl mb-2">
               {t("plans.choosePlan", { defaultValue: "Select a plan" })}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 md:px-6 md:py-6">
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 md:px-8 md:pt-0 md:pb-6">
             {isWaitingForPayment && (
               <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-primary/5 mb-4">
                 <RemixIcon

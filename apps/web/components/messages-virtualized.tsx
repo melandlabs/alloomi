@@ -156,7 +156,7 @@ function PureVirtualizedMessages({
               }}
             >
               <PreviewMessage
-                key={message.id || `msg-${virtualItem.index}`}
+                key={`${message.id}-${virtualItem.index}`}
                 chatId={chatId}
                 message={message}
                 isLoading={isAgentRunning}

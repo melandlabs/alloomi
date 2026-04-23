@@ -5,8 +5,8 @@
  * circular dependency issues during module initialization.
  */
 
-import { getAgentRegistry } from "@alloomi/agent/registry";
-import { claudePlugin } from "@/lib/extensions";
+import { getAgentRegistry } from "@alloomi/ai/agent/registry";
+import { claudePlugin } from "@/lib/ai/extensions";
 
 // Register Claude Agent plugin
 // This must be called AFTER all modules are loaded to avoid circular deps

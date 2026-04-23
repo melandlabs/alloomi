@@ -14,7 +14,7 @@ import {
   startTelegramUserListener,
   isUserListenerRunning,
   stopTelegramUserListener,
-} from "@/lib/telegram/user-listener";
+} from "@/lib/integrations/telegram/user-listener";
 
 export async function GET(req: NextRequest) {
   try {

@@ -1,0 +1,78 @@
+/**
+ * MCP Business Tools - Combined exports
+ *
+ * This module combines all business tool factories and creates the MCP server.
+ */
+
+import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import type { Session } from "next-auth";
+import type { InsightChangeCallback } from "./shared";
+
+import { createTimeTool } from "./time";
+import { createChatInsightTool } from "./chat-insight";
+import { createDownloadAttachmentTool } from "./download-attachment";
+import { createContactsTool } from "./contacts";
+import { createIntegrationsTool } from "./integrations";
+import { createSendReplyTool } from "./send-reply";
+import { createInsightCrudTools } from "./insight-crud";
+import { createSearchKnowledgeTools } from "./search-knowledge";
+import { createRawMessagesTools } from "./raw-messages";
+import { createMemoryPathTool } from "./memory-path";
+import { createSchedulerTools } from "./scheduler";
+
+/**
+ * Create business tools MCP server
+ *
+ * This server provides business logic tools that interact with the database
+ * and external services. It requires a user session to function properly.
+ *
+ * @param session - User session for authentication and context
+ * @param cloudAuthToken - Optional cloud auth token for embeddings API
+ * @param onInsightChange - Optional callback to notify frontend of insight changes
+ * @param chatId - Optional chat ID for associating insights with conversations
+ * @returns MCP server instance
+ */
+export function createBusinessToolsMcpServer(
+  session: Session,
+  cloudAuthToken?: string,
+  onInsightChange?: InsightChangeCallback,
+  chatId?: string,
+) {
+  // Store cloudAuthToken for embeddings API (needed when cloud calls tools)
+  const embeddingsAuthToken = cloudAuthToken;
+
+  return createSdkMcpServer({
+    name: "business-tools",
+    version: "1.0.0",
+    tools: [
+      // time tool - no session needed
+      createTimeTool(),
+
+      // Session-based tools
+      createChatInsightTool(session),
+      createDownloadAttachmentTool(session, chatId),
+      createContactsTool(session),
+      createIntegrationsTool(session),
+      createSendReplyTool(session),
+
+      // Insight CRUD tools
+      ...createInsightCrudTools(session, chatId, onInsightChange),
+
+      // Search knowledge tools
+      ...createSearchKnowledgeTools(session, embeddingsAuthToken),
+
+      // Raw messages tools
+      ...createRawMessagesTools(session),
+
+      // Memory path tool
+      createMemoryPathTool(session),
+
+      // Scheduler tools
+      ...createSchedulerTools(session, embeddingsAuthToken),
+    ],
+  });
+}
+
+// Re-export shared types for external use
+export type { InsightChangeCallback, TaskInput } from "./shared";
+export { INSIGHT_FILTER_KINDS } from "./shared";

@@ -1,5 +1,12 @@
 import type { TFunction } from "i18next";
 
+// Re-export from @alloomi/shared for backward compatibility
+export {
+  stripMalformedToolCalls,
+  containsMalformedToolCall,
+  extractMalformedToolCalls,
+} from "@alloomi/shared";
+
 /**
  * Get the display name for a tool, translating MCP tool names
  * @param name - The tool name (e.g., "mcp__business-tools__chatInsight" or "Read")

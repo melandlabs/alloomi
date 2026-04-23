@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 
 import { auth } from "@/app/(auth)/auth";
 
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
 import { isTauriMode } from "@/lib/env/constants";
 
 const SLACK_TOKEN_URL = "https://slack.com/api/oauth.v2.access";

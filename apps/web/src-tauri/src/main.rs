@@ -5,11 +5,13 @@
 #![allow(unused)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use sentry::{init, capture_message, Level};
+use sentry::{capture_message, init, Level};
 use std::sync::Arc;
 use tauri::Manager;
 use tauri::{Emitter, Listener};
 
+mod constants;
+mod js_scheduler;
 mod menu;
 mod node;
 mod notify;
@@ -147,14 +149,14 @@ fn wait_and_navigate(app: tauri::AppHandle) {
     if node::NEXTJS_STARTED.load(std::sync::atomic::Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         if let Some(window) = app.get_webview_window("main") {
-            if let Ok(url) = url::Url::parse("http://localhost:3415") {
+            if let Ok(url) = url::Url::parse(&constants::nextjs_url()) {
                 let _ = window.navigate(url);
             }
         }
         // Clean up temp file
         let _ = std::fs::remove_file(&temp_path);
         println!("🚀 Tauri app started successfully!");
-        println!("🌐 App URL: http://localhost:3415");
+        println!("🌐 App URL: {}", constants::nextjs_url());
     } else {
         // Check if an error was set (may have been set just before timeout)
         if let Some(err) = node::get_startup_error() {
@@ -200,13 +202,11 @@ fn main() {
         Some(init(sentry::ClientOptions {
             dsn: dsn.parse::<sentry::types::Dsn>().ok(),
             release: Some(env!("CARGO_PKG_VERSION").into()),
-            environment: Some(
-                if cfg!(debug_assertions) {
-                    "development".into()
-                } else {
-                    "production".into()
-                },
-            ),
+            environment: Some(if cfg!(debug_assertions) {
+                "development".into()
+            } else {
+                "production".into()
+            }),
             ..Default::default()
         }))
     } else {
@@ -236,7 +236,10 @@ fn main() {
 
     #[cfg(debug_assertions)]
     {
-        println!("📡 Development mode: expecting Next.js at http://localhost:3415");
+        println!(
+            "📡 Development mode: expecting Next.js at {}",
+            constants::nextjs_url()
+        );
     }
 
     tauri::Builder::default()
@@ -244,8 +247,8 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             // Storage
             storage::save_token,
@@ -274,12 +277,15 @@ fn main() {
             node::restart_server,
             // Auto-update
             update::check_for_update,
+            update::start_update_download,
+            update::poll_update_download_progress,
+            update::finish_update_download,
             update::download_and_install_update,
             update::restart_for_update,
             // Telegram
             telegram::desktop::detect_telegram_desktop,
             telegram::desktop::check_custom_telegram_path,
-            // Notifications
+            // Notification
             notify::send_notification,
         ])
         .setup(|app| {
@@ -327,7 +333,9 @@ fn main() {
                 let window = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { .. } = event {
-                        println!("📴 Window close requested, cleaning up Node.js process...");
+                        println!("📴 Window close requested, stopping scheduler...");
+                        js_scheduler::stop_js_scheduler();
+                        println!("📴 Cleaning up Node.js process...");
                         node::cleanup_nodejs_process();
                     }
                 });
@@ -346,7 +354,7 @@ fn main() {
             #[cfg(debug_assertions)]
             {
                 println!("🚀 Tauri app started successfully!");
-                println!("🌐 App URL: http://localhost:3415");
+                println!("🌐 App URL: {}", constants::nextjs_url());
             }
 
             // Build the native menu with standard macOS items and a custom Help submenu

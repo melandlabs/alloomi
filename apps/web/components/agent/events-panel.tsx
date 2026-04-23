@@ -64,6 +64,7 @@ import { useInsightOptimisticUpdates } from "@/components/insight-optimistic-con
 import { useEventsData } from "@/hooks/use-events-data";
 import { useInsightActions } from "@/hooks/use-insight-actions";
 import { useInsightAvatar } from "@/hooks/use-insight-avatar";
+import { useInsightRefresh } from "@/hooks/use-insight-refresh";
 import { useInsightTabs } from "@/hooks/use-insight-tabs";
 import { useInsightUnread } from "@/hooks/use-insight-unread";
 import { useInsightWeights } from "@/hooks/use-insight-weights";
@@ -77,7 +78,7 @@ import {
   insightIsImport,
   insightIsUrgent,
 } from "@/lib/insights/focus-classifier";
-import { createIntegrationAccount } from "@/lib/integration/client";
+import { createIntegrationAccount } from "@/lib/integrations/client";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -95,7 +96,10 @@ import {
   safeLocalStorageSetItem,
   timeFilterToDays,
 } from "./events-panel-utils";
-import { InsightEmptyState } from "./insight-empty-state";
+import {
+  InsightEmptyState,
+  InsightRefreshingState,
+} from "./insight-empty-state";
 import { AgentSectionHeader } from "./section-header";
 import { useLocalStorage } from "@alloomi/hooks/use-local-storage";
 
@@ -177,7 +181,7 @@ export function AgentEventsPanel({
    */
   const handleGoogleSubmit = useCallback(
     async ({ email, appPassword, name }: GoogleAuthSubmission) => {
-      const account = await createIntegrationAccount({
+      await createIntegrationAccount({
         platform: "gmail",
         externalId: email,
         displayName: name ?? email,
@@ -207,7 +211,7 @@ export function AgentEventsPanel({
   const handleOutlookSubmit = useCallback(
     async ({ email, appPassword, name }: OutlookAuthSubmission) => {
       try {
-        const account = await createIntegrationAccount({
+        await createIntegrationAccount({
           platform: "outlook",
           externalId: email,
           displayName: name ?? email,
@@ -892,8 +896,55 @@ export function AgentEventsPanel({
     return result.sorted;
   }, [baseInsights, weightMultipliers, lastViewedAtMap]);
 
+  /**
+   * Check if it's first entry (no Insight events)
+   * Condition: not in archive mode and baseInsights is empty
+   */
+  const isFirstLanding = useMemo(() => {
+    return !isViewingArchived && baseInsights.length === 0;
+  }, [isViewingArchived, baseInsights.length]);
+
+  const { isRefreshing, refreshStatus, refreshError, handleRefresh } =
+    useInsightRefresh(assistantName, isFirstLanding);
+
+  // When authentication error is detected, automatically open the corresponding connection panel
+  useEffect(() => {
+    if (refreshError?.actionType === "telegram_reconnect") {
+      setShowTelegramTokenForm(true);
+    } else if (refreshError?.actionType === "slack_reconnect") {
+      setIsAddPlatformDialogOpen(true);
+      setLinkingPlatform("slack");
+    } else if (refreshError?.actionType === "discord_reconnect") {
+      setIsAddPlatformDialogOpen(true);
+      setLinkingPlatform("discord");
+    }
+  }, [refreshError?.actionType]);
+
+  // Listen to account authorization success event and trigger refresh
+  useEffect(() => {
+    const handleAccountAuthorized = () => {
+      handleRefresh();
+    };
+
+    window.addEventListener(
+      "integration:accountAuthorized",
+      handleAccountAuthorized,
+    );
+    return () => {
+      window.removeEventListener(
+        "integration:accountAuthorized",
+        handleAccountAuthorized,
+      );
+    };
+  }, [handleRefresh]);
+
   // Dynamically get avatar config based on refresh status
-  const avatarConfig = getAvatarConfigByState(AvatarState.DEFAULT);
+  const avatarConfig = useMemo(() => {
+    return getAvatarConfigByState(
+      isRefreshing ? AvatarState.REFRESHING : AvatarState.DEFAULT,
+    );
+  }, [isRefreshing]);
+
   /**
    * Filter insights by time filter condition (aligned with BriefPanel logic)
    * @param insight - Insight object
@@ -1465,6 +1516,28 @@ export function AgentEventsPanel({
     const tabGroupedInsights = groupInsightsByDay(tabInsights, i18n.language);
 
     if (tabGroupedInsights.length === 0) {
+      // If refreshing, show refresh status placeholder (also show tips)
+      if (isRefreshing) {
+        return (
+          <InsightRefreshingState
+            avatarConfig={avatarConfig}
+            refreshStatus={refreshStatus ?? undefined}
+            isRefreshing={isRefreshing}
+            refreshProgress={refreshProgress}
+            totalFetchingMsgCount={
+              insightData?.sessions?.some(
+                (session) => session.status === "fetching",
+              )
+                ? totalFetchingMsgCount
+                : undefined
+            }
+            accountsCount={accounts.length}
+            assistantName={assistantName}
+            isFirstLanding={isFirstLanding}
+          />
+        );
+      }
+
       // Normal empty state placeholder (custom tab)
       return (
         <InsightEmptyState
@@ -1548,6 +1621,28 @@ export function AgentEventsPanel({
    */
   const renderAllView = () => {
     if (allTimelineGroupedInsights.length === 0) {
+      // If refreshing, show refresh status placeholder (also show tips)
+      if (isRefreshing) {
+        return (
+          <InsightRefreshingState
+            avatarConfig={avatarConfig}
+            refreshStatus={refreshStatus ?? undefined}
+            isRefreshing={isRefreshing}
+            refreshProgress={refreshProgress}
+            totalFetchingMsgCount={
+              insightData?.sessions?.some(
+                (session) => session.status === "fetching",
+              )
+                ? totalFetchingMsgCount
+                : undefined
+            }
+            accountsCount={accounts.length}
+            assistantName={assistantName}
+            isFirstLanding={isFirstLanding}
+          />
+        );
+      }
+
       // Normal empty state placeholder
       return (
         <InsightEmptyState
@@ -1792,6 +1887,34 @@ export function AgentEventsPanel({
                 />
               )}
 
+              {/* Refresh button - desktop display, right of filter button */}
+              {!isMobile && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className={cn(
+                    "h-8 w-8",
+                    refreshError &&
+                      "border-destructive/50 text-destructive hover:bg-destructive/10",
+                  )}
+                  title={
+                    isRefreshing
+                      ? t("insight.refreshing", "Refreshing...")
+                      : refreshError
+                        ? refreshError.friendlyMessage
+                        : t("insight.doRefresh", "Refresh")
+                  }
+                >
+                  {isRefreshing ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <RemixIcon name="refresh" size="size-4" />
+                  )}
+                </Button>
+              )}
+
               {/* More button */}
               <DropdownMenu
                 open={isMoreMenuOpen}
@@ -1808,6 +1931,36 @@ export function AgentEventsPanel({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  {/* Mobile: refresh button */}
+                  {isMobile && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        handleRefresh();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      disabled={isRefreshing}
+                      className={cn(
+                        "cursor-pointer",
+                        refreshError &&
+                          "text-destructive focus:text-destructive",
+                      )}
+                    >
+                      {isRefreshing ? (
+                        <Spinner className="mr-2 size-4" />
+                      ) : (
+                        <RemixIcon
+                          name="refresh"
+                          size="size-4"
+                          className="mr-2"
+                        />
+                      )}
+                      {isRefreshing
+                        ? t("insight.refreshing", "Refreshing...")
+                        : refreshError
+                          ? refreshError.friendlyMessage
+                          : t("insight.doRefresh", "Refresh")}
+                    </DropdownMenuItem>
+                  )}
                   {/* Group management */}
                   <DropdownMenuItem
                     onClick={() => {

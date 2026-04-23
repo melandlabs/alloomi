@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 /**
  * Cited Insights drawer component
- * Displays all Insight event cards referenced in messages
+ * Displays all Insight event cards cited in messages
  */
 export function CitedInsightsDrawer({
   insights,

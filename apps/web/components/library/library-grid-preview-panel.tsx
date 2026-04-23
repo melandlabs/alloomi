@@ -5,7 +5,7 @@ import { MarkdownWithCitations } from "@/components/markdown-with-citations";
 import {
   injectHtmlPreviewScrollFix,
   injectHtmlPreviewSnapshotClamp,
-} from "@/lib/html-preview-scroll-fix";
+} from "@/lib/files/html-preview-scroll-fix";
 import type { LibraryGridCardVariant } from "@/components/library/library-types";
 import type {
   LibraryPreviewKind,

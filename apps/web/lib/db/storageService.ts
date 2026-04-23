@@ -4,6 +4,7 @@ import type { FileStorageProvider } from "@/lib/files/config";
 
 import { db } from "./queries";
 import { userFileUsage, userFiles } from "./schema";
+import { entitlementsByUserType } from "@alloomi/billing/entitlements";
 import { AppError } from "@alloomi/shared/errors";
 
 type StorageQuota = {
@@ -12,7 +13,8 @@ type StorageQuota = {
 };
 
 function resolveStorageQuota(userType: UserType): number {
-  return 20000;
+  const entitlements = entitlementsByUserType[userType];
+  return entitlements?.storageQuotaBytes ?? 0;
 }
 
 export async function getUserStorageUsage(

@@ -77,28 +77,6 @@ export function TelegramLoginWidget({
     }
   };
 
-  // Select custom path
-  const handleSelectPath = async () => {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-
-      const selected = await open({
-        directory: true,
-        title: t(
-          "telegram.loginWidget.selectPathTitle",
-          "Select Telegram Desktop or data directory",
-        ),
-      });
-
-      if (selected) {
-        setCustomPath(selected as string);
-        await validateCustomPath(selected as string);
-      }
-    } catch (error) {
-      console.error("[Telegram] Failed to select path:", error);
-    }
-  };
-
   // Validate custom path
   const validateCustomPath = async (path?: string) => {
     const targetPath = path || customPath;
@@ -121,7 +99,7 @@ export function TelegramLoginWidget({
         installed: false,
         has_session: false,
         accounts: [],
-        data_path: `${targetPath}\n验证失败: ${error}`,
+        data_path: `${targetPath}\nValidation failed: ${error}`,
       });
     } finally {
       setIsValidatingPath(false);
@@ -406,30 +384,6 @@ export function TelegramLoginWidget({
                     </div>
 
                     <div className="flex gap-2">
-                      <input
-                        id="telegram-path"
-                        type="text"
-                        value={customPath}
-                        onChange={(e) => setCustomPath(e.target.value)}
-                        placeholder={t(
-                          "telegram.loginWidget.pathPlaceholder",
-                          "/path/to/TelegramDesktop",
-                        )}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSelectPath}
-                        className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-                        title={t(
-                          "telegram.loginWidget.selectFolder",
-                          "Select folder",
-                        )}
-                      >
-                        <RemixIcon name="folder_open" size="size-5" />
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => validateCustomPath()}
@@ -470,10 +424,14 @@ export function TelegramLoginWidget({
                     {/* Validation result hints */}
                     {desktopInfo?.data_path && (
                       <div className="text-xs whitespace-pre-wrap">
-                        {desktopInfo.data_path.includes("路径不存在") ||
-                        desktopInfo.data_path.includes("数据目录不存在") ||
-                        desktopInfo.data_path.includes("无法确定") ||
-                        desktopInfo.data_path.includes("验证失败") ? (
+                        {desktopInfo.data_path.includes(
+                          "Path does not exist",
+                        ) ||
+                        desktopInfo.data_path.includes(
+                          "Data directory does not exist",
+                        ) ||
+                        desktopInfo.data_path.includes("Cannot determine") ||
+                        desktopInfo.data_path.includes("Validation failed") ? (
                           <div className="text-red-600 bg-red-50 p-2 rounded border border-red-200">
                             ⚠️ {desktopInfo.data_path}
                           </div>

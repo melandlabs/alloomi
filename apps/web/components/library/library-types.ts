@@ -29,4 +29,5 @@ export interface LibraryItem {
   workspaceFile?: { taskId: string; path: string; name: string; type?: string };
   toolExecution?: ToolExecution;
   knowledgeFile?: KnowledgeFile;
+  isTemporary?: boolean;
 }

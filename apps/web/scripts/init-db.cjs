@@ -43,7 +43,8 @@ console.log("   ✅ Database opened successfully");
 // Enable WAL mode for better concurrency
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 30000");
-db.pragma("synchronous = NORMAL");
+// Use FULL to maximize durability under sudden power loss.
+db.pragma("synchronous = FULL");
 
 // Create migrations tracking table
 db.exec(`

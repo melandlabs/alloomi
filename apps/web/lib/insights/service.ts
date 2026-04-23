@@ -1,4 +1,4 @@
-import { maxChunkSummaryCount } from "@/lib/constants";
+import { maxChunkSummaryCount } from "@/lib/env/constants";
 import {
   getBotsByUserId,
   getStoredInsightsByBotIds,

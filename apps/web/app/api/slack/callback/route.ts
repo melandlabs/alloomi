@@ -22,10 +22,10 @@ import { integrationAccounts } from "@/lib/db/schema";
 import {
   getOAuthState,
   deleteOAuthState,
-} from "@/lib/integration/state-manager";
+} from "@/lib/integrations/state-manager";
 import { encryptPayload } from "@/lib/db/queries";
 
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
 import { isTauriMode } from "@/lib/env/constants";
 
 /**

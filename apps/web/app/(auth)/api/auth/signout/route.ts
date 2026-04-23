@@ -3,7 +3,7 @@ import {
   isTauriProductionEnv,
   createTauriProductionAuthModule,
 } from "@/app/(auth)/tauri";
-import { nextAuthSessionCookies } from "@/lib/constants";
+import { nextAuthSessionCookies } from "@/lib/env/constants";
 
 export async function POST(request: Request) {
   // Only clear session in file in Tauri environment

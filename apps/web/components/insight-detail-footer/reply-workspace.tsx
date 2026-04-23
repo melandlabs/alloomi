@@ -39,7 +39,7 @@ import { ReplyTranslationComparison } from "./reply-translation-comparison";
 import { ReplyPolishRequest } from "./reply-polish-request";
 import { ReplyPolishResult } from "./reply-polish-result";
 import { AccountBadgeSelector } from "./account-badge-selector";
-import { isDevelopmentEnvironment } from "@/lib/constants";
+import { isDevelopmentEnvironment } from "@/lib/env/constants";
 import { useInsightCache } from "@/hooks/use-insight-cache";
 import type { DetailData, TimelineData } from "@/lib/ai/subagents/insights";
 import {

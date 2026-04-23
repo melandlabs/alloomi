@@ -43,8 +43,11 @@ pub fn open_url_custom(url: String) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+
         // Try PowerShell first (most reliable, no special char escaping issues)
         let ps_result = Command::new("powershell")
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .args([
                 "-NoProfile",
                 "-Command",
@@ -58,6 +61,7 @@ pub fn open_url_custom(url: String) -> Result<(), String> {
 
         // Fallback to cmd with proper quoting
         Command::new("cmd")
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .args(["/c", "start", "\"\"", &url])
             .spawn()
             .map_err(|e| format!("Failed to open URL: {}", e))?;
@@ -134,11 +138,21 @@ pub fn remove_file_custom(file_path: String) -> Result<(), String> {
 
 /// Tauri command: open folder picker dialog
 #[tauri::command]
-pub fn pick_folder_dialog(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
+pub async fn pick_folder_dialog(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
+    use tokio::sync::oneshot;
 
-    let folder = app_handle.dialog().file().blocking_pick_folder();
-    Ok(folder.map(|p| p.to_string()))
+    let (tx, rx) = oneshot::channel();
+
+    app_handle.dialog().file().pick_folder(move |folder| {
+        let _ = tx.send(folder);
+    });
+
+    match rx.await {
+        Ok(Some(p)) => Ok(Some(p.to_string())),
+        Ok(None) => Ok(None),
+        Err(_) => Err("Failed to receive folder selection".to_string()),
+    }
 }
 
 /// Tauri command: open a file or path (bypasses opener plugin ACL)
@@ -172,7 +186,10 @@ pub fn open_path_custom(path: String) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+
         Command::new("cmd")
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .args(["/c", "start", "", &path])
             .spawn()
             .map_err(|e| format!("Failed to open path: {}", e))?;

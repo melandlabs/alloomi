@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { message, chat, chatInsights, type Chat } from "@/lib/db/schema";
 import { eq, and, sql, inArray, desc, count } from "drizzle-orm";
-import type { ChatHistoryResponse } from "@/lib/types/api";
+import type { ChatHistoryResponse } from "@/lib/ai/chat/api";
 import { isTauriMode } from "@/lib/env";
 
 /**

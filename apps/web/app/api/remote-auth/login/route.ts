@@ -9,9 +9,10 @@
 import type { NextRequest } from "next/server";
 import { compare } from "bcrypt-ts";
 import { getUser, getUserTypeForService } from "@/lib/db/queries";
-import { DUMMY_PASSWORD } from "@/lib/constants";
+import { DUMMY_PASSWORD } from "@/lib/env/constants";
 import {
   generateToken,
+  getTokenLifetime,
   withErrorHandler,
   createSuccessResponse,
   createErrorResponse,
@@ -22,7 +23,7 @@ import {
   RateLimitPresets,
 } from "@/lib/rate-limit/middleware";
 import { setAuthCookies } from "@/lib/auth/cookie-auth";
-import { createCloudClientForRequest } from "@/lib/api/remote-client";
+import { createCloudClientForRequest } from "@/lib/auth/remote-client";
 import { isTauriMode } from "@/lib/env/constants";
 
 export async function POST(request: NextRequest) {
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     const payload = {
       id: user.id,
       email: user.email,
-      exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+      exp: now + getTokenLifetime(),
       iat: now,
     };
 

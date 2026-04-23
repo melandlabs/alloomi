@@ -3,7 +3,7 @@
  * Detects network status, supports offline mode and data synchronization
  */
 
-import { shouldUseCloudAuth } from "@/lib/api/remote-client";
+import { shouldUseCloudAuth } from "@/lib/auth/remote-client";
 import { getAuthToken } from "@/lib/auth/token-manager";
 
 /**
@@ -37,6 +37,9 @@ export class OfflineManager {
   private syncQueue: SyncItem[] = [];
   private listeners: Set<(status: NetworkStatus) => void> = new Set();
   private syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Max sync queue size to prevent localStorage overflow
+  private static readonly MAX_QUEUE_SIZE = 500;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -112,9 +115,23 @@ export class OfflineManager {
       const stored = localStorage.getItem("sync_queue");
       if (stored) {
         this.syncQueue = JSON.parse(stored);
+        // Prune queue to max size on load (keep most recent items)
+        this.pruneQueue();
       }
     } catch (error) {
       console.error("[OfflineManager] Failed to load sync queue:", error);
+    }
+  }
+
+  /**
+   * Prune queue to max size - keeps most recent items
+   */
+  private pruneQueue(): void {
+    if (this.syncQueue.length > OfflineManager.MAX_QUEUE_SIZE) {
+      // Sort by timestamp descending and keep the newest items
+      this.syncQueue.sort((a, b) => b.timestamp - a.timestamp);
+      this.syncQueue = this.syncQueue.slice(0, OfflineManager.MAX_QUEUE_SIZE);
+      this.saveSyncQueue();
     }
   }
 
@@ -267,6 +284,9 @@ export class OfflineManager {
     };
 
     this.syncQueue.push(syncItem);
+
+    // Enforce max queue size to prevent localStorage overflow
+    this.pruneQueue();
     this.saveSyncQueue();
 
     // If online, start syncing immediately

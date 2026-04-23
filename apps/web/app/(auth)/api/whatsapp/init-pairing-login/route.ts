@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { WhatsAppAdapter } from "@/lib/integration/sources/whatsapp";
+import {
+  WhatsAppAdapter,
+  type WhatsAppUserInfo,
+} from "@/lib/integrations/whatsapp";
 import {
   getLoginSession,
   setLoginSession,
   type LoginSession,
+  ensureRedis,
 } from "@/lib/session/context";
 
 type SessionUpdater = (
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
       createdAt,
     };
 
+    await ensureRedis();
     await setLoginSession(sessionId, {
       ...baseSession,
       pairingCode: "",
@@ -63,7 +68,7 @@ export async function POST(request: Request) {
 
     // Start pairing code login process
     const pairingCode = await adapter.startPairingCodeLogin(phone, {
-      onCode: async (code) => {
+      onCode: async (code: string) => {
         await updateLoginSession(
           sessionId,
           {
@@ -83,7 +88,7 @@ export async function POST(request: Request) {
           baseSession,
         );
       },
-      onReady: async (info) => {
+      onReady: async (info: WhatsAppUserInfo) => {
         await updateLoginSession(
           sessionId,
           {
@@ -100,7 +105,7 @@ export async function POST(request: Request) {
         );
         await adapter.kill();
       },
-      onError: async (error) => {
+      onError: async (error: Error) => {
         await updateLoginSession(
           sessionId,
           {

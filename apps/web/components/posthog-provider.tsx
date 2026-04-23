@@ -11,7 +11,7 @@ import {
   getPosthogClient,
   initPosthog,
   isPosthogEnabled,
-} from "@/lib/analytics/posthog";
+} from "@/lib/analytics/posthog/posthog";
 
 function PosthogRouteTracker() {
   const pathname = usePathname();

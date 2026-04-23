@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import {
   startLocalScheduler,
+  stopLocalScheduler,
   getSchedulerStatus,
   setSchedulerUserId,
 } from "@/lib/cron/local-scheduler";
@@ -76,6 +77,41 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[SchedulerAPI] Error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST() {
+  console.log("[SchedulerAPI] POST request received (stop)");
+
+  try {
+    // Only allow in Tauri mode
+    if (!isTauriMode()) {
+      console.log("[SchedulerAPI] Not in Tauri mode, returning 400");
+      return NextResponse.json(
+        {
+          error: "Local scheduler is only available in Tauri/Desktop mode",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Stop the scheduler
+    stopLocalScheduler();
+    schedulerStarted = false;
+    console.log("[SchedulerAPI] Scheduler stopped");
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("[SchedulerAPI] Error stopping scheduler:", error);
     return NextResponse.json(
       {
         success: false,

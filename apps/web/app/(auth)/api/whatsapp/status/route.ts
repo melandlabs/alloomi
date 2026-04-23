@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { deleteLoginSession, getLoginSession } from "@/lib/session/context";
+import {
+  deleteLoginSession,
+  ensureRedis,
+  getLoginSession,
+} from "@/lib/session/context";
 
 export async function GET(request: Request) {
+  await ensureRedis();
+
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("sessionId");
 

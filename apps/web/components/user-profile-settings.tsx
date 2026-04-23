@@ -376,7 +376,7 @@ export function UserProfileSettings() {
         type: "success",
         description: t("settings.passwordSavedAllDevices"),
       });
-      void signOut({ callbackUrl: "/" });
+      void signOut({ callbackUrl: "/login" });
     } catch (error) {
       console.error("[UserPassword] Failed to update password", error);
       toast({

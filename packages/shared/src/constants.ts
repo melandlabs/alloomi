@@ -1,3 +1,6 @@
+export const DEV_PORT = "3515";
+export const PROD_PORT = "3415";
+
 export const maxChunkSummaryCount = 10;
 export const isProductionEnvironment = process.env.NODE_ENV === "production";
 export const isDevelopmentEnvironment = process.env.NODE_ENV === "development";

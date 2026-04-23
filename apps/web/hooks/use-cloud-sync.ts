@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from "react";
-import { initializeCloudSync } from "@/lib/integration/cloud-sync";
+import { initializeCloudSync } from "@/lib/integrations/cloud-sync";
 
 export function useCloudSync() {
   useEffect(() => {

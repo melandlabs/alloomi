@@ -7,7 +7,7 @@ import {
   getPosthogClient,
   initPosthog,
   isPosthogEnabled,
-} from "@/lib/analytics/posthog";
+} from "@/lib/analytics/posthog/posthog";
 
 type SurveyProfile = {
   role?: string | null;

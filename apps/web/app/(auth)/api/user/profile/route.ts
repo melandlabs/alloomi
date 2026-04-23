@@ -7,7 +7,7 @@ import { isTauriMode } from "@/lib/env/constants";
 import {
   createCloudClientForRequest,
   type CloudApiClient,
-} from "@/lib/api/remote-client";
+} from "@/lib/auth/remote-client";
 
 const profileUpdateSchema = z.object({
   name: z

@@ -8,7 +8,7 @@ import type { Insight } from "@/lib/db/schema";
 import { AgentEmptyState } from "@/components/agent/agent-empty-state";
 
 /**
- * Daily statistics type for calendar view
+ * Daily statistics data type for calendar view
  */
 export type DailyStats = {
   totalMessages: number;
@@ -98,7 +98,7 @@ const getCategoryGradient = (category: string) => {
 
 /**
  * Focus card component
- * Displays daily focus event categories including immediate handling, important todos, key information, and follow-up items
+ * Displays daily focus event categories, including immediate handling, important todos, key information, and follow-up items
  *
  * @param props - Component props
  * @returns Focus card component
@@ -122,7 +122,7 @@ export function InsightFocusCard({
   );
 
   /**
-   * Toggle category collapse state
+   * Toggle collapsed state of category
    * @param category - Category name
    */
   const toggleCategory = (category: string) => {

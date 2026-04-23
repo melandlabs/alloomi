@@ -361,6 +361,70 @@ export interface UpdateInstallResult {
 }
 
 /**
+ * Download progress type (for polling)
+ */
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+  percent: number;
+  done: boolean;
+  error: string | null;
+}
+
+/**
+ * Start update download (non-blocking, use pollUpdateDownloadProgress to track)
+ */
+export const startUpdateDownload = async (
+  downloadUrl: string,
+  fileSize: number,
+): Promise<void> => {
+  if (!isTauri()) {
+    return;
+  }
+  try {
+    await invoke("start_update_download", {
+      downloadUrl,
+      fileSize,
+    });
+  } catch (error) {
+    console.error("Failed to start update download:", error);
+    throw error;
+  }
+};
+
+/**
+ * Poll download progress (call repeatedly while downloading)
+ */
+export const pollUpdateDownloadProgress =
+  async (): Promise<DownloadProgress> => {
+    if (!isTauri()) {
+      return { downloaded: 0, total: 0, percent: 0, done: false, error: null };
+    }
+    try {
+      return await invoke<DownloadProgress>("poll_update_download_progress");
+    } catch (error) {
+      console.error("Failed to poll download progress:", error);
+      return { downloaded: 0, total: 0, percent: 0, done: false, error: null };
+    }
+  };
+
+/**
+ * Finish update (install the downloaded file, called after poll shows done)
+ */
+export const finishUpdateDownload =
+  async (): Promise<UpdateInstallResult | null> => {
+    if (!isTauri()) {
+      return null;
+    }
+    try {
+      return await invoke<UpdateInstallResult>("finish_update_download");
+    } catch (error) {
+      console.error("Failed to finish update:", error);
+      throw error;
+    }
+  };
+
+/**
  * Download and auto install update
  */
 export const downloadAndInstallUpdate = async (
@@ -437,6 +501,25 @@ export async function restartServer(): Promise<void> {
   }
 }
 
+// ============ Notification ============
+
+/**
+ * Send a system notification
+ */
+export async function sendNotification(
+  title: string,
+  body: string,
+): Promise<void> {
+  if (!isTauri()) {
+    return;
+  }
+  try {
+    await invoke("send_notification", { title, body });
+  } catch (error) {
+    console.error("Failed to send notification:", error);
+  }
+}
+
 /**
  * Tauri API exports
  */
@@ -466,4 +549,6 @@ export const tauriApi = {
   checkForUpdate,
   downloadAndInstallUpdate,
   restartForUpdate,
+  // Notification
+  sendNotification,
 };

@@ -28,11 +28,17 @@ import {
   getModelConfig,
 } from "@/components/agent/model-selector";
 import { useTranslation } from "react-i18next";
-import { saveMessagesToDatabase } from "@/lib/chat/save-messages";
+import { saveMessagesToDatabase } from "@/lib/ai/chat/save-messages";
 import { getAuthToken } from "@/lib/auth/token-manager";
 import { uploadImageTUS } from "@/lib/files/tus-upload";
-import type { ImageAttachment } from "@alloomi/agent/types";
+import type { ImageAttachment } from "@alloomi/ai/agent/types";
 import { DEFAULT_AI_MODEL, AI_PROXY_BASE_URL } from "@/lib/env/constants";
+import {
+  artifactPathBasename,
+  extractArtifactPathsFromText,
+  pickPreferredArtifactPath,
+} from "@/lib/files/extract-artifact-paths";
+import { formatAgentStreamErrorForUser } from "@/lib/ai/runtime/format-error";
 
 // Max retry attempts for stream errors
 const MAX_STREAM_RETRY_ATTEMPTS = 3;
@@ -62,7 +68,7 @@ export interface ChatContextValue {
   // Per-chat session states
   isAgentRunning: boolean;
   focusedInsights: Insight[];
-  setIsAgentRunning: (running: boolean) => void;
+  setIsAgentRunning: (running: boolean, chatId?: string) => void;
   setFocusedInsight: (insight: Insight) => void;
   /** Set focused insight for a specific chatId (used when navigating from other pages to associate insight) */
   setFocusedInsightForChat: (chatId: string, insight: Insight) => void;
@@ -97,7 +103,10 @@ export interface ChatContextValue {
   setVaultOpen: (open: boolean) => void;
 
   // Switch chatId
-  switchChatId: (chatId: string | null) => void;
+  switchChatId: (chatId: string | null, forceRefresh?: boolean) => void;
+
+  // Sending lock - prevents chat switching while message is being sent
+  isSending: boolean;
 
   // Get all chat session states (used to display running status of each chat in header)
   getChatSessionStates: () => Map<string, ChatSessionState>;
@@ -154,10 +163,16 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     }
   }, [activeChatId]);
 
+  // Max messages per chat to prevent memory issues from unbounded growth
+  const MAX_MESSAGES_PER_CHAT = 1000;
+
   // Messages state - isolated per chatId
   const [messagesMap, setMessagesMap] = useState<Map<string, ChatMessage[]>>(
     new Map(),
   );
+
+  // Sending lock - prevents chat switching while message is being sent
+  const [isSending, setIsSending] = useState(false);
 
   // Get messages for a specific chat
   const getMessages = useCallback(
@@ -177,7 +192,14 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
       setMessagesMap((prev) => {
         const newMap = new Map(prev);
         const chatMessages = newMap.get(chatId) || [];
-        newMap.set(chatId, updater(chatMessages));
+        const updated = updater(chatMessages);
+        // Enforce max messages per chat to prevent memory overflow
+        newMap.set(
+          chatId,
+          updated.length > MAX_MESSAGES_PER_CHAT
+            ? updated.slice(-MAX_MESSAGES_PER_CHAT)
+            : updated,
+        );
         return newMap;
       });
     },
@@ -232,6 +254,27 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     return mediaType?.startsWith("image/") ?? false;
   }
 
+  // Set isAgentRunning for a specific chatId (used by stream callbacks to clear lock for correct chat)
+  // Defined early to avoid initialization order issues with sendMessage
+  const setIsAgentRunningForChatFn = useCallback(
+    (chatId: string, running: boolean) => {
+      if (!chatId) return;
+      setChatSessionStates((prev) => {
+        const newMap = new Map(prev);
+        const currentState =
+          newMap.get(chatId) ||
+          ({
+            isAgentRunning: false,
+            focusedInsights: [],
+            abortFn: null,
+          } as ChatSessionState);
+        newMap.set(chatId, { ...currentState, isAgentRunning: running });
+        return newMap;
+      });
+    },
+    [],
+  );
+
   // Create safe sendMessage wrapper, integrating intelligent routing
   const sendMessage: ChatContextValue["sendMessage"] = useCallback(
     async (message, options) => {
@@ -254,6 +297,9 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
 
       // Capture chatId for message updates, ensure streaming updates still write to correct chat after switching
       const chatIdForMessages = stableActiveChatId;
+
+      // Set sending lock to prevent chat switching during send
+      setIsSending(true);
 
       // Save user message for possible stream error retry
       if (message && !isRetrying) {
@@ -712,7 +758,9 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
       setMessages((prev) => [...prev, assistantMessage], chatIdForMessages);
 
       // Record start index of new message (for saving to database)
+      // Bug fix: store assistantMessageId for onDone to use instead of index
       const newMessageStartIndex = messages.length;
+      const assistantMessageIdForRetry = assistantMessageId;
 
       // Used to manage message stream order
       let parts: any[] = [];
@@ -779,9 +827,9 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
             }
           : undefined;
 
-        setIsAgentRunningFn(true);
+        setIsAgentRunningFn(true, stableActiveChatId);
         // Set abort function and message update for current conversation
-        const chatIdForAbort = activeChatId;
+        const chatIdForAbort = stableActiveChatId;
 
         // Directly save AI message parts during streaming updates
         // Avoid AI message parts being lost to database when switching chats
@@ -800,11 +848,11 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
         };
 
         const abortFn = await streamNativeAgentResponse(messageContent, {
-          chatId: activeChatId ?? undefined,
+          chatId: stableActiveChatId ?? undefined,
           conversation,
-          taskId: activeChatId ?? undefined, // Use activeChatId as taskId so Workspace can correctly display files
-          workDir: activeChatId
-            ? `~/.alloomi/sessions/${activeChatId}`
+          taskId: stableActiveChatId ?? undefined, // Use stableActiveChatId as taskId so Workspace can correctly display files
+          workDir: stableActiveChatId
+            ? `~/.alloomi/sessions/${stableActiveChatId}`
             : undefined, // Pass complete workDir path to ensure files are created in the correct directory
           images,
           fileAttachments:
@@ -1011,66 +1059,53 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
 
                   // Check if files were generated (supports .pptx, .pdf, .xlsx, .md etc.)
                   if (data.output && typeof data.output === "string") {
-                    // Match file path patterns (supports Chinese filenames and various path formats)
-                    // Only match absolute paths, Tauri needs full paths to correctly access files
-                    const patterns = [
-                      // Desktop paths (supports Chinese characters and spaces)
-                      /\/Users\/[^\/]+\/Desktop\/.+?\.(pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|txt|json)(?:\s|\)|$)/gi,
-                      // Memory directory paths (for memory files)
-                      /\/Users\/[^\/]+\/\.alloomi\/data\/memory\/.+?\.(pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|txt|json)(?:\s|\)|$)/gi,
-                      // Workspace/sessions paths (supports various file types)
-                      /\/Users\/[^\/]+\/\.alloomi\/sessions\/[^\/]+\/.+?\.(pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|txt|json)(?:\s|\)|$)/gi,
-                      // Generic absolute paths (most lenient match, as fallback)
-                      /\/(?:Users|home)\/[^\/]+.+?\.(pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|txt|json)(?:\s|\)|$)/gi,
-                    ];
-
-                    const foundFiles: string[] = [];
-                    for (const pattern of patterns) {
-                      pattern.lastIndex = 0; // Reset regex lastIndex
-                      const matches = data.output.match(pattern);
-                      if (matches) {
-                        foundFiles.push(...matches);
-                      }
-                    }
+                    const foundFiles = extractArtifactPathsFromText(
+                      data.output,
+                    );
 
                     if (foundFiles.length > 0) {
-                      // Prefer HTML files if available
-                      let filePath = foundFiles[0];
-                      const htmlFile = foundFiles.find(
-                        (f) => f.endsWith(".html") || f.endsWith(".htm"),
-                      );
-                      if (htmlFile) {
-                        filePath = htmlFile;
-                      }
+                      const filePathRaw = pickPreferredArtifactPath(foundFiles);
+                      if (filePathRaw) {
+                        // Clean path: remove trailing whitespace and parentheses
+                        const filePath = filePathRaw
+                          .trim()
+                          .replace(/[()\s]+$/g, "");
 
-                      // Clean path: remove trailing whitespace and parentheses
-                      filePath = filePath.trim().replace(/[()\s]+$/g, "");
+                        const fileName = artifactPathBasename(filePath);
+                        const fileExt = fileName
+                          .split(".")
+                          .pop()
+                          ?.toLowerCase();
 
-                      const fileName = filePath.split("/").pop() || filePath;
-                      const fileExt = fileName.split(".").pop()?.toLowerCase();
+                        updatedPart.generatedFile = {
+                          path: filePath,
+                          name: fileName,
+                          type: fileExt || "unknown",
+                        };
 
-                      updatedPart.generatedFile = {
-                        path: filePath,
-                        name: fileName,
-                        type: fileExt || "unknown",
-                      };
-
-                      // For code or text files, add code preview
-                      if (
-                        ["py", "js", "ts", "tsx", "jsx", "md", "txt"].includes(
-                          fileExt || "",
-                        )
-                      ) {
-                        // Try to extract code content from output
-                        const codeMatch = data.output.match(
-                          /File created successfully at: (.+)/,
-                        );
-                        if (codeMatch) {
-                          updatedPart.codeFile = {
-                            path: filePath,
-                            name: fileName,
-                            language: fileExt,
-                          };
+                        // For code or text files, add code preview
+                        if (
+                          [
+                            "py",
+                            "js",
+                            "ts",
+                            "tsx",
+                            "jsx",
+                            "md",
+                            "txt",
+                          ].includes(fileExt || "")
+                        ) {
+                          // Try to extract code content from output
+                          const codeMatch = data.output.match(
+                            /File created successfully at: (.+)/,
+                          );
+                          if (codeMatch) {
+                            updatedPart.codeFile = {
+                              path: filePath,
+                              name: fileName,
+                              language: fileExt,
+                            };
+                          }
                         }
                       }
                     }
@@ -1143,14 +1178,19 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
               }, chatIdForMessages);
             } else if (data.type === "error") {
               console.error("[NativeAgent] Error:", data.message);
+              const errorMessage = data.message || "Unknown error";
+              const userFriendlyMessage = formatAgentStreamErrorForUser(
+                "chat",
+                errorMessage,
+              );
               toast({
                 type: "error",
-                description: `Native Agent Error: ${data.message}`,
+                description: userFriendlyMessage,
               });
               // Add error to message
               const errorPart = {
                 type: "error" as const,
-                content: data.message || "Unknown error",
+                content: userFriendlyMessage,
               };
               parts.push(errorPart);
 
@@ -1221,16 +1261,23 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
           },
           modelConfig,
           onDone: async () => {
-            // Cleanup native agent state
-            setIsAgentRunningFn(false);
-            // Clear abort function in ref
+            // Clear sending lock
+            setIsSending(false);
+            // Cleanup native agent state - use chatIdForAbort to ensure lock is cleared for correct chat
+            // Fallback to activeChatId if chatIdForAbort is not available (should not happen but safety check)
+            const chatIdToClear = chatIdForAbort || activeChatId;
+            // Clear abort function in ref FIRST to prevent race with stop()
             abortFnRef.current = null;
-            // Clear abort function for current conversation
-            if (chatIdForAbort) {
+            // Clear abort function and isAgentRunning for current conversation atomically
+            if (chatIdToClear) {
               setChatSessionStates((prev) => {
                 const newMap = new Map(prev);
-                const currentState = getChatSessionState(chatIdForAbort);
-                newMap.set(chatIdForAbort, { ...currentState, abortFn: null });
+                const currentState = getChatSessionState(chatIdToClear);
+                newMap.set(chatIdToClear, {
+                  ...currentState,
+                  isAgentRunning: false,
+                  abortFn: null,
+                });
                 return newMap;
               });
             }
@@ -1240,8 +1287,13 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
             setIsRetrying(false);
 
             // Save Native Agent messages to database (only non-user messages, user messages already saved on send)
+            // Bug fix: use assistantMessageId to find messages instead of index
             const allNewMessages =
-              messagesRef.current.slice(newMessageStartIndex);
+              messagesRef.current.length > newMessageStartIndex
+                ? messagesRef.current.slice(newMessageStartIndex)
+                : messagesRef.current.filter(
+                    (m) => m.id === assistantMessageIdForRetry,
+                  );
             const messagesToSave = allNewMessages.filter(
               (m) => m.role !== "user",
             );
@@ -1258,16 +1310,24 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
             );
           },
           onError: (error) => {
+            // Clear sending lock
+            setIsSending(false);
             console.error("[NativeAgent] Stream error:", error);
-            setIsAgentRunningFn(false);
-            // Clear abort function in ref
+            // Cleanup native agent state - use chatIdForAbort to ensure lock is cleared for correct chat
+            // Fallback to activeChatId if chatIdForAbort is not available (should not happen but safety check)
+            const chatIdToClear = chatIdForAbort || activeChatId;
+            // Clear abort function in ref FIRST to prevent race with stop()
             abortFnRef.current = null;
-            // Clear abort function for current conversation
-            if (chatIdForAbort) {
+            // Clear abort function and isAgentRunning for current conversation atomically
+            if (chatIdToClear) {
               setChatSessionStates((prev) => {
                 const newMap = new Map(prev);
-                const currentState = getChatSessionState(chatIdForAbort);
-                newMap.set(chatIdForAbort, { ...currentState, abortFn: null });
+                const currentState = getChatSessionState(chatIdToClear);
+                newMap.set(chatIdToClear, {
+                  ...currentState,
+                  isAgentRunning: false,
+                  abortFn: null,
+                });
                 return newMap;
               });
             }
@@ -1354,15 +1414,11 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
                   // Set retry flag, force use native agent
                   setIsRetrying(true);
 
-                  // Remove last assistant message (error message)
+                  // Remove assistant message by ID instead of position (bug fix: avoid deleting wrong message if user sent new message during delay)
                   setMessages((prev) => {
-                    const updated = [...prev];
-                    if (
-                      updated.length > 0 &&
-                      updated[updated.length - 1].role === "assistant"
-                    ) {
-                      updated.pop();
-                    }
+                    const updated = prev.filter(
+                      (m) => m.id !== assistantMessageIdForRetry,
+                    );
                     return updated;
                   }, chatIdForMessages);
 
@@ -1496,10 +1552,12 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
           }
           return updated;
         }, chatIdForMessages);
+        // Bug fix: clear isSending lock to allow future messages
+        setIsSending(false);
         return Promise.reject(error);
       }
     },
-    [activeChatId, messages, setMessages, t],
+    [activeChatId, messages, setMessages, t, setIsAgentRunningForChatFn],
   );
 
   // setSendMessage - no longer needed because sendMessage is implemented in context
@@ -1559,19 +1617,80 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     Map<string, ChatSessionState>
   >(loadChatSessionStatesFromStorage);
 
+  // On mount, reconcile stale isAgentRunning states with real backend execution status.
+  // When the browser is refreshed or crashes mid-execution, localStorage can retain
+  // isAgentRunning: true even after the job completes. This effect checks the backend
+  // and clears stale entries.
+  // Safe to run only on mount because chatSessionStates is initialized synchronously
+  // from localStorage via useState(loadChatSessionStatesFromStorage).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let hasRunning = false;
+    for (const [, state] of chatSessionStates) {
+      if (state.isAgentRunning) {
+        hasRunning = true;
+        break;
+      }
+    }
+    if (!hasRunning) return;
+
+    const controller = new AbortController();
+    fetch("/api/characters", { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.characters) return;
+        // Build a set of jobId values for characters that are actually running
+        const runningJobIds = new Set(
+          data.characters
+            .filter((c: any) => c.latestResult?.status === "running")
+            .map((c: any) => c.jobId),
+        );
+        // Clear isAgentRunning for any chatId that is NOT actually running
+        setChatSessionStates((prev) => {
+          let needsUpdate = false;
+          for (const [id, state] of prev) {
+            if (state.isAgentRunning && !runningJobIds.has(id)) {
+              needsUpdate = true;
+              break;
+            }
+          }
+          if (!needsUpdate) return prev;
+          const newMap = new Map(prev);
+          for (const [id, state] of newMap) {
+            if (state.isAgentRunning && !runningJobIds.has(id)) {
+              newMap.set(id, { ...state, isAgentRunning: false });
+            }
+          }
+          return newMap;
+        });
+      })
+      .catch(() => {
+        // Silently fail - stale state will clear on next successful check
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
   // Use ref to store current abortFn, ensure stop function can access synchronously
   // Avoid issues caused by React state async updates
   const abortFnRef = useRef<(() => void) | null>(null);
 
   // Persist chatSessionStates to localStorage - use debounced async write to avoid blocking main thread
+  // Limit stored sessions to prevent localStorage quota exceeded errors
+  const MAX_STORED_SESSIONS = 20;
   useEffect(() => {
     if (typeof window === "undefined") return;
     const timeoutId = setTimeout(() => {
       try {
         // Convert Map to plain object for JSON serialization
-        const obj: Record<string, ChatSessionState> = {};
-        chatSessionStates.forEach((value, key) => {
-          obj[key] = value;
+        // Limit to most recent sessions to prevent localStorage quota exceeded
+        const entries = Array.from(chatSessionStates.entries());
+        const recentEntries = entries.slice(-MAX_STORED_SESSIONS);
+        const obj: Record<string, Omit<ChatSessionState, "abortFn">> = {};
+        recentEntries.forEach(([key, value]) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { abortFn, ...serializable } = value;
+          obj[key] = serializable;
         });
         localStorage.setItem("chatSessionStates", JSON.stringify(obj));
       } catch (e) {
@@ -1655,12 +1774,13 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
   }, [chatSessionStates]);
 
   const setIsAgentRunningFn = useCallback(
-    (running: boolean) => {
-      if (!activeChatId) return;
+    (running: boolean, chatId?: string) => {
+      const targetChatId = chatId ?? activeChatId;
+      if (!targetChatId) return;
       setChatSessionStates((prev) => {
         const newMap = new Map(prev);
-        const currentState = getChatSessionState(activeChatId);
-        newMap.set(activeChatId, { ...currentState, isAgentRunning: running });
+        const currentState = getChatSessionState(targetChatId);
+        newMap.set(targetChatId, { ...currentState, isAgentRunning: running });
         return newMap;
       });
     },
@@ -1806,57 +1926,65 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
   // Switch Chat
   // =====================================================================
 
-  const switchChatId = useCallback(async (newChatId: string | null) => {
-    // Close drawer when switching conversations
-    setIsInsightDrawerOpen(false);
-    setSelectedInsight(null);
+  const switchChatId = useCallback(
+    async (newChatId: string | null, forceRefresh?: boolean) => {
+      // Close drawer when switching conversations
+      setIsInsightDrawerOpen(false);
+      setSelectedInsight(null);
 
-    if (!newChatId) {
-      const newUuid = generateUUID();
-      setActiveChatId(newUuid);
-      // No need to manually clear, will get empty array from map when switching to new chat
-      return;
-    }
-
-    // Switch activeChatId first, messages will automatically be fetched from messagesMap
-    // If the chat already has cached messages, use them directly; otherwise will fetch from API later
-    const existingMessages = messagesMapRef.current.get(newChatId) || [];
-    setActiveChatId(newChatId);
-
-    // If already has cached messages, no need to request API
-    if (existingMessages.length > 0) {
-      return;
-    }
-
-    // Load messages asynchronously without blocking UI
-    (async () => {
-      try {
-        const response = await fetch(`/api/chat/${newChatId}/messages`);
-        // 404 means new conversation has no history, this is normal
-        if (response.status === 404) {
-          // Keep empty, do not store in map
-          return;
-        }
-        if (!response.ok) {
-          console.error(
-            "[switchChatId] Failed to fetch messages:",
-            response.status,
-          );
-          return;
-        }
-        const data = await response.json();
-        const uiMessages = data.messages || [];
-        // Store fetched messages in map
-        setMessagesMap((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(newChatId, uiMessages);
-          return newMap;
-        });
-      } catch (error) {
-        console.error("[switchChatId] Failed to switch chat:", error);
+      // Prevent chat switching while sending a message
+      if (isSending) {
+        return;
       }
-    })();
-  }, []);
+
+      if (!newChatId) {
+        const newUuid = generateUUID();
+        setActiveChatId(newUuid);
+        // No need to manually clear, will get empty array from map when switching to new chat
+        return;
+      }
+
+      // Switch activeChatId first, messages will automatically be fetched from messagesMap
+      // If the chat already has cached messages, use them directly; otherwise will fetch from API later
+      const existingMessages = messagesMapRef.current.get(newChatId) || [];
+      setActiveChatId(newChatId);
+
+      // If already has cached messages and not forcing refresh, use cache
+      if (existingMessages.length > 0 && !forceRefresh) {
+        return;
+      }
+
+      // Load messages asynchronously without blocking UI
+      (async () => {
+        try {
+          const response = await fetch(`/api/chat/${newChatId}/messages`);
+          // 404 means new conversation has no history, this is normal
+          if (response.status === 404) {
+            // Keep empty, do not store in map
+            return;
+          }
+          if (!response.ok) {
+            console.error(
+              "[switchChatId] Failed to fetch messages:",
+              response.status,
+            );
+            return;
+          }
+          const data = await response.json();
+          const uiMessages = data.messages || [];
+          // Store fetched messages in map
+          setMessagesMap((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(newChatId, uiMessages);
+            return newMap;
+          });
+        } catch (error) {
+          console.error("[switchChatId] Failed to switch chat:", error);
+        }
+      })();
+    },
+    [],
+  );
 
   const contextValue = useMemo<ChatContextValue>(() => {
     return {
@@ -1891,6 +2019,8 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
       setVaultOpen: setIsVaultOpen,
       // Switch chat
       switchChatId,
+      // Sending lock
+      isSending,
       // Get all chat session states
       getChatSessionStates: () => chatSessionStates,
     };
@@ -1912,6 +2042,7 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     closeFilePreviewPanel,
     isVaultOpen,
     switchChatId,
+    isSending,
   ]);
 
   return (

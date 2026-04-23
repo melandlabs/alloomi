@@ -11,7 +11,6 @@ import { SessionProvider } from "next-auth/react";
 import { InsightOptimisticProvider } from "@/components/insight-optimistic-context";
 import { MobileLayoutWrapper } from "@/components/mobile-layout-wrapper";
 import { MobileBackButton } from "@/components/mobile-back-button";
-import { AffiliateReferralListener } from "@/components/affiliate-referral-listener";
 import { PosthogIdentityListener } from "@/components/posthog-identity-listener";
 import { TelegramSelfListenerInit } from "@/components/telegram-self-listener-init";
 import { WhatsAppSelfListenerInit } from "@/components/whatsapp-self-listener-init";
@@ -23,6 +22,7 @@ import {
   WeixinListenerInit,
 } from "@/components/feishu-listener-init";
 import { CloudSyncInit } from "@/components/cloud-sync-init";
+import { InsightRefreshInit } from "@/components/insight-refresh-init";
 import { TelegramTokenFormProvider } from "@/components/platform-integrations";
 
 // Lazy load initialization components - use Suspense boundaries to avoid blocking initial render
@@ -36,6 +36,7 @@ const IntegrationInitComponents = memo(() => (
     <QQBotListenerInit />
     <WeixinListenerInit />
     <CloudSyncInit />
+    <InsightRefreshInit />
   </Suspense>
 ));
 
@@ -44,7 +45,6 @@ IntegrationInitComponents.displayName = "IntegrationInitComponents";
 // Lazy load listener components
 const ListenerComponents = memo(() => (
   <Suspense fallback={null}>
-    <AffiliateReferralListener />
     <PosthogIdentityListener />
   </Suspense>
 ));

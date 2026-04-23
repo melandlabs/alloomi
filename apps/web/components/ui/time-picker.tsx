@@ -41,6 +41,46 @@ export function TimePicker({
   const [open, setOpen] = React.useState(false);
   const [hour, minute] = value ? value.split(":") : ["", ""];
   const displayText = value || placeholder;
+  const hourScrollRef = React.useRef<HTMLDivElement>(null);
+  const minuteScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToSelected = React.useCallback(
+    (scrollArea: HTMLDivElement | null, selectedValue: string) => {
+      if (!scrollArea || !selectedValue) return;
+
+      const safeValue =
+        typeof CSS !== "undefined" ? CSS.escape(selectedValue) : selectedValue;
+      const viewport = scrollArea.querySelector<HTMLElement>(
+        "[data-radix-scroll-area-viewport]",
+      );
+      const selectedButton = scrollArea.querySelector<HTMLElement>(
+        `button[data-value="${safeValue}"][data-selected="true"]`,
+      );
+
+      if (!viewport || !selectedButton) return;
+
+      const nextScrollTop =
+        selectedButton.offsetTop -
+        viewport.clientHeight / 2 +
+        selectedButton.offsetHeight / 2;
+      viewport.scrollTop = Math.max(0, nextScrollTop);
+    },
+    [],
+  );
+
+  // Auto-scroll to selected hour/minute when dropdown opens
+  React.useEffect(() => {
+    if (!open) return;
+
+    const frameId = requestAnimationFrame(() => {
+      scrollToSelected(hourScrollRef.current, hour);
+      scrollToSelected(minuteScrollRef.current, minute);
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [open, hour, minute, scrollToSelected]);
 
   const setHour = (h: string) => {
     const m = minute || "00";
@@ -92,12 +132,17 @@ export function TimePicker({
             {placeholder}
           </p>
           <div className="flex gap-1">
-            <ScrollArea className="h-48 w-14 rounded-md border-0 border-[rgba(0,0,0,0)] [border-style:none] [border-image:none]">
+            <ScrollArea
+              ref={hourScrollRef}
+              className="h-48 w-14 rounded-md border-0 border-[rgba(0,0,0,0)] [border-style:none] [border-image:none]"
+            >
               <div className="flex flex-col p-1">
                 {HOURS.map((h) => (
                   <Button
                     key={h}
                     type="button"
+                    data-selected={hour === h ? "true" : undefined}
+                    data-value={h}
                     variant="ghost"
                     size="sm"
                     className={cn(
@@ -112,12 +157,17 @@ export function TimePicker({
                 ))}
               </div>
             </ScrollArea>
-            <ScrollArea className="h-48 w-14 rounded-md border-0 border-[rgba(0,0,0,0)] [border-style:none] [border-image:none]">
+            <ScrollArea
+              ref={minuteScrollRef}
+              className="h-48 w-14 rounded-md border-0 border-[rgba(0,0,0,0)] [border-style:none] [border-image:none]"
+            >
               <div className="flex flex-col p-1">
                 {MINUTES.map((m) => (
                   <Button
                     key={m}
                     type="button"
+                    data-selected={minute === m ? "true" : undefined}
+                    data-value={m}
                     variant="ghost"
                     size="sm"
                     className={cn(

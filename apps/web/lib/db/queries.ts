@@ -98,8 +98,7 @@ import { AppError } from "@alloomi/shared/errors";
 import type { UserType } from "@/app/(auth)/auth";
 import { isTauriMode } from "@/lib/env/constants";
 import { filterDueInsightSettings } from "@/lib/insights/tier";
-import type { IntegrationId } from "@/lib/integration/client";
-import { decryptToken, encryptToken } from "@alloomi/security/token-encryption";
+import type { IntegrationId } from "@/lib/integrations/client";
 import type { GeneratedInsightPayload } from "@/lib/insights/types";
 import {
   MAX_CUSTOM_INSIGHT_FILTERS,
@@ -111,159 +110,33 @@ import type { InsightTaskItem, TimelineData } from "../ai/subagents/insights";
 import { createHash } from "node:crypto";
 import { generateInsightId } from "../insights/transform";
 
-// SQLite single binding parameter limit is about 999, insert in batches to avoid "Too many parameter values were provided"
-const DB_INSERT_CHUNK_SIZE = 100;
+// Import serialization utilities from separate module
+export {
+  serializeJson,
+  deserializeJson,
+  normalizeContactMeta,
+  normalizeContactMetaList,
+  normalizeInsight,
+  normalizeInsightList,
+  encryptPayload,
+  decryptPayload,
+  DEFAULT_INSIGHT_TTL_HOURS,
+} from "./serialization";
+import {
+  serializeJson,
+  deserializeJson,
+  normalizeContactMeta,
+  normalizeContactMetaList,
+  normalizeInsight,
+  normalizeInsightList,
+  encryptPayload,
+  decryptPayload,
+  DEFAULT_INSIGHT_TTL_HOURS,
+} from "./serialization";
 
-/**
- * Execute batch insert operations in chunks
- * @param items Array of data to insert
- * @param chunkSize Size of each batch
- * @param insertFn Insert function that receives a batch of data
- */
-export async function batchInsert<T>(
-  items: T[],
-  chunkSize: number,
-  insertFn: (chunk: T[]) => Promise<unknown>,
-): Promise<unknown[]> {
-  const results: unknown[] = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    const result = await insertFn(chunk);
-    // If returns array, merge results
-    if (Array.isArray(result)) {
-      results.push(...result);
-    } else {
-      results.push(result);
-    }
-  }
-  return results;
-}
-
-/**
- * Convert JSON data (object or array) to database-compatible format
- * SQLite: needs to be serialized to JSON string
- * PostgreSQL: can directly use jsonb object or array
- */
-export function serializeJson(
-  data:
-    | Record<string, unknown>
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null
-    | undefined,
-): any {
-  // SQLite mode: always return JSON string or empty string
-  if (isTauriMode()) {
-    if (data === null || data === undefined) return null;
-    if (typeof data === "string") return data;
-    return JSON.stringify(data);
-  }
-  // PostgreSQL mode: return data directly
-  if (data === null || data === undefined) return null;
-  if (typeof data === "string") return data;
-  return data;
-}
-
-/**
- * Deserialize JSON data (used after reading from database)
- * SQLite: needs to parse JSON string to object or array
- * PostgreSQL: already object or array, return directly
- */
-export function deserializeJson(
-  data: string | unknown[] | Record<string, unknown> | null | undefined,
-): any {
-  // SQLite mode: need to parse JSON string
-  if (isTauriMode()) {
-    if (!data || data === "null" || data === "[]") return [];
-    if (typeof data === "string") return JSON.parse(data);
-    return data;
-  }
-  // PostgreSQL mode: return data directly
-  if (!data) return [];
-  return data;
-}
-
-/**
- * Parse contactMeta for a single UserContact object (using the generic deserializeJson)
- * @param contact Contact object
- * @returns Parsed contact object (modified in place)
- */
-export function normalizeContactMeta<T extends UserContact>(contact: T): T {
-  if (contact.contactMeta) {
-    contact.contactMeta = deserializeJson(contact.contactMeta as any);
-  }
-  return contact;
-}
-
-/**
- * Parse contactMeta for an array of UserContact objects (using the generic deserializeJson)
- * @param contacts Array of contact objects
- * @returns Parsed array of contacts (modified in place)
- */
-export function normalizeContactMetaList<T extends UserContact>(
-  contacts: T[],
-): T[] {
-  for (const contact of contacts) {
-    if (contact.contactMeta) {
-      contact.contactMeta = deserializeJson(contact.contactMeta as any);
-    }
-  }
-  return contacts;
-}
-
-/**
- * Parse all JSON fields for an Insight object (SQLite mode)
- * @param insight Insight object
- * @returns Parsed Insight object
- */
-export function normalizeInsight<T extends Insight>(insight: T): T {
-  const data = insight as any;
-
-  // Parse all JSON fields
-  if (data.groups) data.groups = deserializeJson(data.groups);
-  if (data.people) data.people = deserializeJson(data.people);
-  if (data.details) data.details = deserializeJson(data.details);
-  if (data.timeline) data.timeline = deserializeJson(data.timeline);
-  if (data.insights) data.insights = deserializeJson(data.insights);
-  if (data.topKeywords) data.topKeywords = deserializeJson(data.topKeywords);
-  if (data.topEntities) data.topEntities = deserializeJson(data.topEntities);
-  if (data.topVoices) data.topVoices = deserializeJson(data.topVoices);
-  if (data.sources) data.sources = deserializeJson(data.sources);
-  if (data.buyerSignals) data.buyerSignals = deserializeJson(data.buyerSignals);
-  if (data.stakeholders) data.stakeholders = deserializeJson(data.stakeholders);
-  if (data.nextActions) data.nextActions = deserializeJson(data.nextActions);
-  if (data.followUps) data.followUps = deserializeJson(data.followUps);
-  if (data.actionRequiredDetails)
-    data.actionRequiredDetails = deserializeJson(data.actionRequiredDetails);
-  if (data.myTasks) data.myTasks = deserializeJson(data.myTasks);
-  if (data.waitingForMe) data.waitingForMe = deserializeJson(data.waitingForMe);
-  if (data.waitingForOthers)
-    data.waitingForOthers = deserializeJson(data.waitingForOthers);
-  if (data.categories) data.categories = deserializeJson(data.categories);
-  if (data.priority) data.priority = deserializeJson(data.priority);
-  if (data.experimentIdeas)
-    data.experimentIdeas = deserializeJson(data.experimentIdeas);
-  if (data.riskFlags) data.riskFlags = deserializeJson(data.riskFlags);
-  if (data.historySummary)
-    data.historySummary = deserializeJson(data.historySummary);
-  if (data.strategic) data.strategic = deserializeJson(data.strategic);
-  if (data.roleAttribution)
-    data.roleAttribution = deserializeJson(data.roleAttribution);
-  if (data.alerts) data.alerts = deserializeJson(data.alerts);
-
-  return insight;
-}
-
-/**
- * Parse all JSON fields for an array of Insight objects (SQLite mode)
- * @param insights Array of Insight objects
- * @returns Parsed array of Insight objects
- */
-export function normalizeInsightList<T extends Insight>(insights: T[]): T[] {
-  return insights.map((insight) => normalizeInsight(insight));
-}
+// Import batch operations from separate module
+export { DB_INSERT_CHUNK_SIZE, batchInsert } from "./batch";
+import { DB_INSERT_CHUNK_SIZE } from "./batch";
 
 /**
  * Auto-add id field to data being inserted (SQLite requires explicit provision)
@@ -320,40 +193,6 @@ export type BotWithAccount = Bot & {
 export type IntegrationAccountWithBot = IntegrationAccount & {
   bot: Bot | null;
 };
-
-export function encryptPayload<T>(input: T): string {
-  const serialized = JSON.stringify(input ?? {});
-  try {
-    return encryptToken(serialized);
-  } catch (error) {
-    console.error("[IntegrationAccounts] Failed to encrypt payload", error);
-    throw new Error(
-      `[IntegrationAccounts] Failed to encrypt payload: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
-  }
-}
-
-export function decryptPayload<T = unknown>(payload: string | null): T | null {
-  if (!payload) {
-    return null;
-  }
-  try {
-    const decrypted = decryptToken(payload);
-    return JSON.parse(decrypted) as T;
-  } catch (error) {
-    console.error("[IntegrationAccounts] Failed to decrypt payload", error);
-    try {
-      return JSON.parse(payload) as T;
-    } catch {
-      console.error(
-        "[IntegrationAccounts] Cannot parse payload as plaintext either",
-      );
-      return null;
-    }
-  }
-}
-
-export const DEFAULT_INSIGHT_TTL_HOURS = 24;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -783,7 +622,7 @@ export async function saveChat({
     // Track chat creation events (server-side tracking)
     try {
       const { captureServerEvent } =
-        await import("@/lib/analytics/posthog-server");
+        await import("@/lib/analytics/posthog/posthog-server");
       await captureServerEvent({
         distinctId: userId,
         event: "chat_created",
@@ -2484,7 +2323,7 @@ export async function deleteIntegrationAccount({
 }): Promise<{ deletedAccountId: string | null; deletedBots: string[] }> {
   try {
     const botsToDelete = await db
-      .select({ id: bot.id })
+      .select({ id: bot.id, adapter: bot.adapter })
       .from(bot)
       .where(
         and(
@@ -2494,6 +2333,27 @@ export async function deleteIntegrationAccount({
       );
 
     const botIds = botsToDelete.map((b: any) => b.id);
+    const adapters = botsToDelete.map((b: any) => b.adapter);
+
+    // Delete user contacts associated with these bots
+    // IMPORTANT: Only delete contacts for WeChat (which uses context tokens)
+    // Other platforms don't need contact cleanup as they use different mechanisms
+    if (botIds.length > 0) {
+      const weixinBotIds = botsToDelete
+        .filter((b: any) => b.adapter === "weixin")
+        .map((b: any) => b.id);
+
+      if (weixinBotIds.length > 0) {
+        await db
+          .delete(userContacts)
+          .where(
+            and(
+              eq(userContacts.userId, userId),
+              inArray(userContacts.botId, weixinBotIds),
+            ),
+          );
+      }
+    }
 
     if (botIds.length > 0) {
       await db
@@ -7969,7 +7829,7 @@ export async function listTasksFromInsights(
           const taskId = task.id || `${insightItem.id}|${task.title}`;
           results.push({
             id: taskId,
-            title: task.title || "未命名任务",
+            title: task.title || "Untitled task",
             context: task.context ?? null,
             insightId: insightItem.id,
           });
@@ -8495,6 +8355,7 @@ export async function getInsightsWithNotesAndDocuments({
         sizeBytes: ragDocuments.sizeBytes,
         totalChunks: ragDocuments.totalChunks,
         uploadedAt: ragDocuments.uploadedAt,
+        blobPath: ragDocuments.blobPath,
       })
       .from(insightDocuments)
       .innerJoin(ragDocuments, eq(insightDocuments.documentId, ragDocuments.id))
@@ -8525,6 +8386,7 @@ export async function getInsightsWithNotesAndDocuments({
           sizeBytes: number;
           totalChunks: number;
           uploadedAt: Date;
+          blobPath: string | null;
         }>;
       }
     >();
@@ -8560,6 +8422,7 @@ export async function getInsightsWithNotesAndDocuments({
           sizeBytes: doc.sizeBytes,
           totalChunks: doc.totalChunks,
           uploadedAt: doc.uploadedAt,
+          blobPath: doc.blobPath,
         });
       }
     }
@@ -8689,4 +8552,50 @@ export async function listDingTalkInsightMessagesForInsights(params: {
   }
   picked.sort((a, b) => a.tsSec - b.tsSec);
   return picked;
+}
+
+/**
+ * Check if a WeChat bot has any contacts with valid lastContextToken
+ * @param userId - User ID
+ * @param botId - Bot ID
+ * @returns true if the bot has at least one contact with a non-empty lastContextToken
+ */
+export async function weixinBotHasValidContextToken(
+  userId: string,
+  botId: string,
+): Promise<boolean> {
+  try {
+    const contacts = await db
+      .select()
+      .from(userContacts)
+      .where(
+        and(eq(userContacts.userId, userId), eq(userContacts.botId, botId)),
+      );
+
+    if (contacts.length === 0) {
+      return false;
+    }
+
+    // Normalize contactMeta for all contacts
+    const normalizedContacts = normalizeContactMetaList(contacts);
+
+    // Check if any contact has a non-empty lastContextToken
+    for (const contact of normalizedContacts) {
+      const meta = contact.contactMeta as
+        | { lastContextToken?: string }
+        | null
+        | undefined;
+      const token = meta?.lastContextToken?.trim();
+      if (token) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error(
+      `[Queries] Failed to check WeChat bot context tokens: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  }
 }

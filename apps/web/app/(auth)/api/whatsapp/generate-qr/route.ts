@@ -1,16 +1,14 @@
-import type { WhatsAppUserInfo } from "@/lib/integration/sources/whatsapp";
+import type { WhatsAppUserInfo } from "@/lib/integrations/whatsapp";
 import {
   type LoginSession,
   getLoginSession,
   setLoginSession,
+  ensureRedis,
 } from "@/lib/session/context";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { whatsappClientRegistry } from "@/lib/whatsapp/client-registry";
-import {
-  WhatsAppAdapter,
-  activeAdapters,
-} from "@/lib/integration/sources/whatsapp";
+import { whatsappClientRegistry } from "@/lib/integrations/whatsapp/client-registry";
+import { WhatsAppAdapter, activeAdapters } from "@/lib/integrations/whatsapp";
 
 type SessionUpdater = (
   sessionId: string,
@@ -85,6 +83,7 @@ export async function POST(request: Request) {
     createdAt,
   };
 
+  await ensureRedis();
   await setLoginSession(sessionId, {
     ...baseSession,
     qrData: "",

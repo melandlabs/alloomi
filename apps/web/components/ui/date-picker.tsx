@@ -182,7 +182,7 @@ export function DatePicker({
             </Button>
             <span className="text-sm font-medium">
               {localeZh
-                ? format(viewMonth, "yyyy年MM月", { locale })
+                ? format(viewMonth, "yyyy 年 MM 月", { locale })
                 : format(viewMonth, "MMMM yyyy", { locale })}
             </span>
             <Button

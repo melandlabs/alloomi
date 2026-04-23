@@ -16,6 +16,7 @@ import {
   formatToLocalTime,
   getCurrentYearMonth,
   formatBytes,
+  filterToolCallText,
 } from "@/lib/utils";
 import { AppError } from "@alloomi/shared/errors";
 import type { DBMessage } from "@/lib/db/schema";
@@ -243,5 +244,42 @@ describe("utils", () => {
     expect(formatBytes(0)).toBe("0 B");
     expect(formatBytes(1024)).toBe("1 KB");
     expect(formatBytes(1_048_576, 2)).toBe("1 MB");
+  });
+});
+
+describe("filterToolCallText", () => {
+  it("should strip malformed XML tool calls", () => {
+    const input =
+      '<invoke name="mcp_business-tools modifyInsight">content</invoke>';
+    expect(filterToolCallText(input)).toBe("");
+  });
+
+  it("should strip tool call with complex content", () => {
+    const input = `<invoke name="mcp_business-tools modifyInsight"> <parametername="insightId">test</parametername></invoke>`;
+    expect(filterToolCallText(input)).toBe("");
+  });
+
+  it("should handle chat output prefix", () => {
+    const input =
+      'chat output: \n<invoke name="mcp_business-tools modifyInsight">...</invoke>\n\nsome real text';
+    expect(filterToolCallText(input)).toBe("some real text");
+  });
+
+  it("should handle real MiniMax malformed output", () => {
+    const input = `chat output:
+<invoke name="mcp_business-tools modifyInsight"> <parametername="insightId">0cblc9de-ece5-463d-8255-cel9ac6d19c</parametername="updates">{"timeline": [{"time": 17762636000000,"summary":"Candidate report updated"}]}</invoke>
+
+some real response text`;
+    expect(filterToolCallText(input)).toBe("some real response text");
+  });
+
+  it("should return empty string for input with only malformed tool calls", () => {
+    const input = '<invoke name="test">...</invoke>';
+    expect(filterToolCallText(input)).toBe("");
+  });
+
+  it("should preserve normal text without tool calls", () => {
+    const input = "This is a normal message";
+    expect(filterToolCallText(input)).toBe(input);
   });
 });

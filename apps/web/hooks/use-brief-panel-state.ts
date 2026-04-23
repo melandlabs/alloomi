@@ -18,6 +18,7 @@ import {
 import { useInsightAvatar } from "@/hooks/use-insight-avatar";
 import { useInsightBriefCategory } from "@/hooks/use-insight-brief-category";
 import { useInsightPagination } from "@/hooks/use-insight-data";
+import { useInsightRefresh } from "@/hooks/use-insight-refresh";
 import { useInsightWeights } from "@/hooks/use-insight-weights";
 import { useIntegrations } from "@/hooks/use-integrations";
 import type { ActionCategory } from "@/lib/insights/event-rank";
@@ -35,6 +36,8 @@ export type BriefMessageStats = {
 
 export interface UseBriefPanelStateProps {
   externalSelectedInsight?: Insight | null;
+  /** When true, excludes manual platform insights from the list */
+  excludeManualInsights?: boolean;
 }
 
 export interface UseBriefPanelStateReturn {
@@ -105,6 +108,7 @@ const statsFetcher = async (url: string) => {
  */
 export function useBriefPanelState({
   externalSelectedInsight = null,
+  excludeManualInsights = false,
 }: UseBriefPanelStateProps = {}): UseBriefPanelStateReturn {
   const { t, i18n } = useTranslation();
   const { data } = useSession();
@@ -246,7 +250,21 @@ export function useBriefPanelState({
     uniqueInsightsRef.current = uniqueInsights;
   }, [uniqueInsights]);
 
-  const avatarConfig = getAvatarConfigByState(AvatarState.DEFAULT);
+  const isFirstLanding = useMemo(
+    () => uniqueInsights.length === 0,
+    [uniqueInsights.length],
+  );
+  const { isRefreshing, handleRefresh } = useInsightRefresh(
+    assistantName,
+    isFirstLanding,
+  );
+  const avatarConfig = useMemo(
+    () =>
+      getAvatarConfigByState(
+        isRefreshing ? AvatarState.REFRESHING : AvatarState.DEFAULT,
+      ),
+    [isRefreshing],
+  );
 
   const briefHeaderTitle = useMemo(() => {
     const today = new Date();
@@ -264,6 +282,19 @@ export function useBriefPanelState({
     statsFetcher,
     { revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
+
+  useEffect(() => {
+    const handleAccountAuthorized = () => handleRefresh();
+    window.addEventListener(
+      "integration:accountAuthorized",
+      handleAccountAuthorized,
+    );
+    return () =>
+      window.removeEventListener(
+        "integration:accountAuthorized",
+        handleAccountAuthorized,
+      );
+  }, [handleRefresh]);
 
   useEffect(() => {
     const handleCategoryChange = (event: CustomEvent) => {
@@ -440,6 +471,12 @@ export function useBriefPanelState({
     today.setHours(0, 0, 0, 0);
     return uniqueInsights.filter((insight) => {
       if (insight.isArchived) return false;
+      // When excludeManualInsights is true, skip manual insights and NULL platform insights (character-created)
+      if (
+        excludeManualInsights &&
+        (!insight.platform || insight.platform === "manual")
+      )
+        return false;
       // Keep manually created tracking (platform === "manual")
       if (insight.platform === "manual") return true;
       const insightTime = getInsightTime(insight);
@@ -460,7 +497,7 @@ export function useBriefPanelState({
         hasNextActions
       );
     });
-  }, [uniqueInsights]);
+  }, [uniqueInsights, excludeManualInsights]);
 
   const { updateInsightCategory } = useInsightBriefCategory();
 
@@ -622,11 +659,24 @@ export function useBriefPanelState({
     const allInsights: Insight[] = [
       ...filteredInsights,
       // Pinned insights from uniqueInsights
-      ...pinnedInsights.filter((p) => !filteredIds.has(p.id)),
+      ...pinnedInsights.filter(
+        (p) =>
+          !filteredIds.has(p.id) &&
+          !(excludeManualInsights && (!p.platform || p.platform === "manual")),
+      ),
       // All pinned insights from backend (not time-limited), filter out already included
       ...pinnedFromBrief.filter((p: any) => {
         const id = typeof p === "string" ? p : p.id;
-        return !filteredIds.has(id) && !pinnedIds.has(id) && !p.isArchived;
+        const insight = typeof p === "string" ? null : p;
+        return (
+          !filteredIds.has(id) &&
+          !pinnedIds.has(id) &&
+          !p.isArchived &&
+          !(
+            excludeManualInsights &&
+            (!insight?.platform || insight?.platform === "manual")
+          )
+        );
       }),
       // Optimistically updated pinned insights
       ...optimisticPinnedInsights.filter(
@@ -634,7 +684,8 @@ export function useBriefPanelState({
           !filteredIds.has(o.id) &&
           !pinnedIds.has(o.id) &&
           !allPinnedIds.has(o.id) &&
-          !o.isArchived,
+          !o.isArchived &&
+          !(excludeManualInsights && (!o.platform || o.platform === "manual")),
       ),
     ];
     const insightIdsKey = allInsights

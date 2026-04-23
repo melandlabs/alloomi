@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { startDingTalkListenersForUser } from "@/lib/dingtalk/ws-listener";
+import { startDingTalkListenersForUser } from "@/lib/integrations/dingtalk/ws-listener";
 import { setCloudAuthToken } from "@/lib/auth/token-manager";
 import { isTauriMode } from "@/lib/env/constants";
 

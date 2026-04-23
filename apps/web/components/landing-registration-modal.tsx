@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { RemixIcon } from "@/components/remix-icon";
 import { FaDiscord } from "react-icons/fa";
 import { openUrl } from "@/lib/tauri";
@@ -49,18 +49,6 @@ export function LandingRegistrationModal({
   const [verificationStatus, setVerificationStatus] =
     useState<VerificationStatus>("idle");
 
-  // Track modal open
-  useEffect(() => {
-    if (isOpen) {
-    }
-  }, [isOpen, trackingParams, defaultReferralCode]);
-
-  // Track step changes
-  useEffect(() => {
-    if (isOpen && currentStep === "register") {
-    }
-  }, [currentStep, isOpen, verificationStatus, trackingParams]);
-
   // Discord verification handler (now optional)
   const handleDiscordVerify = async () => {
     setVerificationStatus("verifying");
@@ -83,6 +71,7 @@ export function LandingRegistrationModal({
 
   const handleClose = () => {
     if (!isLoading) {
+      // Track modal close
       onClose();
       // Reset form after close animation
       setTimeout(() => {
@@ -104,6 +93,8 @@ export function LandingRegistrationModal({
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+
+    // Track registration submission attempt
 
     try {
       const response = await fetch("/api/landing/claim", {
@@ -131,12 +122,18 @@ export function LandingRegistrationModal({
         };
         setSuccessData(resultData);
 
+        // Track registration success
+
         onSuccess?.(resultData);
       } else {
         setError(data.error || data.message || "Registration failed");
+
+        // Track registration failure
       }
     } catch (err) {
       setError("Network error. Please try again.");
+
+      // Track network error
     } finally {
       setIsLoading(false);
     }

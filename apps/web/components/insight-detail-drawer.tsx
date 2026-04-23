@@ -15,7 +15,6 @@ import { Button, Tabs, TabsList, TabsTrigger } from "@alloomi/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@alloomi/ui";
 import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
-import { Spinner } from "@/components/spinner";
 import { useLocalStorage } from "@alloomi/hooks/use-local-storage";
 import { useSingleInsightRefresh } from "@/hooks/use-single-insight-refresh";
 import { useInsightCache } from "@/hooks/use-insight-cache";
@@ -51,16 +50,6 @@ import {
 const TimelineHistoryDialog = lazy(() =>
   import("@/components/timeline-history-dialog").then((mod) => ({
     default: mod.TimelineHistoryDialog,
-  })),
-);
-const InsightNotesAndFilesView = lazy(() =>
-  import("@/components/insight-notes-and-files-dialog").then((mod) => ({
-    default: mod.InsightNotesAndFilesView,
-  })),
-);
-const InsightFilesView = lazy(() =>
-  import("@/components/insight-files-view").then((mod) => ({
-    default: mod.InsightFilesView,
   })),
 );
 
@@ -197,16 +186,6 @@ function InsightDetailSidebar({
             tooltip: t("insightDetail.sidebarTooltipSources", "Info"),
           },
         ]),
-    {
-      id: "attached" as const,
-      icon: "sticky_note",
-      tooltip: t("insightDetail.sidebarTooltipAttached", "Notes"),
-    },
-    {
-      id: "files" as const,
-      icon: "attachment",
-      tooltip: t("insightDetail.sidebarTooltipFiles", "Files"),
-    },
   ];
 
   return (
@@ -1240,8 +1219,8 @@ function InsightDetailDrawerContent({
                       className={cn(
                         "grid w-full",
                         normalizedInsight.platform === "manual"
-                          ? "grid-cols-3"
-                          : "grid-cols-4",
+                          ? "grid-cols-1"
+                          : "grid-cols-2",
                       )}
                     >
                       <TabsTrigger
@@ -1268,28 +1247,6 @@ function InsightDetailDrawerContent({
                           {t("insightDetail.tabSources", "Sources")}
                         </TabsTrigger>
                       )}
-                      <TabsTrigger
-                        value="attached"
-                        className="flex items-center gap-2"
-                      >
-                        <RemixIcon
-                          name="book_open"
-                          size="size-4"
-                          className="shrink-0"
-                        />
-                        {t("insightDetail.tabAttached", "Notes")}
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="files"
-                        className="flex items-center gap-2"
-                      >
-                        <RemixIcon
-                          name="file_input"
-                          size="size-4"
-                          className="shrink-0"
-                        />
-                        {t("insightDetail.tabFiles", "Files")}
-                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </div>
@@ -1397,38 +1354,6 @@ function InsightDetailDrawerContent({
                                   handleTimelineActionClick
                                 }
                               />
-                            )}
-
-                            {detailTab === "attached" && (
-                              <Suspense
-                                fallback={
-                                  <div className="flex items-center justify-center py-12">
-                                    <Spinner size={24} />
-                                  </div>
-                                }
-                              >
-                                <InsightNotesAndFilesView
-                                  insightId={normalizedInsight.id}
-                                  onContentChange={handleRefresh}
-                                  refreshKey={0}
-                                  showNotesOnly={true}
-                                />
-                              </Suspense>
-                            )}
-
-                            {detailTab === "files" && (
-                              <Suspense
-                                fallback={
-                                  <div className="flex items-center justify-center py-12">
-                                    <Spinner size={24} />
-                                  </div>
-                                }
-                              >
-                                <InsightFilesView
-                                  insightId={normalizedInsight.id}
-                                  insightTimeline={normalizedInsight.timeline}
-                                />
-                              </Suspense>
                             )}
                           </div>
                         </>

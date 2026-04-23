@@ -104,9 +104,10 @@ type DecryptedPayloads = {
   };
   hubspot: HubspotCredentials;
   rss: never;
-  feishu: { appId: string; appSecret: string };
+  feishu: { appId: string; appSecret: string; domain?: "feishu" | "lark" };
   dingtalk: { clientId: string; clientSecret: string };
   qqbot: { appId: string; appSecret: string };
+  /** ilink_bot_token obtained after OpenClaw QR code login */
   weixin: { ilinkToken: string; baseUrl?: string; routeTag?: string };
 };
 
@@ -145,7 +146,7 @@ type AdapterConfigs = {
   google_docs: {};
   hubspot: {};
   rss: {};
-  feishu: { appId?: string; appSecret?: string };
+  feishu: { appId?: string; appSecret?: string; domain?: "feishu" | "lark" };
   dingtalk: { clientId?: string; clientSecret?: string };
   qqbot: { appId?: string; appSecret?: string };
   weixin: { ilinkToken?: string; baseUrl?: string; routeTag?: string };
@@ -412,6 +413,7 @@ export async function getBotCredentials<T extends BotAdapter>(
       return {
         appId: feishuPayload.appId ?? feishuConfig?.appId ?? "",
         appSecret: feishuPayload.appSecret ?? feishuConfig?.appSecret ?? "",
+        domain: feishuPayload.domain ?? feishuConfig?.domain,
       } as AccessTokenType<T>;
     }
 

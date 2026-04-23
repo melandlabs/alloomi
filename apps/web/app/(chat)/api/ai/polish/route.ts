@@ -3,6 +3,7 @@ import { AppError } from "@alloomi/shared/errors";
 import { generateText } from "ai";
 import { getModel } from "@/lib/ai";
 import { setAIUserContextFromRequest } from "@/lib/ai/request-context";
+import { isTauriMode } from "@/lib/env";
 
 /**
  * POST /api/ai/polish
@@ -96,7 +97,7 @@ Provide only the polished version without any explanations or preamble. Keep the
 
     // Call AI to polish
     const { text } = await generateText({
-      model: getModel(),
+      model: getModel(isTauriMode()),
       prompt,
       temperature: 0.3,
     });

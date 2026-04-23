@@ -1,4 +1,4 @@
-import type { ImageAttachment } from "@alloomi/agent/types";
+import type { ImageAttachment } from "@alloomi/ai/agent/types";
 
 export type AgentMode = "chat" | "native";
 

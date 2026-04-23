@@ -12,7 +12,7 @@ interface FeishuStepsDialogProps {
 }
 
 /**
- * Feishu connection steps dialog: Shows instructions for creating apps, permissions, events, and publishing
+ * Feishu connection steps dialog: displays instructions for creating apps, permissions, events, and publishing
  */
 export function FeishuStepsDialog({
   open,

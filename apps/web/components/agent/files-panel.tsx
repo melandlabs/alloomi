@@ -367,9 +367,10 @@ export function FilesPanel() {
             return null;
           }
 
-          const file = new File([new Uint8Array(contents)], fileName, {
-            type: mimeType,
-          });
+          // Create proper ArrayBuffer from Uint8Array for File constructor
+          const arrayBuffer = new ArrayBuffer(contents.byteLength);
+          new Uint8Array(arrayBuffer).set(contents);
+          const file = new File([arrayBuffer], fileName, { type: mimeType });
           await handleFileUpload(file);
           return null; // Already handled via handleFileUpload
         }

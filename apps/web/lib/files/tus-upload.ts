@@ -3,7 +3,7 @@
  * Used for large images that exceed Vercel's 4.5MB request body limit
  */
 import { getAuthToken } from "@/lib/auth/token-manager";
-import { getCloudUrl } from "@/lib/api/cloud-proxy";
+import { getCloudUrl } from "@/lib/auth/cloud-proxy";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB - stays under Vercel's 4.5MB body limit
 

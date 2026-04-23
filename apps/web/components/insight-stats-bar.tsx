@@ -34,7 +34,7 @@ export interface InsightStatsBarProps {
 
 /**
  * Focus stats bar component
- * Displays event statistics, supports click to toggle filter
+ * Displays event statistics, supports click to toggle filtering
  *
  * @param props - Component props
  * @returns Stats bar component
@@ -47,7 +47,7 @@ export function InsightStatsBar({
   const { t } = useTranslation();
 
   /**
-   * Statistics item configuration
+   * Stats item configuration
    */
   const statItems = [
     {

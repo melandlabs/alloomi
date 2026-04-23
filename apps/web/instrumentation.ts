@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { sanitizeSentryEvent } from "./lib/sentry-sanitize";
+import { sanitizeSentryEvent } from "./lib/analytics/sentry/sentry-sanitize";
 
 export function register() {
   // Only enable OTel in production when not in Tauri mode
@@ -37,18 +37,17 @@ export function register() {
     const isTauri =
       process.env.TAURI_MODE === "1" || process.env.IS_TAURI === "true";
     if (isTauri) {
-      import("./lib/feishu/ws-listener")
+      import("./lib/integrations/feishu/ws-listener")
         .then(({ startAllFeishuListeners }) => startAllFeishuListeners())
         .catch((e) => console.warn("[Feishu] Failed to start listener:", e));
-      import("./lib/dingtalk/ws-listener")
+      import("./lib/integrations/dingtalk/ws-listener")
         .then(({ startAllDingTalkListeners }) => startAllDingTalkListeners())
         .catch((e) => console.warn("[DingTalk] Failed to start listener:", e));
-      import("./lib/qqbot/ws-listener")
+      import("./lib/integrations/qqbot/ws-listener")
         .then(({ startAllQQListeners }) => startAllQQListeners())
         .catch((e) => console.warn("[QQBot] Failed to start listener:", e));
-      import("./lib/weixin/ws-listener")
-        .then(({ startAllWeixinListeners }) => startAllWeixinListeners())
-        .catch((e) => console.warn("[Weixin] Failed to start listener:", e));
+      // Weixin listener is started on-demand by WeixinListenerInit (frontend component)
+      // after user authentication, not here, to avoid duplicate poll loops.
     }
   }
 }

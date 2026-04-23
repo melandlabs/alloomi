@@ -6,14 +6,14 @@
  */
 
 import { isTauriMode } from "@/lib/env/constants";
-import { getModelProvider } from "@alloomi/agent/ai/providers";
+import { getModelProvider } from "@alloomi/ai/agent/model";
 import type {
   ModelCallOptions,
   ModelCallResult,
-} from "@alloomi/agent/ai/router";
+} from "@alloomi/ai/agent/routing";
 
 export type { ModelCallOptions, ModelCallResult };
-export { getRecommendedMode } from "@alloomi/agent/ai/router";
+export { getRecommendedMode } from "@alloomi/ai/agent/routing";
 
 export interface CloudAIRequest {
   messages: Array<{ role: string; content: string }>;
@@ -35,17 +35,12 @@ async function callLocalModel(
   const { streamText, createUIMessageStream, JsonToSseTransformStream } =
     await import("ai");
 
-  // Inline UUID generation
-  const generateUUID = () =>
-    "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+  const { generateUUID } = await import("@alloomi/shared");
 
+  const modelProvider = getModelProvider(isTauriMode());
   const model = options.model
-    ? getModelProvider(isTauriMode()).languageModel(options.model)
-    : getModelProvider(isTauriMode()).languageModel("chat-model");
+    ? modelProvider.languageModel(options.model)
+    : modelProvider.languageModel("chat-model");
 
   const stream = createUIMessageStream({
     execute: async ({ writer: dataStream }) => {

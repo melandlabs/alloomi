@@ -3,6 +3,7 @@
 import { useMemo, lazy, Suspense } from "react";
 import { RemixIcon } from "@/components/remix-icon";
 import { cn } from "@/lib/utils";
+import { injectHtmlPreviewScrollFix } from "@/lib/files/html-preview-scroll-fix";
 
 // Bundle optimization: Dynamically import large preview components
 const CodePreview = lazy(() =>
@@ -18,6 +19,9 @@ const SpreadsheetPreview = lazy(() =>
   import("./spreadsheet-preview").then((mod) => ({
     default: mod.SpreadsheetPreview,
   })),
+);
+const CsvPreview = lazy(() =>
+  import("./csv-preview").then((mod) => ({ default: mod.CsvPreview })),
 );
 const PdfPreview = lazy(() =>
   import("./pdf-preview").then((mod) => ({ default: mod.PdfPreview })),
@@ -107,7 +111,7 @@ const EXTENSION_MAP: Record<string, ArtifactType> = {
   // Spreadsheets
   xls: "spreadsheet",
   xlsx: "spreadsheet",
-  csv: "code",
+  csv: "spreadsheet",
   ods: "spreadsheet",
 
   // Media files
@@ -316,7 +320,7 @@ export function ArtifactPreview({
           <span className="font-medium text-sm">{name}</span>
         </div>
         <iframe
-          srcDoc={content}
+          srcDoc={injectHtmlPreviewScrollFix(content)}
           className="w-full bg-white"
           style={{ maxHeight }}
           sandbox="allow-same-origin"
@@ -392,8 +396,33 @@ export function ArtifactPreview({
     );
   }
 
-  // Spreadsheet preview
+  // Spreadsheet preview (CSV with inline content uses papaparse table, otherwise uses SheetJS URL/file)
   if (inferredType === "spreadsheet") {
+    const isCsvFile = name.toLowerCase().endsWith(".csv");
+    if (isCsvFile && content?.trim()) {
+      return (
+        <div className={cn("rounded-lg overflow-hidden border", className)}>
+          <Suspense
+            fallback={
+              <div className="p-4 flex items-center justify-center">
+                <RemixIcon
+                  name="loader_2"
+                  size="size-5"
+                  className="animate-spin"
+                />
+              </div>
+            }
+          >
+            <CsvPreview
+              content={content}
+              filename={name}
+              maxHeight={maxHeight}
+            />
+          </Suspense>
+        </div>
+      );
+    }
+
     const fileSource = path || url || "";
 
     return (

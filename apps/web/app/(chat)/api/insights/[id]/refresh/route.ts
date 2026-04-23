@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { refreshActiveBotInsight } from "@/lib/bots/insights";
+import { refreshActiveBotInsight } from "@/lib/insights";
 import { isTauriMode } from "@/lib/env/constants";
 import {
   getInsightByIdForUser,

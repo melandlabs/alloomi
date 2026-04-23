@@ -24,8 +24,15 @@ export function computeNextRun(
     return atDate > now ? atDate : null;
   }
 
-  if (config.type === "interval") {
-    const intervalMs = Math.max(1, config.minutes) * 60 * 1000;
+  if (config.type === "interval-hours") {
+    const totalMinutes = (config.hours ?? 1) * 60;
+    const intervalMs = totalMinutes * 60 * 1000;
+    return new Date(now.getTime() + intervalMs);
+  }
+
+  if (config.type === "interval-minutes") {
+    const totalMinutes = config.minutes ?? 60;
+    const intervalMs = totalMinutes * 60 * 1000;
     return new Date(now.getTime() + intervalMs);
   }
 

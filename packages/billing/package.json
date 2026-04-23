@@ -1,7 +1,7 @@
 {
   "name": "@alloomi/billing",
-  "version": "0.4.1",
-  "private": false,
+  "version": "0.4.3",
+  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -10,6 +10,7 @@
     "./subscription": "./src/subscription.ts"
   },
   "dependencies": {
+    "@alloomi/shared": "workspace:*",
     "stripe": "^19.1.0",
     "zod": "^4.3.6"
   },

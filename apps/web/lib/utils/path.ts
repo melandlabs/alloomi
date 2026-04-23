@@ -99,3 +99,50 @@ export function getStoragePath(): string {
 export function getLogsPath(): string {
   return getAppDataSubPath("logs");
 }
+
+// ============================================================================
+// Tauri-specific path utilities
+// Consistent with Rust side get_data_dir():
+// - Unix: ~/.alloomi/data
+// - Windows: %USERPROFILE%\.alloomi\data or %APPDATA%\Alloomi\data
+// ============================================================================
+
+/**
+ * Get Tauri data directory
+ * Uses TAURI_DATA_DIR env var if set, otherwise falls back to <appDataDir>/data
+ */
+export function getTauriDataDir(): string {
+  if (process.env.TAURI_DATA_DIR) {
+    return process.env.TAURI_DATA_DIR;
+  }
+  return joinPath(getAppDataDir(), "data");
+}
+
+/**
+ * Get database path under Tauri data directory
+ */
+export function getTauriDbPath(): string {
+  return process.env.TAURI_DB_PATH || joinPath(getTauriDataDir(), "data.db");
+}
+
+/**
+ * Get storage directory path under Tauri data directory
+ */
+export function getTauriStoragePath(): string {
+  return (
+    process.env.TAURI_STORAGE_PATH || joinPath(getTauriDataDir(), "storage")
+  );
+}
+
+/**
+ * Get logs directory path under Tauri data directory
+ */
+export function getTauriLogsPath(): string {
+  return process.env.TAURI_LOGS_PATH || joinPath(getTauriDataDir(), "logs");
+}
+
+// Tauri path constants
+export const TAURI_DATA_DIR = getTauriDataDir();
+export const TAURI_DB_PATH = getTauriDbPath();
+export const TAURI_STORAGE_PATH = getTauriStoragePath();
+export const TAURI_LOGS_PATH = getTauriLogsPath();
