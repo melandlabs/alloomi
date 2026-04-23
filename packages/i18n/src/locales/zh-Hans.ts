@@ -3107,6 +3107,7 @@ const zhHans = {
     language: "语言设置",
     /** Settings sidebar language entry: differentiated from account menu copy, bilingual display */
     languageSidebar: "语言",
+    followSystem: "跟随系统",
     logout: "退出登录",
     select: "切换语言",
     selecting: "切换中...",
