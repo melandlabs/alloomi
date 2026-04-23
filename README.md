@@ -102,20 +102,82 @@ See [alloomi.ai](https://alloomi.ai) for more information.
 
 ## Developing
 
-Requirements: Node.js 18+, pnpm 9+, Rust Cargo 1.88+
+### Environment Setup
+
+Copy the example environment file and configure your credentials:
+
+```bash
+cp apps/web/.env.example apps/web/.env
+```
+
+#### Required Variables
+
+Generate the security keys:
+
+```bash
+# Generate AUTH_SECRET
+openssl rand -base64 32
+
+# Generate ENCRYPTION_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+| Variable | Description |
+|---|---|
+| `AUTH_SECRET` | Authentication secret (32+ chars) |
+| `ENCRYPTION_KEY` | AES-256 encryption key for local data |
+| `POSTGRES_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage token |
+
+#### AI Configuration
+
+Choose your AI provider (Anthropic, OpenAI, or OpenRouter):
+
+```bash
+# Anthropic Compatible API
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-6
+
+# OpenAI Compatible API
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o
+```
+
+For **embeddings** (RAG / Knowledge Base), an OpenAI-compatible API key is required:
+
+```bash
+OPENAI_EMBEDDINGS_API_KEY=sk-...
+LLM_EMBEDDING_BASE_URL=https://api.openai.com/v1
+LLM_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+#### Optional Integrations
+
+| Variable | Description |
+|---|---|
+| `BRAVE_SEARCH_API_KEY` | Brave Search for web content |
+| `TG_BOT_TOKEN` | Telegram bot token |
+| `SLACK_BOT_TOKEN` | Slack bot token |
+| `DISCORD_BOT_TOKEN` | Discord bot token |
+| `TWITTER_CLIENT_ID` / `_SECRET` | Twitter OAuth |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | Google OAuth |
+| `GMAIL_CLIENT_ID` / `_SECRET` | Gmail OAuth |
+| `AUTH_SMTP_*` | Email SMTP server |
+
+
+Requirements: Node.js 22+, pnpm 9+, Rust Cargo 1.88+
+
+## Install 
 
 ```bash
 # Install dependencies
-pnpm install --ignore-scripts=false
-
-# Setup database (only once or when schema changes)
-cd apps/web && pnpm db:generate && pnpm db:migrate && pnpm db:push && cd ../..
+pnpm install
 
 # Start desktop app (requires Rust)
 pnpm tauri:dev
-
-# Start web app
-pnpm dev
 ```
 
 ## Build & Test
