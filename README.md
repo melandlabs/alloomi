@@ -123,15 +123,19 @@ See [alloomi.ai](https://alloomi.ai) for more information.
 
 ### Environment Setup
 
+Download Node.js 22+, pnpm 9+, Rust Cargo 1.88+
+
 Copy the example environment file and configure your credentials:
 
 ```bash
+git clone https://github.com/melandlabs/alloomi
+cd alloomi
 cp apps/web/.env.example apps/web/.env
 ```
 
 #### Required Variables
 
-Generate the security keys:
+Set required variables in `apps/web/.env`
 
 ```bash
 # Generate AUTH_SECRET
