@@ -24,7 +24,7 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 ### Multi-Platform Access
 
-- **Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu integrations
+- **Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu, Weixin, Dingtalk integrations
 - **Desktop Apps** — Native apps for Windows, macOS, and Linux with keyboard shortcuts and system tray
 - **Web App** — Always accessible in your browser
 
@@ -97,11 +97,11 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 ![Chat Interface](screenshots/chat.png)
 
-- Connector
+- Connectors
 
 ![Connector](screenshots/connector.png)
 
-- Automation
+- Automation & Cron Jobs
 
 ![Automation](screenshots/automation.png)
 
