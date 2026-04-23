@@ -1,4 +1,4 @@
-<p align="center">
+<div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="apps/web/public/images/logo-dark-light.svg">
   <img src="apps/web/public/images/logo-full-light.svg" alt="Alloomi Logo">
@@ -13,7 +13,7 @@
   <a href="https://github.com/melandlabs/release">
     <img src="https://img.shields.io/github/v/tag/melandlabs/release?logo=github&label=Download&color=24C8D5" alt="Download" height="30" style="transform:scale(1);">
   </a>
-</p>
+</div>
 
 Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
 
