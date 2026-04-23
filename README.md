@@ -27,11 +27,19 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end
 - **💬 Natural Chat** — assign tasks in plain language; no complex commands to learn with powerful skills and MCP tools
 
+### Built-in File Preview
+
+- **Documents** — Docx, DOC, ODT, RTF
+- **Spreadsheets** — Xlsx, XLS, CSV, ODS
+- **Presentations** — PPTx, PPT, ODP
+- **PDF** — PDF files with full rendering
+- **Images** — JPG, PNG, GIF, SVG, WebP, BMP
+- **Code** — Syntax-highlighted preview for JS, TS, Python, Go, Rust, and 20+ languages and HTML preview with live rendering
+
 ### Multi-Platform Access
 
-- **Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu, Weixin, Dingtalk integrations
+- **Messaging Apps** — Telegram, WhatsApp, iMessage, QQ, Feishu, Weixin, Dingtalk integrations with message fetching, sending, file attachments, and real-time sync
 - **Desktop Apps** — Native apps for Windows, macOS, and Linux with keyboard shortcuts and system tray
-- **Web App** — Always accessible in your browser
 
 ### Enterprise-Grade Security
 
