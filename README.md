@@ -225,8 +225,3 @@ pnpm test         # Run tests
 ## Note
 
 This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**
-
-## Join Community
-
-- [Discord](https://discord.com/invite/xkJaJyWcsv) — Chat with the community
-- [GitHub](https://github.com/alloomi/alloomi) — Star and contribute
