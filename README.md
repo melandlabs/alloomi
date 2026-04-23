@@ -1,8 +1,16 @@
-![Alloomi Logo](apps/web/public/images/logo-full-light.svg)
+![Alloomi Logo](apps/web/public/images/logo-full-light.svg) 
 
-> **Proactive AI workspace** — understands your intent, orchestrates execution, and gets things done.
+[![Node.js Version](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](https://nodejs.org) [![Tauri](https://img.shields.io/badge/Tauri-Desktop-24C8D5?logo=tauri)](https://tauri.app) [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-4B4B4B?logo=linux&logoColor=white)](https://alloomi.ai) [![License](https://img.shields.io/badge/License-Apache%202.0-F8D52A?logo=apache)](https://www.apache.org/licenses/LICENSE-2.0) [![GitHub Trending](https://img.shields.io/badge/GitHub-Trending-blue?logo=github)](https://github.com/alloomi/alloomi) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv)
 
-Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive digital partner** that watches, learns, remembers, and acts on your behalf.
+#### *Proactive AI workspace — understands your intent, orchestrates execution, and gets things done.*
+
+Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
+
+<p align="center">
+  <a href="https://github.com/melandlabs/release">
+    <img src="https://img.shields.io/badge/Download-Alloomi-24C8D5?logo=github&logoColor=white" alt="Download" height="30" style="transform:scale(1);">
+  </a>
+</p>
 
 ## Features
 
@@ -26,6 +34,15 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - Hardware-isolated processing environments (no public gateways)
 - Zero training commitments — your data never trains public AI models
 - Local-first architecture
+
+### Agent Runtime Integrations
+
+- **Claude Code** — Anthropic's coding agent *(Default)*
+- **Codex** — OpenAI's code generation agent *(Coming Soon)*
+- **Gemmi** — General-purpose AI agent *(Coming Soon)*
+- **Pi** — Inflection AI's personal agent *(Coming Soon)*
+- **OpenClaw** — Open agent protocol & ecosystem *(Coming Soon)*
+- **Hermes Agent** — NousResearch's agent framework *(Coming Soon)*
 
 ## What Makes Alloomi Different?
 
@@ -71,6 +88,8 @@ Alloomi implements a complete **"Receive → Process → Remember → Understand
 - **🚀 Founders & Salespeople** — Maintain hundreds of client relationships, auto follow-ups, personalized proposals at scale
 - **🧑‍💻 Engineering Teams** — Automated dev reports, issue triaging, GitHub-Linear sync
 - **📱 Social Media Managers** — Autopilot X (Twitter) account with approval workflow
+
+See [here](https://alloomi.ai/docs) for more features and use cases.
 
 ## Screenshots
 
@@ -189,3 +208,8 @@ pnpm test         # Run tests
 ## Note
 
 This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**
+
+## Join Community
+
+- [Discord](https://discord.com/invite/xkJaJyWcsv) — Chat with the community
+- [GitHub](https://github.com/alloomi/alloomi) — Star and contribute
