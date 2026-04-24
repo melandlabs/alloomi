@@ -61,7 +61,7 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 ### Agent Runtime Integrations
 
-- **Claude Code** — Anthropic's coding agent (auto-inherits `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` from environment) & [Skills](https://code.claude.com/docs/en/skills) _(Default)_
+- **Claude Code** — Anthropic's coding agent (auto-inherits `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` from environment & [skills](https://code.claude.com/docs/en/skills) in `~/.claude/skills`) _(Default)_
 - **Codex** — OpenAI's code generation agent _(Coming Soon)_
 - **Gemmi** — General-purpose AI agent _(Coming Soon)_
 - **Pi** — Inflection AI's personal agent _(Coming Soon)_
