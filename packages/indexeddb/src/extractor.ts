@@ -334,7 +334,11 @@ export function extractEmailMessages(
   return emails
     .filter((email) => email && typeof email === "object")
     .map((email: any, index: number) => {
-      const timestamp = email.timestamp || email.date || email.time;
+      const timestamp =
+        email.timestamp ||
+        email.date ||
+        email.time ||
+        Math.floor(Date.now() / 1000);
       const content =
         email.text || email.snippet || email.subject || email.body || "";
       const channel =
@@ -350,7 +354,7 @@ export function extractEmailMessages(
         const contentHash = content
           ? btoa(content.substring(0, 100)).substring(0, 16)
           : "";
-        messageId = `${platform}_${botId}_${timestamp}_${channel}_${sender}_${contentHash}`;
+        messageId = `${platform}_${botId}_${timestamp || 0}_${channel}_${sender}_${contentHash}`;
       }
 
       return {
