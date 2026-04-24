@@ -25,7 +25,7 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - **📡 Proactive Awareness** — monitors signals across Slack, Email, Calendar, Documents and alerts you proactively before issues escalate
 - **🧠 Long-Term Memory (Context Atlas)** — persistent knowledge graphs of people, projects, and decisions; remembers context even months later
 - **🎯 95% Noise Filtering** — hundreds of daily messages refined into one focused panel; tells you what you should act on
-- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end
+- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end; supports **scheduled tasks** (cron-like recurring jobs) and **proactively triggered tasks** (event-driven actions based on signals from Slack, Email, Calendar, etc.)
 - **💬 Natural Chat** — assign tasks in plain language; no complex commands to learn with powerful skills and MCP tools
 
 ### Built-in File Preview
