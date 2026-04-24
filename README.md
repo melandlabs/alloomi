@@ -20,7 +20,6 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 > This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**
 
-
 <p align="center">
 <a href="#features">Features</a>&nbsp;|&nbsp;
 <a href="#what-makes-alloomi-different">Difference</a>&nbsp;|&nbsp;

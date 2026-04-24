@@ -375,7 +375,7 @@ export function AgentChatPanel({
 
       return sendMessage(message, requestOptions);
     },
-    [sendMessage],
+    [sendMessage, isAgentRunning],
   );
 
   /** Auto-send initialMessageToSend after mount (e.g., from onboarding "Chat with Alloomi" click): switches to new chat first, then sends, runs only once; if from URL send param, clears after sending */

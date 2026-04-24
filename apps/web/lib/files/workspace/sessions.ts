@@ -527,6 +527,91 @@ export function getAllFilesAtPath(sessionDir: string): SessionFile[] {
 }
 
 /**
+ * Directories to skip during file traversal for performance.
+ */
+const TRAVERSAL_SKIP_DIRS = new Set([
+  "node_modules",
+  "__pycache__",
+  ".pytest_cache",
+  ".next",
+  ".nuxt",
+  ".cache",
+  "dist",
+  "build",
+  ".venv",
+  "venv",
+  "vendor",
+  "target",
+]);
+
+/**
+ * Recursively collect all files and total directory size in a single traversal.
+ * Combines the logic of getAllFilesAtPath + getSessionSize to avoid duplicate directory walks.
+ * Skips known large directories (node_modules, .next, etc.) during traversal.
+ */
+export function getAllFilesAtPathWithSize(sessionDir: string): {
+  files: SessionFile[];
+  size: number;
+} {
+  if (!existsSync(sessionDir)) {
+    return { files: [], size: 0 };
+  }
+
+  const allFiles: SessionFile[] = [];
+  let totalSize = 0;
+
+  function traverse(currentPath: string, relativePath: string) {
+    const entries = readdirSync(currentPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      if (entry.isDirectory() && TRAVERSAL_SKIP_DIRS.has(entry.name)) continue;
+
+      const fullPath = join(currentPath, entry.name);
+      const fileRelativePath = relativePath
+        ? join(relativePath, entry.name)
+        : entry.name;
+
+      const stats = statSync(fullPath);
+      const ext = entry.name.includes(".")
+        ? entry.name.split(".").pop()?.toLowerCase()
+        : "";
+
+      allFiles.push({
+        name: entry.name,
+        path: fileRelativePath,
+        absolutePath: fullPath,
+        size: stats.size,
+        isDirectory: entry.isDirectory(),
+        modifiedTime: stats.mtime,
+        type: entry.isDirectory() ? undefined : ext || undefined,
+      });
+
+      if (entry.isDirectory()) {
+        traverse(fullPath, fileRelativePath);
+      } else {
+        totalSize += stats.size;
+      }
+    }
+  }
+
+  try {
+    traverse(sessionDir, "");
+  } catch (error) {
+    workspaceLogger.error("Failed to traverse directory:", error);
+  }
+
+  return {
+    files: allFiles.sort((a, b) => {
+      const timeA = a.modifiedTime?.getTime() ?? 0;
+      const timeB = b.modifiedTime?.getTime() ?? 0;
+      return timeB - timeA;
+    }),
+    size: totalSize,
+  };
+}
+
+/**
  * Workspace-level file item (includes taskId, path is relative to that task session directory, for use with readSessionFile)
  */
 export interface WorkspaceFileItem {
@@ -554,20 +639,7 @@ export async function getAllWorkspaceFilesRecursive(
     ? allTaskIds.filter((id) => taskIdFilter.has(id))
     : allTaskIds;
 
-  const skipDirs = new Set([
-    "node_modules",
-    "__pycache__",
-    ".pytest_cache",
-    ".next",
-    ".nuxt",
-    ".cache",
-    "dist",
-    "build",
-    ".venv",
-    "venv",
-    "vendor",
-    "target",
-  ]);
+  const skipDirs = TRAVERSAL_SKIP_DIRS;
 
   // Process sessions in parallel
   const sessionResults = await Promise.all(

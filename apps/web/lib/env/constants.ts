@@ -53,8 +53,9 @@ export function isServerMode(): boolean {
 }
 
 // AI Model and Proxy Configuration
-export const DEFAULT_AI_MODEL = "anthropic/claude-sonnet-4.6";
-export const AI_PROXY_BASE_URL = process.env.ANTHROPIC_BASE_URL;
+export const DEFAULT_AI_MODEL =
+  process.env.ANTHROPIC_MODEL || "anthropic/claude-sonnet-4.6";
+export const AI_PROXY_BASE_URL = `http://${TAURI_SERVER_HOST}:${TAURI_SERVER_PORT}/api/ai`;
 
 // Session and Auth Constants
 export const maxChunkSummaryCount = 10;

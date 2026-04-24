@@ -13,7 +13,6 @@ import { useTranslation } from "react-i18next";
 import { RemixIcon } from "@/components/remix-icon";
 import ContactUs from "@/components/contact-us";
 import { getAppInfo, isTauri, openUrl } from "@/lib/tauri";
-import { toast } from "@/components/toast";
 
 interface TauriAppInfo {
   name?: string;
@@ -122,18 +121,9 @@ export function AboutSettings() {
    * In Tauri, emit manual update event for existing update workflow.
    * In Web, open release page as fallback.
    */
-  const handleCheckForUpdates = async () => {
+  const handleCheckForUpdates = () => {
     if (isTauriEnv) {
-      try {
-        const { emit } = await import("@tauri-apps/api/event");
-        await emit("manual-update-check");
-      } catch (error) {
-        console.error("Failed to trigger update check:", error);
-        toast({
-          type: "error",
-          description: t("common.error", "Operation failed"),
-        });
-      }
+      window.dispatchEvent(new CustomEvent("manual-update-check"));
       return;
     }
 

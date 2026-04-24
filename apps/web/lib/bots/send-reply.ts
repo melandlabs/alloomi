@@ -8,24 +8,6 @@ import {
 } from "../db/queries";
 import type { UserContact } from "../db/schema";
 import { AppError } from "@alloomi/shared/errors";
-import { EmailAdapter } from "../integrations/email";
-import { SlackAdapter } from "../integrations/slack";
-import { TelegramAdapter } from "@alloomi/integrations/telegram/adapter";
-import { DiscordAdapter } from "../integrations/discord";
-import { WhatsAppAdapter } from "../integrations/whatsapp";
-import { TeamsAdapter } from "../integrations/teams";
-import { FacebookMessengerAdapter } from "@alloomi/integrations/facebook-messenger";
-import { InstagramAdapter } from "@alloomi/integrations/instagram";
-import { XAdapter } from "@alloomi/integrations/x";
-import {
-  IMessageAdapter,
-  isIMessageContactMeta,
-  formatIMessageChatId,
-} from "../integrations/imessage";
-import { FeishuAdapter } from "@alloomi/integrations/feishu";
-import { DingTalkAdapter } from "@alloomi/integrations/dingtalk";
-import { QQBotAdapter } from "@alloomi/integrations/qqbot";
-import { WeixinAdapter } from "@alloomi/integrations/weixin";
 import type { Attachment } from "@alloomi/shared";
 import type {
   File as FileMsg,
@@ -197,6 +179,7 @@ export async function sendReplyByBotId({
 
     if (bot.adapter === "slack") {
       console.log(`[Bot ${bot.id}] uses Slack platform manager to send reply`);
+      const { SlackAdapter } = await import("../integrations/slack");
       const adapter = new SlackAdapter({
         botId: bot.id,
         token: await getBotCredentials("slack", bot),
@@ -244,7 +227,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Slack adapter cleanly`,
             killError,
@@ -255,6 +238,8 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Telegram platform manager to send reply`,
       );
+      const { TelegramAdapter } =
+        await import("@alloomi/integrations/telegram/adapter");
       const credentials = await getBotCredentials("telegram", bot);
       const configuredSession = credentials;
       const configuredBotToken = "";
@@ -421,6 +406,7 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses WhatsApp platform manager to send reply`,
       );
+      const { WhatsAppAdapter } = await import("../integrations/whatsapp");
       // credentials validated by getBotCredentials
       await getBotCredentials("whatsapp", bot);
       const adapter = new WhatsAppAdapter({
@@ -481,6 +467,8 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Facebook Messenger platform manager to send reply`,
       );
+      const { FacebookMessengerAdapter } =
+        await import("@alloomi/integrations/facebook-messenger");
       const credentials = await getBotCredentials("facebook_messenger", bot);
       if (!credentials?.pageAccessToken || !credentials.pageId) {
         throw new AppError(
@@ -549,7 +537,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Facebook Messenger adapter cleanly`,
             killError,
@@ -560,6 +548,7 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Discord platform manager to send reply`,
       );
+      const { DiscordAdapter } = await import("../integrations/discord");
       const credentials = await getBotCredentials("discord", bot);
       const adapter = new DiscordAdapter({
         botId: bot.id,
@@ -618,7 +607,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Discord adapter cleanly`,
             killError,
@@ -627,6 +616,7 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "teams") {
       console.log(`[Bot ${bot.id}] uses Teams platform manager to send reply`);
+      const { TeamsAdapter } = await import("../integrations/teams");
       const credentials = await getBotCredentials("teams", bot);
       const adapter = new TeamsAdapter({
         botId: bot.id,
@@ -799,6 +789,7 @@ export async function sendReplyByBotId({
         }
       } else {
         // Use App Password Adapter (EmailAdapter with IMAP/SMTP)
+        const { EmailAdapter } = await import("../integrations/email");
         const gmailAddress = credentials.email;
         const gmailAppPassword = credentials.appPassword;
 
@@ -909,7 +900,7 @@ export async function sendReplyByBotId({
           console.error(error);
           throw error;
         } finally {
-          await adapter.kill().catch((killError) => {
+          await adapter.kill().catch((killError: unknown) => {
             console.error(
               `[Bot ${bot.id}] failed to shutdown Gmail adapter cleanly`,
               killError,
@@ -921,6 +912,7 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Outlook platform manager to send reply`,
       );
+      const { EmailAdapter } = await import("../integrations/email");
       const credentials = (await getBotCredentials("outlook", bot)) as {
         email?: string;
         appPassword?: string;
@@ -1041,7 +1033,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Outlook adapter cleanly`,
             killError,
@@ -1052,6 +1044,8 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Instagram platform manager to send reply`,
       );
+      const { InstagramAdapter } =
+        await import("@alloomi/integrations/instagram");
       const credentials = (await getBotCredentials("instagram", bot)) as {
         accessToken: string;
         pageId: string;
@@ -1106,7 +1100,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Instagram adapter cleanly`,
             killError,
@@ -1115,6 +1109,7 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "twitter") {
       console.log(`[Bot ${bot.id}] uses X manager to send reply`);
+      const { XAdapter } = await import("@alloomi/integrations/x");
       const credentials = (await getBotCredentials("twitter", bot)) as {
         accessToken?: string | null;
         refreshToken?: string | null;
@@ -1185,7 +1180,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown X adapter cleanly`,
             killError,
@@ -1196,6 +1191,8 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses iMessage platform manager to send reply`,
       );
+      const { IMessageAdapter, isIMessageContactMeta, formatIMessageChatId } =
+        await import("../integrations/imessage");
 
       const adapter = new IMessageAdapter({
         botId: bot.id,
@@ -1306,7 +1303,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown iMessage adapter cleanly`,
             killError,
@@ -1315,6 +1312,7 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "feishu") {
       console.log(`[Bot ${bot.id}] uses Feishu platform to send reply`);
+      const { FeishuAdapter } = await import("@alloomi/integrations/feishu");
       const credentials = await getBotCredentials("feishu", bot);
       const adapter = new FeishuAdapter({
         botId: bot.id,
@@ -1354,7 +1352,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Feishu adapter cleanly`,
             killError,
@@ -1363,6 +1361,8 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "dingtalk") {
       console.log(`[Bot ${bot.id}] uses DingTalk platform to send reply`);
+      const { DingTalkAdapter } =
+        await import("@alloomi/integrations/dingtalk");
       const credentials = await getBotCredentials("dingtalk", bot);
       const adapter = new DingTalkAdapter({
         botId: bot.id,
@@ -1482,7 +1482,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown DingTalk adapter cleanly`,
             killError,
@@ -1491,6 +1491,7 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "qqbot") {
       console.log(`[Bot ${bot.id}] uses QQ Bot platform to send reply`);
+      const { QQBotAdapter } = await import("@alloomi/integrations/qqbot");
       if (typeof ownerId !== "string" || !ownerId) {
         throw new AppError(
           "bad_request:bot",
@@ -1546,7 +1547,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown QQBot adapter cleanly`,
             killError,
@@ -1555,6 +1556,7 @@ export async function sendReplyByBotId({
       }
     } else if (bot.adapter === "weixin") {
       console.log(`[Bot ${bot.id}] uses Weixin (iLink) platform to send reply`);
+      const { WeixinAdapter } = await import("@alloomi/integrations/weixin");
       if (typeof ownerId !== "string" || !ownerId) {
         throw new AppError(
           "bad_request:bot",
@@ -1570,13 +1572,36 @@ export async function sendReplyByBotId({
         for (const r of recipientsSet) {
           const contact = await findContactByIdOrName(ownerId, r, bot.id);
           const meta = contact?.contactMeta as
-            | { lastContextToken?: string }
+            | { lastContextToken?: string; lastContextTokenAt?: number }
             | null
             | undefined;
           const contextToken =
             recipientsSet.length === 1 && weixinContextToken?.trim()
               ? weixinContextToken.trim()
               : meta?.lastContextToken?.trim() || "";
+
+          // Validate contextToken: must exist and not be expired (23h window)
+          const WEIXIN_TOKEN_MAX_AGE_MS = 23 * 60 * 60 * 1000;
+          const tokenAge = meta?.lastContextTokenAt
+            ? Date.now() - meta.lastContextTokenAt
+            : Number.POSITIVE_INFINITY;
+
+          if (
+            !contextToken ||
+            (!weixinContextToken?.trim() && tokenAge > WEIXIN_TOKEN_MAX_AGE_MS)
+          ) {
+            const reason = !contextToken
+              ? "never chatted with the Bot"
+              : `over ${Math.round(tokenAge / 3600000)} hours since last chat with Bot`;
+            console.warn(
+              `[Bot ${bot.id}] WeChat contextToken for ${r} invalid or expired: ${reason}`,
+            );
+            return {
+              skipped: true,
+              message: `WeChat notification failed: contact ${reason}, context_token invalid or expired. WeChat Bot cannot initiate conversations proactively; the contact must first send a message to the Bot before notifications can be sent.`,
+            };
+          }
+
           const messagesChain: Messages = [];
           if (sentMessage.trim().length > 0) {
             messagesChain.push(sentMessage);
@@ -1606,7 +1631,7 @@ export async function sendReplyByBotId({
         console.error(error);
         throw error;
       } finally {
-        await adapter.kill().catch((killError) => {
+        await adapter.kill().catch((killError: unknown) => {
           console.error(
             `[Bot ${bot.id}] failed to shutdown Weixin adapter cleanly`,
             killError,

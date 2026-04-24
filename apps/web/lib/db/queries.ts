@@ -8558,7 +8558,7 @@ export async function listDingTalkInsightMessagesForInsights(params: {
  * Check if a WeChat bot has any contacts with valid lastContextToken
  * @param userId - User ID
  * @param botId - Bot ID
- * @returns true if the bot has at least one contact with a non-empty lastContextToken
+ * @returns true if the bot has at least one contact with a non-empty and non-expired lastContextToken
  */
 export async function weixinBotHasValidContextToken(
   userId: string,
@@ -8579,14 +8579,18 @@ export async function weixinBotHasValidContextToken(
     // Normalize contactMeta for all contacts
     const normalizedContacts = normalizeContactMetaList(contacts);
 
-    // Check if any contact has a non-empty lastContextToken
+    // Check if any contact has a valid (non-empty, non-expired) lastContextToken
+    const WEIXIN_TOKEN_MAX_AGE_MS = 23 * 60 * 60 * 1000; // 23 hours
     for (const contact of normalizedContacts) {
       const meta = contact.contactMeta as
-        | { lastContextToken?: string }
+        | { lastContextToken?: string; lastContextTokenAt?: number }
         | null
         | undefined;
       const token = meta?.lastContextToken?.trim();
-      if (token) {
+      const age = meta?.lastContextTokenAt
+        ? Date.now() - meta.lastContextTokenAt
+        : Number.POSITIVE_INFINITY;
+      if (token && age < WEIXIN_TOKEN_MAX_AGE_MS) {
         return true;
       }
     }
