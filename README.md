@@ -127,7 +127,7 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 ## Screenshots
 
-- Office Assistants — Docx, Pptx & Xlsx
+- Document Previews — Docx, PPTx & Xlsx
 
 <table align="center">
 <tr>
