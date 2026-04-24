@@ -78,6 +78,8 @@ every conversation—and every moment—makes Alloomi smarter and more aligned w
 agent role in Alloomi to handle one-off or scheduled tasks, this brain acts as the orchestrator, dramatically
 improving execution quality.
 
+![Architecture](screenshots/arch.png)
+
 Alloomi implements a complete **"Receive → Process → Remember → Understand → Serve"** loop:
 
 | Layer             | What It Does                                                                                         |
