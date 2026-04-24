@@ -24,6 +24,8 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 <a href="#features">Features</a>&nbsp;|&nbsp;
 <a href="#what-makes-alloomi-different">Difference</a>&nbsp;|&nbsp;
 <a href="#use-cases">Use Cases</a>&nbsp;|&nbsp;
+<a href="#installation">Installation</a>&nbsp;|&nbsp;
+<a href="#documentation">Documentation</a>&nbsp;|&nbsp;
 <a href="#developing">Developing</a>
 </p>
 
@@ -161,6 +163,14 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 See [alloomi.ai](https://alloomi.ai) for more information.
 
+## Installation
+
+For more information about installation, please check the Installation Guide on the [Alloomi GitHub Releases](https://github.com/melandlabs/release).
+
+## Documentation
+
+Detailed documentation is available at [Alloomi Website](https://alloomi.ai/docs).
+
 ## Developing
 
 ### Environment Setup
@@ -230,6 +240,7 @@ LLM_EMBEDDING_MODEL=text-embedding-3-small
 | `AUTH_SMTP_*`                   | Email SMTP server            |
 
 Requirements: Node.js 22+, pnpm 9+, Rust Cargo 1.88+
+
 
 ## Install
 
