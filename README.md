@@ -58,6 +58,14 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - **OpenClaw** — Open agent protocol & ecosystem _(Coming Soon)_
 - **Hermes Agent** — NousResearch's agent framework _(Coming Soon)_
 
+### Hybrid Model Architecture (Coming Soon)
+
+- **🤖 Hybrid Model Routing** — dynamically routes tasks to optimal models (Claude, GPT, Gemini, open-source) based on complexity, cost, and latency requirements
+- **🧪 Reinforcement Learning from Feedback (RLHF) & LoRA** — continuously improves task execution quality through human feedback signals
+- **🔄 Multi-Agent Debate** — multiple specialized agents collaborate and debate to reach higher-quality decisions
+- **📊 Outcome Validation** — end-to-end result verification with automated checks and human-in-the-loop approval workflows
+- **🧬 Adaptive Personalization** — learns your communication style, preferences, and workflows over time
+
 ## What Makes Alloomi Different?
 
 Most AI assistants are **workflow tools**—you give commands, they execute tasks, with no knowledge of
@@ -111,27 +119,27 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 - Chat
 
-![Chat Interface](screenshots/chat.png)
+![Chat Interface](screenshots/app/chat.png)
 
 - Connectors
 
-![Connector](screenshots/connector.png)
+![Connector](screenshots/app/connector.png)
 
 - Automation & Cron Jobs
 
-![Automation](screenshots/automation.png)
+![Automation](screenshots/app/automation.png)
 
 - Library
 
-![Library](screenshots/library.png)
+![Library](screenshots/app/library.png)
 
 - Skill
 
-![Skill](screenshots/skill.png)
+![Skill](screenshots/app/skill.png)
 
 - Message Apps
 
-![Message App](screenshots/message-app.png)
+![Message App](screenshots/app/message-app.png)
 
 See [alloomi.ai](https://alloomi.ai) for more information.
 
