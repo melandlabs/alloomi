@@ -5,6 +5,7 @@
 
 import type { AvatarConfiguration, ColorPreset, SvgPath } from "./types";
 import { AvatarState } from "./types";
+import { AVATAR_SHAPE_PRESETS } from "./shape-presets";
 
 /**
  * Eye styles collection
@@ -244,15 +245,8 @@ export const COLOR_PRESETS: ColorPreset[] = [
 /**
  * Generate random avatar configuration
  * @returns Random avatar configuration object
- * @deprecated Deprecated, please use getAvatarConfigByState to get configuration based on state
  */
-export function generateRandomAvatarConfig(): {
-  eyesId: string;
-  eyebrowsId: string;
-  noseId: string;
-  mouthId: string;
-  colorPresetId: string;
-} {
+export function generateRandomAvatarConfig(): AvatarConfiguration {
   return {
     eyesId: EYES[Math.floor(Math.random() * EYES.length)].id,
     eyebrowsId: EYEBROWS[Math.floor(Math.random() * EYEBROWS.length)].id,
@@ -260,6 +254,12 @@ export function generateRandomAvatarConfig(): {
     mouthId: MOUTHS[Math.floor(Math.random() * MOUTHS.length)].id,
     colorPresetId:
       COLOR_PRESETS[Math.floor(Math.random() * COLOR_PRESETS.length)].id,
+    shapeId:
+      AVATAR_SHAPE_PRESETS[
+        Math.floor(Math.random() * AVATAR_SHAPE_PRESETS.length)
+      ].id,
+    showBorder: false,
+    customTextureUrl: null,
   };
 }
 

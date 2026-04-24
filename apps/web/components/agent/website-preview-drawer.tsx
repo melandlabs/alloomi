@@ -299,6 +299,7 @@ export function WebsitePreviewDrawer({
       content={htmlContent}
       filename={file.name}
       filePath={file.path}
+      taskId={taskId}
       onClose={onClose}
     />
   );

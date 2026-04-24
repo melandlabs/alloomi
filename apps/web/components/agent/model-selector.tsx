@@ -1,6 +1,5 @@
 "use client";
 import { useLocalStorage } from "usehooks-ts";
-import { DEFAULT_AI_MODEL } from "@/lib/env/constants";
 
 /**
  * Available model types
@@ -53,15 +52,15 @@ interface ModelConfig {
 /**
  * Available models configuration
  */
-const MODELS: Record<ModelType, ModelConfig> = {
+const MODELS = {
   default: {
     id: "default",
     name: "Default",
     provider: "System",
     description: "Use system default model",
   },
-  [DEFAULT_AI_MODEL]: {
-    id: DEFAULT_AI_MODEL,
+  "anthropic/claude-sonnet-4.6": {
+    id: "anthropic/claude-sonnet-4.6",
     name: "Claude Sonnet 4.6",
     provider: "Anthropic",
     description: "Balanced performance and speed",
@@ -230,7 +229,7 @@ const MODELS: Record<ModelType, ModelConfig> = {
     contextTokens: 200000,
     monthlyFreeQuota: 290,
   },
-};
+} as Record<ModelType, ModelConfig>;
 
 /**
  * Local storage key for model preference
