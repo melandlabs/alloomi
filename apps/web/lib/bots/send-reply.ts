@@ -10,7 +10,6 @@ import type { UserContact } from "../db/schema";
 import { AppError } from "@alloomi/shared/errors";
 import { EmailAdapter } from "../integrations/email";
 import { SlackAdapter } from "../integrations/slack";
-import { TelegramAdapter } from "@alloomi/integrations/telegram/adapter";
 import { DiscordAdapter } from "../integrations/discord";
 import { WhatsAppAdapter } from "../integrations/whatsapp";
 import { TeamsAdapter } from "../integrations/teams";
@@ -33,11 +32,9 @@ import type {
   Messages,
   Voice,
 } from "@alloomi/integrations/channels";
-import { handleTelegramAuthFailure } from "@/lib/integrations/telegram/session";
 import { isTelegramContactMeta } from "@alloomi/integrations/contacts";
 import { getBotCredentials } from "./token";
 import { fileIngester } from "../integrations/providers/file-ingester";
-import { telegramClientRegistry } from "../integrations/telegram/client-registry";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -264,6 +261,15 @@ export async function sendReplyByBotId({
         typeof configuredBotToken === "string"
           ? (configuredBotToken as string)
           : undefined;
+      const [
+        { TelegramAdapter },
+        { handleTelegramAuthFailure },
+        { telegramClientRegistry },
+      ] = await Promise.all([
+        import("@alloomi/integrations/telegram/adapter"),
+        import("@/lib/integrations/telegram/session"),
+        import("../integrations/telegram/client-registry"),
+      ]);
 
       const adapter = new TelegramAdapter({
         botId: bot.id,
