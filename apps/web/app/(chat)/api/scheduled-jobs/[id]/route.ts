@@ -16,6 +16,7 @@ import {
 } from "@/lib/cron/service";
 import { executeJob } from "@/lib/cron/executor";
 import { startJobExecution, completeJobExecution } from "@/lib/cron/service";
+import { createJobExecutionStreamResponse } from "@/lib/cron/stream-response";
 import { isTauriMode } from "@/lib/env";
 import { AI_PROXY_BASE_URL } from "@/lib/env/constants";
 import type { JobExecutionContext } from "@/lib/cron/types";
@@ -113,6 +114,7 @@ export async function POST(
 
     const url = new URL(request.url);
     const action = url.searchParams.get("action");
+    const shouldStream = url.searchParams.get("stream") === "true";
     const { id } = await params;
 
     // Parse body for execute action
@@ -183,6 +185,67 @@ export async function POST(
         deploymentMode: process.env.DEPLOYMENT_MODE,
         isTauri: process.env.IS_TAURI,
       });
+
+      if (shouldStream) {
+        const userMessageId = crypto.randomUUID();
+        const assistantMessageId = crypto.randomUUID();
+        let fallbackMessage = "";
+        try {
+          const parsedConfig = JSON.parse(jobConfigStr) as { handler?: string };
+          fallbackMessage =
+            typeof parsedConfig.handler === "string"
+              ? parsedConfig.handler
+              : "";
+        } catch {
+          // ignore malformed config, executeJob will handle it
+        }
+        const messageText = job.description || fallbackMessage;
+
+        return createJobExecutionStreamResponse(async (send) => {
+          send({
+            type: "execution_start",
+            chatId: context.jobId,
+            executionId: context.executionId,
+            message: messageText,
+            userMessageId,
+            assistantMessageId,
+          });
+
+          try {
+            const result = await executeJob(
+              context,
+              jobConfigStr,
+              job.description || undefined,
+              {
+                userMessageId,
+                assistantMessageId,
+                onAgentEvent: send,
+              },
+            );
+            await completeJobExecution(context, result);
+            send({
+              type: "execution_done",
+              executionId: context.executionId,
+              status: result.status,
+            });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            await completeJobExecution(context, {
+              status: "error",
+              error: errorMessage,
+              output: "",
+              duration: 0,
+            });
+            send({ type: "error", content: errorMessage });
+            send({
+              type: "execution_done",
+              executionId: context.executionId,
+              status: "error",
+            });
+          }
+        });
+      }
 
       // Execute job asynchronously - don't wait for completion
       // This allows the UI to update immediately

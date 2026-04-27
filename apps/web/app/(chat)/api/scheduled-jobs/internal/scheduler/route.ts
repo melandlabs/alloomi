@@ -58,12 +58,12 @@ export async function GET(request: Request) {
       );
     }
 
-    // Start the scheduler if not already started
+    // Always refresh the active desktop auth/user context before reporting scheduler state.
+    setCloudAuthToken(cloudAuthToken);
+    setSchedulerUserId(userId);
+
+    // Start the scheduler once; subsequent GETs just refresh runtime context.
     if (!schedulerStarted) {
-      // Set cloud auth token for scheduled job execution
-      setCloudAuthToken(cloudAuthToken);
-      // Set current user ID for job filtering
-      setSchedulerUserId(userId);
       await startLocalScheduler();
       schedulerStarted = true;
     }

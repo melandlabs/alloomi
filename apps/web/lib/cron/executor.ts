@@ -4,12 +4,11 @@
  */
 
 import type {
+  ExecuteJobOptions,
   JobConfig,
   JobExecutionResult,
   JobExecutionContext,
 } from "./types";
-// Note: createClaudeAgent is imported lazily inside executeJob to avoid
-// loading the AI provider chain (which requires LLM_MODEL env var) on startup
 import {
   prepareConversationWindows,
   triggerCompactionAsync,
@@ -36,14 +35,15 @@ import {
 import { desc, eq } from "drizzle-orm";
 import { generateUUID } from "@/lib/utils";
 import { stripMalformedToolCalls } from "@/lib/utils/tool-names";
-import { parseStructuredOutput } from "@/lib/types/execution-result";
+import type { ReasoningFile } from "@/lib/types/execution-result";
+import { getAllFilesAtPathWithSize } from "@/lib/files/workspace/sessions";
 import { platform, homedir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_JOB_TIMEOUT_MS } from "../env/config/constants";
 import { APP_DIR_NAME } from "../env/config/constants";
 import { DEFAULT_AI_MODEL, AI_PROXY_BASE_URL } from "@/lib/env/constants";
 
-const MAX_JOB_HISTORY_TOKENS = 50_000;
+const MAX_JOB_HISTORY_TOKENS = 20_000;
 const JOB_HISTORY_LIMIT = 100;
 
 // Registry for custom job handlers
@@ -205,6 +205,7 @@ export async function executeJob(
   context: JobExecutionContext,
   jobConfigStr: string,
   jobDescription?: string,
+  options?: ExecuteJobOptions,
 ): Promise<JobExecutionResult> {
   const startTime = Date.now();
 
@@ -218,8 +219,26 @@ export async function executeJob(
       description: jobDescription,
     });
 
+    // Check for registered custom handlers first
+    const handlerName = (jobConfig as any).handler;
+    if (
+      handlerName &&
+      typeof handlerName === "string" &&
+      customJobHandlers[handlerName]
+    ) {
+      console.log(`[JobExecutor] Using custom handler: ${handlerName}`);
+      const result = await customJobHandlers[handlerName](context);
+      result.duration = Date.now() - startTime;
+      return result;
+    }
+
     // Only custom type is supported
-    const result = await executeCustomJob(context, jobConfig, jobDescription);
+    const result = await executeCustomJob(
+      context,
+      jobConfig,
+      jobDescription,
+      options,
+    );
 
     result.duration = Date.now() - startTime;
     return result;
@@ -240,6 +259,7 @@ async function executeCustomJob(
   context: JobExecutionContext,
   config: Extract<JobConfig, { type: "custom" }>,
   jobDescription?: string,
+  options?: ExecuteJobOptions,
 ): Promise<JobExecutionResult> {
   // Phase 1.1: Check Character status before executing
   let char: (typeof characters.$inferSelect & Record<string, unknown>) | null =
@@ -566,76 +586,7 @@ ${platformNotificationExamples}
 - Send a short, actionable reminder message, NOT the task description
 - If the task is associated with a specific insight/event/track, ALWAYS update the existing one - never create a new insight
 - After sending the reminder and completing all actions, respond with a concise conclusion summarizing the result. Focus on the key outcome rather than step-by-step details. If the output is too long or complex, save it to a file and just respond with the file path instead.
-${characterContextSection}
-
-**STRUCTURED OUTPUT (REQUIRED):**
-After completing the task, you MUST append a structured JSON block at the very end of your response, wrapped in <structured-output> tags.
-The format must be:
-<structured-output>
-{
-  "summary": "不超过20字的中文摘要",
-  "subtitle": "不超过40字的补充描述（可选，描述量化指标或上下文）",
-  "reasoningChain": [
-    {
-      "summary": "步骤简短总结",
-      "description": "步骤详细描述",
-      "sourceType": "email|wechat|file|slack|telegram|whatsapp|feishu|dingtalk|notion|web|google-drive|linear|jira",
-      "sourceId": "来源标识（发件人邮箱、联系人名等）",
-      "files": [{"name": "文件名", "path": "路径", "type": "类型"}]
-    }
-  ],
-  "suggestedActions": [
-    {
-      "type": "open_file",
-      "label": "打开文件",
-      "content": "文件路径（向后兼容）",
-      "params": { "path": "/absolute/path/to/file.txt", "name": "file.txt", "type": "txt" },
-      "requiresConfirmation": false
-    },
-    {
-      "type": "open_link",
-      "label": "打开链接",
-      "content": "URL（向后兼容）",
-      "params": { "url": "https://example.com" },
-      "requiresConfirmation": false
-    },
-    {
-      "type": "download_file",
-      "label": "下载文件",
-      "content": "文件路径（向后兼容）",
-      "params": { "path": "/absolute/path/to/file.txt" },
-      "requiresConfirmation": false
-    },
-    {
-      "type": "reply_email|send_message|create_task|schedule_reminder|custom",
-      "label": "操作描述（用于按钮显示）",
-      "content": "操作的具体内容",
-      "params": {},
-      "requiresConfirmation": true
-    }
-  ]
-}
-</structured-output>
-
-Rules for structured output:
-- summary: REQUIRED, no more than 20 Chinese characters
-  - Must use an action-object phrase (verb-object), e.g. "确认面试时间", "处理账单异常", "回复关键客户"
-  - Preferred style: first state key outcome, then highlight the priority focus for user action (e.g. "筛出3份匹配简历，张明明优先跟进")
-  - Prioritize what the USER should pay attention to and execute next, not what the AI has done
-  - Align with this Character's configured task intent to reflect the user's true goal
-  - Make it immediately clear at a glance: what should the user care about now
-  - Avoid process narration such as "已完成分析", "执行完毕", "已处理邮件"
-- subtitle: OPTIONAL, no more than 40 Chinese characters, describing quantitative metrics or supplementary context (e.g. "已处理 47 封邮件", "涉及 3 个数据源")
-- reasoningChain: REQUIRED, at least one item describing key analysis steps
-- sourceType must be one of: email, wechat, file, slack, telegram, whatsapp, feishu, dingtalk, notion, web, google-drive, linear, jira
-- suggestedActions: can be an empty array [], only add when there are genuinely useful recommended actions
-- suggestedActions type specific rules:
-  - open_file: params MUST include "path", optionally "name" and "type"
-  - open_link: params MUST include "url"
-  - download_file: params MUST include "path"
-  - reply_email/send_message: requiresConfirmation MUST be true
-- suggestedActions content field: always set to the same value as the primary params field (e.g. for open_file, content = params.path) for backward compatibility
-- This block MUST be the last thing in your response`,
+${characterContextSection}`,
     });
 
     console.log(
@@ -833,16 +784,12 @@ Rules for structured output:
         })),
       );
 
+      // Skip historical compaction messages to avoid context overflow
+      // Historical messages are handled asynchronously by triggerCompactionAsync
       const runtimeConversation: Array<{
         role: "user" | "assistant";
         content: string;
-      }> = [
-        ...preprocessedHistory.flattened.map(({ role, content }) => ({
-          role: normalizeRole(role),
-          content,
-        })),
-        ...messages,
-      ];
+      }> = [...messages];
 
       // Save chat to database
       try {
@@ -862,7 +809,7 @@ Rules for structured output:
       }
 
       // Save user message
-      const userMessageId = generateUUID();
+      const userMessageId = options?.userMessageId ?? generateUUID();
       await saveMessages({
         messages: [
           {
@@ -882,7 +829,7 @@ Rules for structured output:
       // Use stream: false for non-streaming mode (reference handleAgentRuntime in shared.ts)
       const generator = agent.run(messageText, {
         sessionId,
-        taskId: chatId, // Pass chatId as taskId to ensure workspace files are stored at ~/.alloomi/sessions/{chatId}/
+        taskId: `${chatId}/${context.executionId}`, // Each execution uses an independent sub-directory to prevent file overwrite
         conversation: runtimeConversation,
         permissionMode: "bypassPermissions", // Full permissions for scheduled tasks
         stream: false, // Non-stream mode, simpler message handling
@@ -914,7 +861,7 @@ Rules for structured output:
 
       // Current assistant message being built - like chat-context.tsx
       // All tool calls and text are accumulated in parts array of a single message
-      let currentMessageId = generateUUID();
+      let currentMessageId = options?.assistantMessageId ?? generateUUID();
       let currentParts: Array<any> = [];
       let hasSavedCurrentMessage = false;
 
@@ -967,6 +914,13 @@ Rules for structured output:
         // Check tool call count
         if (message.type === "tool_use") {
           toolCallCount++;
+          await options?.onAgentEvent?.({
+            type: "tool_use",
+            id: message.id || generateUUID(),
+            name: message.name || "",
+            input: message.input,
+            messageId: currentMessageId,
+          });
           if (toolCallCount > maxToolCalls) {
             console.error("[JobExecutor] Too many tool calls:", toolCallCount);
             hasError = true;
@@ -981,6 +935,11 @@ Rules for structured output:
           const textContent = message.content || "";
 
           lastTextContent = textContent;
+          await options?.onAgentEvent?.({
+            type: "text",
+            content: textContent,
+            messageId: currentMessageId,
+          });
 
           // Save complete text message
           currentParts.push({ type: "text", text: textContent });
@@ -1017,6 +976,13 @@ Rules for structured output:
           if (!message.toolUseId) {
             console.log("[JobExecutor] Skipping tool_result - no tool use id");
           } else {
+            await options?.onAgentEvent?.({
+              type: "tool_result",
+              toolUseId: message.toolUseId,
+              output: message.output,
+              isError: message.isError,
+              messageId: currentMessageId,
+            });
             // Find and update the tool-native part in currentParts
             let found = false;
             currentParts = currentParts.map((part) => {
@@ -1144,37 +1110,40 @@ Rules for structured output:
     }
 
     // Compute session directory path (same logic as agent's getSessionWorkDir with taskId)
-    const sessionDir = join(homedir(), APP_DIR_NAME, "sessions", chatId);
+    const sessionDir = join(
+      homedir(),
+      APP_DIR_NAME,
+      "sessions",
+      chatId,
+      context.executionId,
+    );
 
-    // --- Extract structured output from agent response ---
-    const { data: structuredData, cleanText } =
-      parseStructuredOutput(lastTextContent);
-    const hasStructuredOutput =
-      (structuredData.summary && structuredData.summary.length > 0) ||
-      (structuredData.reasoningChain &&
-        structuredData.reasoningChain.length > 0) ||
-      (structuredData.suggestedActions &&
-        structuredData.suggestedActions.length > 0);
-
-    if (hasStructuredOutput) {
-      console.log(
-        "[JobExecutor] Parsed structured output from agent response:",
-        JSON.stringify(structuredData).slice(0, 200),
-      );
+    const sessionFiles: ReasoningFile[] = [];
+    try {
+      const result = getAllFilesAtPathWithSize(sessionDir);
+      for (const file of result.files) {
+        if (file.isDirectory) continue;
+        sessionFiles.push({
+          name: file.name,
+          path: file.absolutePath ?? file.path,
+          type: file.type,
+          role: "output",
+        });
+      }
+    } catch (error) {
+      console.warn("[JobExecutor] Failed to scan execution files:", error);
     }
 
     const jobResult: JobExecutionResult = {
       status: (hasError ? "error" : "success") as "error" | "success",
-      // Use cleanText (structured-output block stripped) for display
-      output: stripMalformedToolCalls(cleanText) || "Task completed",
+      // Use lastTextContent (structured-output block stripped) for display
+      output: stripMalformedToolCalls(lastTextContent) || "Task completed",
       error: hasError ? errorMessage : undefined,
       result: {
         chatId,
         message: messageText,
         executionId: context.executionId,
         sessionDir,
-        // Embed structured metadata when available
-        ...(hasStructuredOutput ? structuredData : {}),
       },
       duration: 0,
     };
