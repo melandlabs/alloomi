@@ -128,12 +128,16 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 ## Screenshots
 
-- Document Previews — Docx, PPTx & Xlsx
+- Document Previews — Docx, PPTx, Xlsx & Mind Map
 
 <table align="center">
 <tr>
 <td><img src="screenshots/app/docx.gif" alt="Docx" style="border:1px solid #ddd; border-radius:8px;"></td>
 <td><img src="screenshots/app/excel.gif" alt="Excel" style="border:1px solid #ddd; border-radius:8px;"></td>
+</tr>
+<tr>
+<td><img src="screenshots/app/pptx.gif" alt="PPTx" style="border:1px solid #ddd; border-radius:8px;"></td>
+<td><img src="screenshots/app/mmark.gif" alt="MindMap" style="border:1px solid #ddd; border-radius:8px;"></td>
 </tr>
 </table>
 
