@@ -16,19 +16,8 @@ import {
   updateIntegrationAccount,
 } from "../db/queries";
 import type { UserContact } from "../db/schema";
-import { AppError } from "@alloomi/shared/errors";
-import type { Attachment } from "@alloomi/shared";
-import type {
-  File as FileMsg,
-  Image,
-  Messages,
-  Voice,
-} from "@alloomi/integrations/channels";
-import { handleTelegramAuthFailure } from "@/lib/integrations/telegram/session";
-import { isTelegramContactMeta } from "@alloomi/integrations/contacts";
 import { getBotCredentials } from "./token";
 import { fileIngester } from "../integrations/providers/file-ingester";
-import { telegramClientRegistry } from "../integrations/telegram/client-registry";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

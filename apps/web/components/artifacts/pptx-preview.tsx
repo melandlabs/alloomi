@@ -180,7 +180,9 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
             );
 
             setSlides(serverSlides);
-            setRenderEngineStatusMessage("Using high-fidelity server-side rendering");
+            setRenderEngineStatusMessage(
+              "Using high-fidelity server-side rendering",
+            );
             setLoading(false);
             return;
           }
@@ -204,7 +206,10 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
             setServerRenderWarning("Server-side rendering request failed");
           }
         } catch (err) {
-          console.error("[PptxPreview] Error during server-side rendering:", err);
+          console.error(
+            "[PptxPreview] Error during server-side rendering:",
+            err,
+          );
           setServerRenderWarning("Could not connect to render server");
         }
       } else if (taskId) {
@@ -218,7 +223,12 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           if (response.ok) {
             const manifest = await response.json();
             const serverSlides: PptxSlide[] = manifest.slides.map(
-              (slide: { index: number; path: string; width: number; height: number }) => ({
+              (slide: {
+                index: number;
+                path: string;
+                width: number;
+                height: number;
+              }) => ({
                 index: slide.index,
                 title: `Slide ${slide.index}`,
                 content: [],
@@ -228,12 +238,17 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
               }),
             );
             setSlides(serverSlides);
-            setRenderEngineStatusMessage("Using high-fidelity server-side rendering");
+            setRenderEngineStatusMessage(
+              "Using high-fidelity server-side rendering",
+            );
             setLoading(false);
             return;
           }
         } catch (err) {
-          console.warn("[PptxPreview] Non-Tauri server-side rendering failed:", err);
+          console.warn(
+            "[PptxPreview] Non-Tauri server-side rendering failed:",
+            err,
+          );
         }
       }
 
