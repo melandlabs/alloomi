@@ -66,6 +66,19 @@ export interface AuditEntry {
   extra?: Record<string, unknown>;
 }
 
+export interface CredentialAccessEntry {
+  timestamp: string;
+  type: "credential_access";
+  accountId: string;
+  userId: string;
+  action: "read" | "update" | "rotate" | "delete";
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+  success: boolean;
+  errorMessage?: string;
+}
+
 let rotateCounter = 0;
 
 function writeEntry(entry: AuditEntry) {
@@ -100,6 +113,43 @@ export function logCommandExec(command: string, args?: string[]) {
     detail: command,
     extra: args?.length ? { args } : undefined,
   });
+}
+
+/** Log credential access operations */
+export function logCredentialAccess(params: {
+  accountId: string;
+  userId: string;
+  action: "read" | "update" | "rotate" | "delete";
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+  success: boolean;
+  errorMessage?: string;
+}) {
+  const entry: CredentialAccessEntry = {
+    timestamp: new Date().toISOString(),
+    type: "credential_access",
+    accountId: params.accountId,
+    userId: params.userId,
+    action: params.action,
+    ipAddress: params.ipAddress,
+    userAgent: params.userAgent,
+    metadata: params.metadata,
+    success: params.success,
+    errorMessage: params.errorMessage,
+  };
+
+  try {
+    ensureLogDir();
+    if (++rotateCounter % 500 === 0) {
+      rotateIfNeeded();
+    }
+    const fs = getFs();
+    const { file } = getLogPaths();
+    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`);
+  } catch {
+    // Ignore
+  }
 }
 
 /** Read audit logs (returns parsed entry array) */

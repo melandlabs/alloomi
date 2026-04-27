@@ -99,16 +99,20 @@ type InstalledRenderEngineRecord = {
 };
 
 function getInstalledRenderEngineRecordPath(): string {
-  return resolve(process.env.HOME || "", ".alloomi", "render-engines", "office", "installed.json");
+  return resolve(
+    process.env.HOME || "",
+    ".alloomi",
+    "render-engines",
+    "office",
+    "installed.json",
+  );
 }
 
-function readInstalledRenderEngine():
-  | {
-      sofficePath: string;
-      pdftoppmPath: string;
-      pythonPath: string | null;
-    }
-  | null {
+function readInstalledRenderEngine(): {
+  sofficePath: string;
+  pdftoppmPath: string;
+  pythonPath: string | null;
+} | null {
   const recordPath = getInstalledRenderEngineRecordPath();
   if (!existsSync(recordPath)) {
     return null;
@@ -236,8 +240,9 @@ function isManifestUsable(
   if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
     return false;
   }
-  return manifest.slides.every((slide) =>
-    typeof slide?.path === "string" && typeof slide?.index === "number",
+  return manifest.slides.every(
+    (slide) =>
+      typeof slide?.path === "string" && typeof slide?.index === "number",
   );
 }
 
@@ -289,11 +294,9 @@ function renderPdfFromPptx(pptxPath: string, outDir: string, pdfPath: string) {
 function renderSlidesFromPdf(pdfPath: string, renderDir: string) {
   const ppmPrefix = join(renderDir, "slide");
   const pdftoppmCommand = getPdftoppmCommand();
-  execFileSync(
-    pdftoppmCommand,
-    ["-png", "-r", "180", pdfPath, ppmPrefix],
-    { stdio: "pipe" },
-  );
+  execFileSync(pdftoppmCommand, ["-png", "-r", "180", pdfPath, ppmPrefix], {
+    stdio: "pipe",
+  });
 
   const rawSlides = readdirSync(renderDir)
     .filter((name) => /^slide-\d+\.png$/i.test(name))

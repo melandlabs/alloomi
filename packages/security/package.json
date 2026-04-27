@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./token-encryption": "./src/token-encryption.ts",
-    "./url-validator": "./src/url-validator.ts"
+    "./url-validator": "./src/url-validator.ts",
+    "./key-manager": "./src/key-manager.ts"
   },
   "dependencies": {
     "fernet": "^0.4.0"

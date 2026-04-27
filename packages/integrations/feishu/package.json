@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./app-registration": "./src/app-registration.ts",
-    "./registration-cookie": "./src/registration-cookie.ts"
+    "./registration-cookie": "./src/registration-cookie.ts",
+    "./conversation-store": "./src/conversation-store.ts"
   },
   "dependencies": {
     "@alloomi/integrations-channels": "workspace:*",

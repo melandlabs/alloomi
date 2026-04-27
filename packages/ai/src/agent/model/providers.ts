@@ -37,6 +37,33 @@ export interface AIUserContext {
 let globalUserContext: AIUserContext | null = null;
 
 /**
+ * Module-level keepalive fetch instance for connection reuse.
+ * Using a singleton pattern to ensure the same connection is reused across requests.
+ */
+let _keepaliveFetch: typeof fetch | null = null;
+
+/**
+ * Create a fetch function with keepalive enabled for connection reuse.
+ * This reduces TTFT (Time To First Token) by maintaining persistent HTTP connections.
+ */
+function createKeepAliveFetch(): typeof fetch {
+  if (_keepaliveFetch) return _keepaliveFetch;
+
+  _keepaliveFetch = async (
+    url: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const keepaliveInit: RequestInit = {
+      ...init,
+      keepalive: true, // Keep connection alive for subsequent requests
+    };
+    return fetch(url, keepaliveInit);
+  };
+
+  return _keepaliveFetch;
+}
+
+/**
  * Set the global user context for AI requests
  * Call this at the beginning of bot/background operations
  */
@@ -76,12 +103,17 @@ export function getAIUserContext(): AIUserContext | null {
 
 /**
  * Create a custom fetch function that adds user JWT token
+ * @param userContext - Optional user context for authentication
+ * @param options - Options including keepalive for connection reuse
  */
 function createFetchWithContext(
   userContext?: AIUserContext | null,
+  options?: { keepalive?: boolean },
 ): typeof fetch {
-  return async (url, options) => {
-    const headers = new Headers(options?.headers);
+  const baseFetch = options?.keepalive ? createKeepAliveFetch() : fetch;
+
+  return async (url, init) => {
+    const headers = new Headers(init?.headers);
 
     if (userContext) {
       if (!userContext.token) {
@@ -96,9 +128,10 @@ function createFetchWithContext(
       headers.set("Authorization", `Bearer ${userContext.token}`);
     }
 
-    return fetch(url, {
-      ...options,
+    return baseFetch(url, {
+      ...init,
       headers,
+      keepalive: options?.keepalive ?? true, // Default to keepalive for connection reuse
     });
   };
 }
@@ -183,9 +216,10 @@ function initializeModels(isNativeMode: boolean) {
   const shouldUseCustomFetch =
     userContext && (!isNativeMode || userContext.token);
 
+  // Use keepalive fetch to reduce TTFT through connection reuse
   const customFetch = shouldUseCustomFetch
-    ? createFetchWithContext(userContext)
-    : undefined;
+    ? createFetchWithContext(userContext, { keepalive: true })
+    : createKeepAliveFetch();
 
   if (userContext && isNativeMode && !userContext.token) {
     console.warn(
@@ -279,9 +313,10 @@ export function createDynamicModel(
   const shouldUseCustomFetch =
     userContext && (!isNativeMode || userContext.token);
 
+  // Use keepalive fetch to reduce TTFT through connection reuse
   const customFetch = shouldUseCustomFetch
-    ? createFetchWithContext(userContext)
-    : undefined;
+    ? createFetchWithContext(userContext, { keepalive: true })
+    : createKeepAliveFetch();
 
   const debugFetch = customFetch
     ? async (url: RequestInfo | URL, init?: RequestInit) => {

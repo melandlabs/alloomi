@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import * as JSZipModule from "jszip";
-import {
-  getRenderEngineStatus,
-} from "@/lib/tauri";
+import { getRenderEngineStatus } from "@/lib/tauri";
 
 /** JSZip module type (export = JSZip, with both constructor and static methods like loadAsync) */
 type JSZipType = import("jszip");
@@ -163,10 +161,7 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
                   "High-fidelity render engine is unavailable in this app build. Preview is using the simplified built-in renderer for now.",
                 ),
               );
-            } else if (
-              reason === "invalid_record" ||
-              reason === "error"
-            ) {
+            } else if (reason === "invalid_record" || reason === "error") {
               setRenderEngineStatusMessage(
                 t(
                   "common.pptxPreview.renderEngineUnavailable",
@@ -195,14 +190,16 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
             if (manifest.slides?.length) {
               if (isCancelled) return;
 
-              const renderedSlides: PptxSlide[] = manifest.slides.map((slide) => ({
-                index: slide.index + 1,
-                title: `${t("common.pptxPreview.slide")} ${slide.index + 1}`,
-                content: [],
-                shapes: [],
-                background: "#ffffff",
-                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
-              }));
+              const renderedSlides: PptxSlide[] = manifest.slides.map(
+                (slide) => ({
+                  index: slide.index + 1,
+                  title: `${t("common.pptxPreview.slide")} ${slide.index + 1}`,
+                  content: [],
+                  shapes: [],
+                  background: "#ffffff",
+                  renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                }),
+              );
 
               setSlides(renderedSlides);
               setError(null);
@@ -218,14 +215,11 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
             );
           } else {
             setServerRenderWarning(
-              t(
-                "common.pptxPreview.serverRenderUnavailableWithReason",
-                {
-                  defaultValue:
-                    "Server-rendered preview unavailable ({{reason}}). Showing simplified preview instead.",
-                  reason: `${previewRes.status} ${previewRes.statusText || "request failed"}`,
-                },
-              ),
+              t("common.pptxPreview.serverRenderUnavailableWithReason", {
+                defaultValue:
+                  "Server-rendered preview unavailable ({{reason}}). Showing simplified preview instead.",
+                reason: `${previewRes.status} ${previewRes.statusText || "request failed"}`,
+              }),
             );
           }
         }

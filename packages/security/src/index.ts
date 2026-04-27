@@ -12,3 +12,11 @@ export {
   fetchWithSSRFProtection,
   isTrustedStorageUrl,
 } from "./url-validator";
+
+export {
+  KeyManager,
+  getKeyManager,
+  encryptWithAccountKey,
+  decryptWithAccountKey,
+  type DerivedKey,
+} from "./key-manager";

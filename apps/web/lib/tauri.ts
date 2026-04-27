@@ -474,7 +474,9 @@ export const getRenderEngineStatus =
       return null;
     }
     try {
-      return await invoke<DesktopRenderEngineStatus>("get_render_engine_status");
+      return await invoke<DesktopRenderEngineStatus>(
+        "get_render_engine_status",
+      );
     } catch (error) {
       console.error("Failed to get render engine status:", error);
       return null;

@@ -241,7 +241,6 @@ LLM_EMBEDDING_MODEL=text-embedding-3-small
 
 Requirements: Node.js 22+, pnpm 9+, Rust Cargo 1.88+
 
-
 ## Install
 
 ```bash
