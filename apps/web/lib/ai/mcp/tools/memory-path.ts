@@ -39,7 +39,7 @@ export function createMemoryPathTool(session: Session) {
       "**CONVERSATION HISTORY (cross-platform):**",
       "Use the Read tool to access conversation history stored in:",
       "  <appDataDir>/data/memory/{platform}/YYYY-MM-DD.json",
-      "Where {platform} is one of: whatsapp, gmail, weixin, imessage, telegram",
+      "Where {platform} is one of: whatsapp, gmail, weixin, imessage, telegram, feishu, lark",
       "Each file contains JSON with messages grouped by userKey and accountId.",
       "Use this to look up past conversations across days — especially useful when:",
       "- User asks about something discussed earlier ('what did we talk about yesterday?')",

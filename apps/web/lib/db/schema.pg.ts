@@ -15,6 +15,7 @@ import {
   numeric,
   index,
   bigint,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type { DetailData, TimelineData } from "../ai/subagents/insights";
 import type { ContactMeta } from "@alloomi/integrations/contacts";
@@ -204,6 +205,9 @@ export const integrationAccounts = pgTable(
       .default(null),
     credentialsEncrypted: text("credentials_encrypted").notNull(),
     encryptionKeyId: text("encryption_key_id"),
+    lastRotatedAt: timestamp("last_rotated_at", { withTimezone: true }),
+    rotationCount: integer("rotation_count").notNull().default(0),
+    keyVersion: integer("key_version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -222,6 +226,90 @@ export const integrationAccounts = pgTable(
 export type IntegrationAccount = InferSelectModel<typeof integrationAccounts>;
 export type InsertIntegrationAccount = InferInsertModel<
   typeof integrationAccounts
+>;
+
+// Credential Rotation History - stores previous credentials during rotation
+export const credentialRotationHistory = pgTable(
+  "credential_rotation_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => integrationAccounts.id, { onDelete: "cascade" }),
+    credentialsEncrypted: text("credentials_encrypted").notNull(),
+    encryptionKeyId: text("encryption_key_id"),
+    rotatedAt: timestamp("rotated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    rotatedBy: text("rotated_by"),
+    reason: text("reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    accountIdx: index("credential_rotation_history_account_idx").on(
+      table.accountId,
+      table.rotatedAt.desc(),
+    ),
+    expiresIdx: index("credential_rotation_history_expires_idx").on(
+      table.expiresAt,
+    ),
+  }),
+);
+
+export type CredentialRotationHistory = InferSelectModel<
+  typeof credentialRotationHistory
+>;
+export type InsertCredentialRotationHistory = InferInsertModel<
+  typeof credentialRotationHistory
+>;
+
+// Credential Access Log - audit log for credential operations
+export const credentialAccessLog = pgTable(
+  "credential_access_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => integrationAccounts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 16 })
+      .notNull()
+      .$type<"read" | "update" | "rotate" | "delete">(),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    accessedAt: timestamp("accessed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown> | null>()
+      .default(null),
+    success: boolean("success").notNull().default(true),
+    errorMessage: text("error_message"),
+  },
+  (table) => ({
+    accountIdx: index("credential_access_log_account_idx").on(
+      table.accountId,
+      table.accessedAt.desc(),
+    ),
+    userIdx: index("credential_access_log_user_idx").on(
+      table.userId,
+      table.accessedAt.desc(),
+    ),
+    actionIdx: index("credential_access_log_action_idx").on(
+      table.action,
+      table.accessedAt.desc(),
+    ),
+  }),
+);
+
+export type CredentialAccessLog = InferSelectModel<typeof credentialAccessLog>;
+export type InsertCredentialAccessLog = InferInsertModel<
+  typeof credentialAccessLog
 >;
 
 export const integrationCatalog = pgTable(
@@ -596,6 +684,13 @@ export const insight = pgTable(
       .$type<InsightRoleAttribution | null>()
       .default(null),
     alerts: jsonb("alerts").$type<InsightAlert[] | null>().default(null),
+    pendingDeletionAt: timestamp("pending_deletion_at", {
+      withTimezone: true,
+    }),
+    compactedIntoInsightId: uuid("compacted_into_insight_id").references(
+      (): AnyPgColumn => insight.id,
+      { onDelete: "set null" },
+    ),
     isArchived: boolean("is_archived").notNull().default(false),
     isFavorited: boolean("is_favorited").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -616,11 +711,56 @@ export const insight = pgTable(
       table.botId,
       table.isArchived,
     ),
+    botIdPendingDeletionIdx: index("insight_bot_id_pending_deletion_idx").on(
+      table.botId,
+      table.pendingDeletionAt,
+    ),
+    compactedIntoInsightIdx: index("insight_compacted_into_idx").on(
+      table.compactedIntoInsightId,
+    ),
   }),
 );
 
 export type Insight = InferSelectModel<typeof insight>;
 export type InsertInsight = InferInsertModel<typeof insight>;
+
+export const insightCompactionLinks = pgTable(
+  "insight_compaction_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    compactedInsightId: uuid("compacted_insight_id")
+      .notNull()
+      .references(() => insight.id, { onDelete: "cascade" }),
+    sourceInsightId: uuid("source_insight_id")
+      .notNull()
+      .references(() => insight.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    compactedInsightIdx: index("insight_compaction_links_compacted_idx").on(
+      table.compactedInsightId,
+    ),
+    sourceInsightIdx: index("insight_compaction_links_source_idx").on(
+      table.sourceInsightId,
+    ),
+    uniquePairIdx: uniqueIndex("insight_compaction_links_pair_idx").on(
+      table.compactedInsightId,
+      table.sourceInsightId,
+    ),
+  }),
+);
+
+export type InsightCompactionLink = InferSelectModel<
+  typeof insightCompactionLinks
+>;
+export type InsertInsightCompactionLink = InferInsertModel<
+  typeof insightCompactionLinks
+>;
 
 // Insight Notes Table
 // Stores user notes/comments on insights
@@ -753,6 +893,7 @@ export const userInsightSettings = pgTable("user_insight_settings", {
     .default(60),
   lastMessageProcessedAt: timestamp("last_message_processed_at"),
   lastActiveAt: timestamp("last_active_at"),
+  lastInsightMaintenanceRunAt: timestamp("last_insight_maintenance_run_at"),
   activityTier: varchar("activity_tier", { length: 16 })
     .notNull()
     .default("low"),
@@ -815,6 +956,7 @@ export type InsightSettings = {
   refreshIntervalMinutes: number;
   lastMessageProcessedAt: Date | null;
   lastActiveAt: Date | null;
+  lastInsightMaintenanceRunAt?: Date | null;
   activityTier: "high" | "medium" | "low" | "dormant";
   aiSoulPrompt: string | null;
   identityIndustries: string[] | null;
@@ -837,6 +979,7 @@ export function parseInsightSettings(
     refreshIntervalMinutes: dbSettings.refreshIntervalMinutes ?? 30,
     lastMessageProcessedAt: dbSettings.lastMessageProcessedAt ?? null,
     lastActiveAt: dbSettings.lastActiveAt ?? null,
+    lastInsightMaintenanceRunAt: dbSettings.lastInsightMaintenanceRunAt ?? null,
     activityTier: normalizeActivityTier(dbSettings.activityTier),
     aiSoulPrompt: dbSettings.aiSoulPrompt ?? null,
     identityIndustries:
@@ -902,6 +1045,7 @@ export function serializeInsightSettings(
     refreshIntervalMinutes: settings.refreshIntervalMinutes,
     lastMessageProcessedAt: settings.lastMessageProcessedAt,
     lastActiveAt: settings.lastActiveAt,
+    lastInsightMaintenanceRunAt: settings.lastInsightMaintenanceRunAt,
     activityTier: settings.activityTier,
     aiSoulPrompt: settings.aiSoulPrompt ?? null,
     identityIndustries:

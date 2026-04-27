@@ -69,6 +69,13 @@ export async function POST() {
     domainAlreadySwitched: payload.domainSwitched,
     tp: "ob_app",
   });
+  console.log(
+    "[Feishu registration poll] userId=%s cookieDomain=%s switched=%s stepKind=%s",
+    session.user.id,
+    payload.domain,
+    payload.domainSwitched ? "yes" : "no",
+    step.kind,
+  );
 
   if (step.kind === "success") {
     const displayName =
@@ -76,6 +83,13 @@ export async function POST() {
         ? `Feishu · ${step.openId.slice(0, 12)}`
         : `Feishu · ${step.appId.slice(0, 12)}`;
 
+    console.log(
+      "[Feishu registration poll] success userId=%s appIdPrefix=%s apiDomain=%s openId=%s",
+      session.user.id,
+      step.appId.slice(0, 8),
+      step.domain,
+      step.openId ? `${step.openId.slice(0, 8)}...` : "(none)",
+    );
     await upsertFeishuBotIntegration({
       userId: session.user.id,
       appId: step.appId,
@@ -94,6 +108,11 @@ export async function POST() {
     await startFeishuListenersForUser(session.user.id).catch((err) => {
       console.warn("[Feishu registration poll] listener start", err);
     });
+    console.log(
+      "[Feishu registration poll] listener started userId=%s apiDomain=%s",
+      session.user.id,
+      step.domain,
+    );
 
     const res = NextResponse.json({ status: "success" });
     clearRegCookie(res);
@@ -113,6 +132,12 @@ export async function POST() {
   }
 
   if (step.kind === "error") {
+    console.warn(
+      "[Feishu registration poll] error userId=%s cookieDomain=%s message=%s",
+      session.user.id,
+      payload.domain,
+      step.message,
+    );
     const res = NextResponse.json(
       { status: "error", message: step.message },
       { status: 502 },
@@ -124,6 +149,12 @@ export async function POST() {
   // pending: may switch domain or adjust interval
   let nextPayload = { ...payload };
   if (step.nextDomain !== payload.domain) {
+    console.log(
+      "[Feishu registration poll] domain switched userId=%s %s -> %s",
+      session.user.id,
+      payload.domain,
+      step.nextDomain,
+    );
     nextPayload = {
       ...nextPayload,
       domain: step.nextDomain,

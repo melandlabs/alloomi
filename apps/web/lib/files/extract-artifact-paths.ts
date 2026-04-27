@@ -3,7 +3,8 @@
  * Supports both macOS/Linux (/Users/...) and Windows (C:\Users\..., with / and \ intermixed in paths).
  */
 
-const ARTIFACT_EXT = "pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|txt|json";
+const ARTIFACT_EXT =
+  "pptx|pdf|xlsx|docx|py|js|ts|tsx|jsx|html|htm|md|mmark|txt|json";
 
 /**
  * Path boundary: lookahead match that excludes separators (including Markdown backticks `) from the match result,

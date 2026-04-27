@@ -4,7 +4,17 @@
  * Compatible with both PostgreSQL (web) and SQLite (Tauri) modes
  */
 
-import { eq, and, desc, asc, lt, isNull, or, sql, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  lt,
+  isNotNull,
+  or,
+  sql,
+  inArray,
+} from "drizzle-orm";
 import { db } from "../db/index";
 import {
   scheduledJobs,
@@ -23,6 +33,13 @@ import { computeNextRun } from "./scheduler";
 import { deserializeJson, serializeJson } from "../db/queries";
 import { DEFAULT_JOB_TIMEOUT_MS } from "../env/config/constants";
 
+function legacyIntervalToMinutes(schedule: {
+  hours?: number;
+  minutes?: number;
+}): number {
+  return (schedule.hours ?? 0) * 60 + (schedule.minutes ?? 0) || 60;
+}
+
 /**
  * List all jobs for a user
  */
@@ -39,13 +56,15 @@ export async function listJobs(
 
   let viewConditions = undefined;
   if (opts.view === "active") {
-    // Active: recurring jobs (cron/interval) OR one-time jobs not yet in terminal state
+    // Active: recurring jobs OR one-time jobs with a pending next run.
     viewConditions = or(
       eq(scheduledJobs.scheduleType, "cron"),
       eq(scheduledJobs.scheduleType, "interval"),
-      or(
-        isNull(scheduledJobs.lastStatus),
-        eq(scheduledJobs.lastStatus, "running"),
+      eq(scheduledJobs.scheduleType, "interval-hours"),
+      eq(scheduledJobs.scheduleType, "interval-minutes"),
+      and(
+        eq(scheduledJobs.scheduleType, "once"),
+        isNotNull(scheduledJobs.nextRunAt),
       ),
     );
   } else if (opts.view === "executed") {
@@ -156,7 +175,9 @@ export async function createJob(
         ? input.schedule.minutes
         : input.schedule.type === "interval-hours"
           ? (input.schedule.hours ?? 1) * 60
-          : null,
+          : input.schedule.type === "interval"
+            ? legacyIntervalToMinutes(input.schedule)
+            : null,
     scheduledAt:
       input.schedule.type === "once"
         ? input.schedule.at instanceof Date
@@ -213,12 +234,17 @@ export async function updateJob(
     if (updates.schedule.type === "cron") {
       updateData.cronExpression = updates.schedule.expression;
       updateData.intervalMinutes = null; // Clear old interval value when switching to cron
+      updateData.scheduledAt = null; // Clear old once time when switching to cron
     } else if (updates.schedule.type === "interval-hours") {
       updateData.intervalMinutes = (updates.schedule.hours ?? 1) * 60;
       updateData.cronExpression = null; // Clear old cron expression when switching to interval
       updateData.scheduledAt = null; // Clear old once time when switching to interval
     } else if (updates.schedule.type === "interval-minutes") {
       updateData.intervalMinutes = updates.schedule.minutes;
+      updateData.cronExpression = null; // Clear old cron expression when switching to interval
+      updateData.scheduledAt = null; // Clear old once time when switching to interval
+    } else if (updates.schedule.type === "interval") {
+      updateData.intervalMinutes = legacyIntervalToMinutes(updates.schedule);
       updateData.cronExpression = null; // Clear old cron expression when switching to interval
       updateData.scheduledAt = null; // Clear old once time when switching to interval
     } else if (updates.schedule.type === "once") {
@@ -233,6 +259,9 @@ export async function updateJob(
     // Recompute next run time
     const nextRun = computeNextRun(updates.schedule, new Date());
     updateData.nextRunAt = nextRun;
+    if (updates.schedule.type === "once" && nextRun) {
+      updateData.lastStatus = null;
+    }
   }
 
   if (updates.job) {

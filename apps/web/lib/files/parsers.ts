@@ -9,9 +9,13 @@ import { unlink, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import JSZip from "jszip";
 import { isTauriMode } from "@/lib/env";
 import { PDF_MAX_PAGES, PDF_MAX_SIZE_MB, PREFER_NATIVE_PDF } from "./config";
+
+async function getJSZip() {
+  const module = await import("jszip");
+  return module.default ?? module;
+}
 
 /**
  * Get the appropriate base URL for vision API
@@ -431,6 +435,7 @@ class AppleDocumentLoader {
   async load(): Promise<Document[]> {
     try {
       const fileBuffer = await readFile(this.filePath);
+      const JSZip = await getJSZip();
       const zip = await JSZip.loadAsync(fileBuffer);
 
       // List all files for debugging

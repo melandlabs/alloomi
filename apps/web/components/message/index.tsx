@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { useCopyToClipboard } from "usehooks-ts";
 import { useIntegrations } from "@/hooks/use-integrations";
 import { PreviewAttachment } from "../preview-attachment";
+import { MindMapPreview } from "../artifacts/mindmap-preview";
+import { MessageMmarkFile } from "./message-mmark-file";
 import type { Insight } from "@/lib/db/schema";
 import { CitedInsightsDrawer } from "../cited-insights-drawer";
 import InsightDetailDrawer from "../insight-detail-drawer";
@@ -29,6 +31,7 @@ import { getFileIcon, getFileColor } from "@/components/file-icons";
 import { stripMalformedToolCalls } from "@/lib/utils/tool-names";
 import { parseStructuredOutput } from "@/lib/types/execution-result";
 import { QuestionInput } from "../question-input";
+import { PasswordInput } from "../password-input";
 import { useChatContext } from "../chat-context";
 import { useGlobalInsightDrawer } from "../global-insight-drawer";
 import type { ContentSegment } from "@alloomi/shared/ref";
@@ -46,6 +49,7 @@ import {
 } from "@/components/library/library-item-row";
 import { sessionRelativePathFromStoredPath } from "@/lib/files/open-workspace-file-locally";
 import { collectToolOutputFilesFromParts } from "./message-output-files";
+import { normalizeExtractedArtifactPath } from "@/lib/files/extract-artifact-paths";
 import { format } from "date-fns";
 import { zhCN, enUS } from "date-fns/locale";
 
@@ -492,20 +496,38 @@ const PurePreviewMessage = ({
   }, [filteredParts, message.id]);
 
   /**
+   * Collect file paths that are already displayed via NativeToolCall (to avoid duplicate display).
+   */
+  const nativeToolDisplayedFilePaths = useMemo(() => {
+    const paths = new Set<string>();
+    if (!filteredParts) return paths;
+    for (const part of filteredParts) {
+      if (part.type === "tool-native") {
+        const p = part as {
+          type?: string;
+          generatedFile?: { name?: string; path?: string; type?: string };
+          codeFile?: { name?: string; path?: string; language?: string };
+        };
+        if (p.generatedFile?.path) {
+          paths.add(normalizeExtractedArtifactPath(p.generatedFile.path));
+        }
+        if (p.codeFile?.path) {
+          paths.add(normalizeExtractedArtifactPath(p.codeFile.path));
+        }
+      }
+    }
+    return paths;
+  }, [filteredParts]);
+
+  /**
    * Convert tool output paths to LibraryItem same as "My Files / Dialog Space" for LibraryItemRow rendering.
+   * Files already displayed via NativeToolCall are excluded to prevent duplicate display.
    */
   const assistantOutputLibraryItems = useMemo((): LibraryItem[] => {
     if (message.role !== "assistant") return [];
-    const files = collectToolOutputFilesFromParts(message.parts);
-    const msgAny = message as {
-      createdAt?: string | number | Date;
-      timestamp?: string | number | Date;
-    };
-    const raw = msgAny.createdAt ?? msgAny.timestamp;
-    const rowDate =
-      raw != null && !Number.isNaN(new Date(raw).getTime())
-        ? new Date(raw)
-        : new Date();
+    const files = collectToolOutputFilesFromParts(filteredParts).filter(
+      (f) => !nativeToolDisplayedFilePaths.has(f.path),
+    );
 
     return files.map((f) => {
       const rel = sessionRelativePathFromStoredPath(f.path, chatId);
@@ -513,7 +535,7 @@ const PurePreviewMessage = ({
         id: `${message.id}-${rel}`,
         kind: "workspace_file",
         title: f.name,
-        date: rowDate,
+        date: new Date(0), // epoch - date not shown for chat output files
         groupKey: "chat-output",
         workspaceFile: {
           taskId: chatId,
@@ -524,7 +546,14 @@ const PurePreviewMessage = ({
         isTemporary: f.isTemporary,
       };
     });
-  }, [message.role, message.parts, message.id, chatId, message]);
+  }, [
+    message.role,
+    message.parts,
+    filteredParts,
+    message.id,
+    chatId,
+    nativeToolDisplayedFilePaths,
+  ]);
 
   // Detect if the last tool call is executing
   const isLastToolExecuting = useMemo(() => {
@@ -573,8 +602,10 @@ const PurePreviewMessage = ({
     const msgAny = message as {
       createdAt?: string | number | Date;
       timestamp?: string | number | Date;
+      metadata?: { createdAt?: string | number | Date };
     };
-    const raw = msgAny.createdAt ?? msgAny.timestamp;
+    const raw =
+      msgAny.createdAt ?? msgAny.timestamp ?? msgAny.metadata?.createdAt;
     if (raw != null && !Number.isNaN(new Date(raw).getTime())) {
       return new Date(raw);
     }
@@ -896,7 +927,7 @@ const PurePreviewMessage = ({
                     // Handle file type (images rendered uniformly in imageParts later, skip here)
                     if (type === "file") {
                       const filePart = part as any;
-                      const { mediaType } = filePart;
+                      const { mediaType, name, url, blobPath } = filePart;
 
                       if (mediaType?.startsWith("image/")) {
                         // Image rendering - convert mediaType to contentType
@@ -911,6 +942,18 @@ const PurePreviewMessage = ({
                           />
                         );
                       }
+
+                      // Handle .mmark files as mind maps
+                      if (name?.endsWith(".mmark") && (url || blobPath)) {
+                        return (
+                          <MessageMmarkFile
+                            key={key}
+                            src={blobPath || url || ""}
+                            filename={name}
+                          />
+                        );
+                      }
+
                       // Other file types
                       return null;
                     }
@@ -923,6 +966,24 @@ const PurePreviewMessage = ({
                           isLoading={isLoading}
                           reasoning={part.text}
                         />
+                      );
+                    }
+
+                    // Handle mindmap type
+                    if (type === "mindmap") {
+                      const mindmapPart = part as {
+                        type: "mindmap";
+                        content: string;
+                        name?: string;
+                      };
+                      return (
+                        <div key={key} className="mt-3">
+                          <MindMapPreview
+                            content={mindmapPart.content}
+                            filename={mindmapPart.name}
+                            maxHeight="400px"
+                          />
+                        </div>
                       );
                     }
 
@@ -998,6 +1059,75 @@ const PurePreviewMessage = ({
                                     text: answersText,
                                   },
                                 ],
+                              });
+                            }}
+                          />
+                        );
+                      }
+                    }
+
+                    // Handle password_input from Native Agent (sudo password prompts)
+                    if (type === "password_input") {
+                      const passwordPart = part as {
+                        data?: {
+                          toolUseID: string;
+                          originalCommand: string;
+                        };
+                      };
+                      const { data } = passwordPart;
+
+                      if (data?.toolUseID && data?.originalCommand) {
+                        return (
+                          <PasswordInput
+                            key={key}
+                            toolUseID={data.toolUseID}
+                            originalCommand={data.originalCommand}
+                            onSubmit={(password) => {
+                              // Submit password to API
+                              fetch("/api/native/agent/password", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  toolUseID: data.toolUseID,
+                                  password: password,
+                                  originalCommand: data.originalCommand,
+                                }),
+                              })
+                                .then((res) => res.json())
+                                .then((result) => {
+                                  if (!result.success) {
+                                    console.error(
+                                      "[PasswordInput] Failed to submit password:",
+                                      result.error,
+                                    );
+                                  }
+                                })
+                                .catch((err) => {
+                                  console.error(
+                                    "[PasswordInput] Error submitting password:",
+                                    err,
+                                  );
+                                });
+                            }}
+                            onCancel={() => {
+                              // Submit empty password to cancel
+                              fetch("/api/native/agent/password", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  toolUseID: data.toolUseID,
+                                  password: "",
+                                  originalCommand: data.originalCommand,
+                                }),
+                              }).catch((err) => {
+                                console.error(
+                                  "[PasswordInput] Error canceling password input:",
+                                  err,
+                                );
                               });
                             }}
                           />

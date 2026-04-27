@@ -89,6 +89,7 @@ describe("Insights Service", () => {
           lastMessageProcessedAt: null,
           lastActiveAt: null,
           activityTier: "low",
+          lastInsightMaintenanceRunAt: null,
         },
       );
       expect(result).toEqual(defaultSettings);

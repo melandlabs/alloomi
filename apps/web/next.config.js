@@ -134,6 +134,7 @@ const nextConfig = {
       "stripe",
       "@anthropic-ai/sdk",
       "googleapis",
+      "recharts",
     ],
   },
 

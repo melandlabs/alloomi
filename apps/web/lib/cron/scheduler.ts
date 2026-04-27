@@ -36,6 +36,12 @@ export function computeNextRun(
     return new Date(now.getTime() + intervalMs);
   }
 
+  if (config.type === "interval") {
+    const totalMinutes = (config.hours ?? 0) * 60 + (config.minutes ?? 0) || 60;
+    const intervalMs = totalMinutes * 60 * 1000;
+    return new Date(now.getTime() + intervalMs);
+  }
+
   if (config.type === "cron") {
     try {
       const cron = new Cron(config.expression, {

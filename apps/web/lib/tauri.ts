@@ -363,21 +363,12 @@ export interface UpdateInstallResult {
 /**
  * Download progress type (for polling)
  */
-export interface DesktopRenderEngineInstalled {
-  version: string;
-  installed_at: string;
-  install_dir: string;
-  soffice_path: string;
-  pdftoppm_path: string;
-  python_path?: string | null;
-}
-
-export interface DesktopRenderEngineStatus {
-  available: boolean;
-  install_dir: string;
-  installed: DesktopRenderEngineInstalled | null;
-  reason: string;
-  error_message: string | null;
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+  percent: number;
+  done: boolean;
+  error: string | null;
 }
 
 /**
@@ -468,21 +459,6 @@ export const restartForUpdate = async (): Promise<void> => {
   }
 };
 
-export const getRenderEngineStatus =
-  async (): Promise<DesktopRenderEngineStatus | null> => {
-    if (!isTauri()) {
-      return null;
-    }
-    try {
-      return await invoke<DesktopRenderEngineStatus>(
-        "get_render_engine_status",
-      );
-    } catch (error) {
-      console.error("Failed to get render engine status:", error);
-      return null;
-    }
-  };
-
 // ============ Server Status ============
 
 /**
@@ -493,14 +469,6 @@ export interface ServerStatus {
   status: string; // "starting", "downloading", "running", "error"
   error_message: string | null;
   node_version: string | null;
-}
-
-export interface DownloadProgress {
-  downloaded: number;
-  total: number;
-  percent: number;
-  done: boolean;
-  error: string | null;
 }
 
 /**
@@ -530,6 +498,49 @@ export async function restartServer(): Promise<void> {
   } catch (error) {
     console.error("Failed to restart server:", error);
     throw error;
+  }
+}
+
+// ============ Render Engine ============
+
+/**
+ * Desktop render engine installed info
+ */
+export interface DesktopRenderEngineInstalled {
+  version: string;
+  installed_at: string;
+  install_dir: string;
+  soffice_path: string;
+  pdftoppm_path: string;
+  python_path?: string;
+}
+
+/**
+ * Desktop render engine status
+ */
+export interface DesktopRenderEngineStatus {
+  available: boolean;
+  install_dir: string | null;
+  installed: boolean;
+  reason: string | null;
+  error_message: string | null;
+}
+
+/**
+ * Get render engine status (Tauri specific)
+ * Checks if bundled LibreOffice and pdftoppm are available for high-fidelity PPTX rendering
+ */
+export async function getRenderEngineStatus(): Promise<DesktopRenderEngineStatus | null> {
+  if (!isTauri()) {
+    return null;
+  }
+  try {
+    return await invoke<DesktopRenderEngineStatus>(
+      "get_render_engine_status_cmd",
+    );
+  } catch (error) {
+    console.error("Failed to get render engine status:", error);
+    return null;
   }
 }
 
@@ -581,6 +592,8 @@ export const tauriApi = {
   checkForUpdate,
   downloadAndInstallUpdate,
   restartForUpdate,
+  // Render engine
+  getRenderEngineStatus,
   // Notification
   sendNotification,
 };

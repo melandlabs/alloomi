@@ -13,6 +13,10 @@ const ALLOWED_DOMAINS = [
   "code.jquery.com",
 ];
 
+// CDN domains that work at root URL (may redirect to versioned paths)
+// These are trusted CDNs - allow requests even without explicit path/query
+const ROOT_URL_CDNS = ["cdn.tailwindcss.com"];
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -33,7 +37,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate URL has a meaningful path or query
-    if (parsedUrl.pathname === "/" && !parsedUrl.search) {
+    // Exception: some CDNs like cdn.tailwindcss.com work at root URL and may redirect to versioned paths
+    if (
+      parsedUrl.pathname === "/" &&
+      !parsedUrl.search &&
+      !ROOT_URL_CDNS.includes(parsedUrl.hostname)
+    ) {
       return NextResponse.json(
         { error: "URL must have a path or query string" },
         { status: 400 },
@@ -45,6 +54,7 @@ export async function GET(request: NextRequest) {
         "User-Agent":
           "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
       },
+      redirect: "follow",
     });
 
     if (!response.ok) {
@@ -59,7 +69,9 @@ export async function GET(request: NextRequest) {
       contentType.includes("javascript") ||
       contentType.includes("application/javascript") ||
       contentType.includes("application/x-javascript") ||
-      url.endsWith(".js");
+      url.endsWith(".js") ||
+      // cdn.tailwindcss.com always serves JS even at root URL (may redirect to versioned path)
+      parsedUrl.hostname === "cdn.tailwindcss.com";
 
     if (!isJs) {
       return NextResponse.json({ error: "not JS content" }, { status: 400 });

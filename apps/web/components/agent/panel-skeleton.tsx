@@ -2,6 +2,27 @@
 
 import { cn } from "@/lib/utils";
 
+const BRIEF_CATEGORIES = [
+  { key: "urgent" as const, count: 2 },
+  { key: "important" as const, count: 3 },
+  { key: "monitor" as const, count: 2 },
+] as const;
+
+/** Category skeleton styles: use design tokens to match actual tags */
+const CATEGORY_TAG_STYLES: Record<"urgent" | "important" | "monitor", string> =
+  {
+    urgent: "bg-destructive/10 border-destructive/30",
+    important: "bg-accent-brand/10 border-accent-brand/30",
+    monitor: "bg-primary/10 border-primary/30",
+  };
+
+const CATEGORY_TEXT_STYLES: Record<"urgent" | "important" | "monitor", string> =
+  {
+    urgent: "text-destructive",
+    important: "text-accent-brand",
+    monitor: "text-primary",
+  };
+
 /**
  * Skeleton for Chat Panel - matches the actual chat layout structure
  * Includes: message bubbles (AI and user), and input area placeholder
@@ -77,27 +98,6 @@ export function ChatSkeleton() {
     </div>
   );
 }
-
-const BRIEF_CATEGORIES = [
-  { key: "urgent" as const, count: 2 },
-  { key: "important" as const, count: 3 },
-  { key: "monitor" as const, count: 2 },
-] as const;
-
-/** Category skeleton styles: use design tokens to match actual tags */
-const CATEGORY_TAG_STYLES: Record<"urgent" | "important" | "monitor", string> =
-  {
-    urgent: "bg-destructive/10 border-destructive/30",
-    important: "bg-accent-brand/10 border-accent-brand/30",
-    monitor: "bg-primary/10 border-primary/30",
-  };
-
-const CATEGORY_TEXT_STYLES: Record<"urgent" | "important" | "monitor", string> =
-  {
-    urgent: "text-destructive",
-    important: "text-accent-brand",
-    monitor: "text-primary",
-  };
 
 /**
  * Skeleton for Brief Panel - matches the actual layout structure

@@ -16,8 +16,8 @@ import {
   updateIntegrationAccount,
 } from "../db/queries";
 import type { UserContact } from "../db/schema";
-import { fileIngester } from "../integrations/providers/file-ingester";
 import { getBotCredentials } from "./token";
+import { fileIngester } from "../integrations/providers/file-ingester";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -236,6 +236,8 @@ export async function sendReplyByBotId({
       console.log(
         `[Bot ${bot.id}] uses Telegram platform manager to send reply`,
       );
+      const { TelegramAdapter } =
+        await import("@alloomi/integrations/telegram/adapter");
       const credentials = await getBotCredentials("telegram", bot);
       const configuredSession = credentials;
       const configuredBotToken = "";

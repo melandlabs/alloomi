@@ -10,6 +10,8 @@ import {
   statSync,
   rmSync,
   unlinkSync,
+  readFileSync,
+  writeFileSync,
 } from "node:fs";
 import { promises as fs } from "node:fs";
 import { join, dirname, resolve, sep, isAbsolute } from "node:path";
@@ -209,7 +211,6 @@ export function readSessionFile(
   }
 
   try {
-    const { readFileSync } = require("node:fs");
     return readFileSync(fullPath, "utf-8");
   } catch (error) {
     workspaceLogger.error("Failed to read file:", error);
@@ -234,7 +235,6 @@ export function readSessionFileBinary(
   }
 
   try {
-    const { readFileSync } = require("node:fs");
     return readFileSync(fullPath) as Buffer;
   } catch (error) {
     workspaceLogger.error("Failed to read binary file:", error);
@@ -264,7 +264,6 @@ export function getSessionFileSize(
   }
 
   try {
-    const { statSync } = require("node:fs");
     const stats = statSync(fullPath);
     return stats.size;
   } catch (error) {
@@ -284,7 +283,6 @@ export function writeSessionFile(
   const fullPath = join(getTaskSessionDir(taskId), filePath);
 
   try {
-    const { writeFileSync } = require("node:fs");
     const dir = dirname(fullPath);
 
     // Ensure directory exists

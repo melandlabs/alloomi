@@ -12,10 +12,18 @@ import {
   getUserTypeForService,
   getUserById,
   getUserInsightSettings,
+  loadIntegrationCredentials,
 } from "@/lib/db/queries";
 import { DEFAULT_AI_MODEL, AI_PROXY_BASE_URL } from "@/lib/env/constants";
 import { getCloudAuthToken } from "@/lib/auth/token-manager";
 import { handleAgentRuntime } from "@/lib/ai/runtime/shared";
+import { FeishuConversationStore } from "@alloomi/integrations/feishu/conversation-store";
+
+type FeishuCredentials = {
+  appId?: string;
+  appSecret?: string;
+  domain?: "feishu" | "lark";
+};
 
 /** Matches Insight settings language, used for Feishu-side visible text */
 function userPrefersChinese(language: string | null | undefined): boolean {
@@ -97,22 +105,49 @@ export async function handleFeishuInboundMessage(
     const userType = await getUserTypeForService(userId);
     const user = await getUserById(userId);
 
-    // Bot mode: only this user message as "current question", no session history
+    // Get domain from credentials (feishu or lark)
+    const credentials = loadIntegrationCredentials<FeishuCredentials>(account);
+    const domain: "feishu" | "lark" =
+      credentials?.domain === "lark" ? "lark" : "feishu";
+
+    // Initialize conversation store with domain and get history
+    const conversationStore = new FeishuConversationStore(domain);
+    const conversationHistory = conversationStore.getConversationHistory(
+      userId,
+      chatId,
+    );
+
+    // Build prompt with conversation history
+    const historySection =
+      conversationHistory.length > 0
+        ? [
+            "=== Conversation History ===",
+            ...conversationHistory.map(
+              (msg: { role: string; content: string }) =>
+                `[${msg.role.toUpperCase()}]: ${msg.content}`,
+            ),
+            "",
+          ].join("\n")
+        : "";
+
     const prompt = [
       "You are the Alloomi assistant. Help the user based on the following cross-platform message summaries.",
       "When information is insufficient, say so instead of making up content.",
       "",
-      "=== User's question (this single message to the bot) ===",
+      historySection,
+      "=== User's current question ===",
       text,
       "",
-      "Answer concisely.",
-    ].join("\n");
+      "Answer concisely, taking into account the conversation history above.",
+    ]
+      .filter((line) => line !== "")
+      .join("\n");
 
     console.log(
-      "[Feishu] Bot initiating model generation message_id=%s user message length=%d content=%s",
+      "[Feishu] Bot initiating model generation message_id=%s user message length=%d conversationHistory.length=%d",
       messageId,
       text.length,
-      text.slice(0, 200),
+      conversationHistory.length,
     );
 
     // Prefer cached token on inbound; after cold start init sets CloudAuthToken, merge here to avoid WS connected before conn refreshes after restart
@@ -148,7 +183,7 @@ export async function handleFeishuInboundMessage(
         prompt,
         {
           userId,
-          conversation: [],
+          conversation: conversationHistory,
           stream: false,
           silentTools: true, // Don't push tool_use stream to user
           language: insightSettings?.language ?? null,
@@ -171,6 +206,19 @@ export async function handleFeishuInboundMessage(
     }
 
     const answer = replyParts.join("").trim();
+
+    // Save user message and assistant reply to conversation store
+    try {
+      conversationStore.addMessage(userId, chatId, "user", text);
+      if (answer) {
+        conversationStore.addMessage(userId, chatId, "assistant", answer);
+      }
+    } catch (saveError) {
+      console.error(
+        "[Feishu] Failed to save conversation messages:",
+        saveError,
+      );
+    }
 
     const looksLikeAuthOrProxyFailure = (s: string) =>
       s.includes("无效的令牌") ||

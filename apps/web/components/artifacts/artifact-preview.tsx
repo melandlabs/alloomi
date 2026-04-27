@@ -31,11 +31,17 @@ const MarkdownPreview = lazy(() =>
     default: mod.MarkdownPreview,
   })),
 );
+const MindMapPreview = lazy(() =>
+  import("./mindmap-preview").then((mod) => ({
+    default: mod.MindMapPreview,
+  })),
+);
 
 export type ArtifactType =
   | "code"
   | "html"
   | "markdown"
+  | "mindmap"
   | "text"
   | "image"
   | "pdf"
@@ -60,6 +66,7 @@ interface ArtifactPreviewProps {
   artifact: Artifact;
   className?: string;
   maxHeight?: string;
+  /** Optional taskId for workspace files - enables server-side high-fidelity rendering for PPTX */
   taskId?: string;
 }
 
@@ -97,6 +104,7 @@ const EXTENSION_MAP: Record<string, ArtifactType> = {
   // Document files
   md: "markdown",
   markdown: "markdown",
+  mmark: "mindmap",
   txt: "text",
   pdf: "pdf",
   doc: "document",
@@ -153,6 +161,7 @@ function getFileIconName(type: ArtifactType): string {
     case "code":
     case "html":
     case "markdown":
+    case "mindmap":
     case "text":
     case "document":
       return "file_text";
@@ -309,6 +318,56 @@ export function ArtifactPreview({
           }
         >
           <MarkdownPreview content={content} filename={name} filePath={path} />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // Mind map preview
+  if (inferredType === "mindmap") {
+    if (!content) {
+      return (
+        <div
+          className={cn(
+            "flex items-center gap-3 p-4 rounded-lg bg-muted",
+            className,
+          )}
+        >
+          <RemixIcon
+            name="mind-map"
+            size="size-8"
+            className="text-muted-foreground"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{name}</p>
+            {fileSize && (
+              <p className="text-sm text-muted-foreground">
+                {formatFileSize(fileSize)}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("rounded-lg overflow-hidden border", className)}>
+        <Suspense
+          fallback={
+            <div className="p-4 flex items-center justify-center">
+              <RemixIcon
+                name="loader_2"
+                size="size-5"
+                className="animate-spin"
+              />
+            </div>
+          }
+        >
+          <MindMapPreview
+            content={content}
+            filename={name}
+            maxHeight={maxHeight}
+          />
         </Suspense>
       </div>
     );

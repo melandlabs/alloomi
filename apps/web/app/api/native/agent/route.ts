@@ -29,22 +29,10 @@ import os from "node:os";
 import { getDocument, getDocumentChunks } from "@/lib/ai/rag/langchain-service";
 import { readFile } from "@/lib/storage";
 import { permissionResponses } from "./permission/route";
+import { detectSudoPasswordPrompt } from "./password/route";
 
 // Register Claude Agent plugin
 getAgentRegistry().register(claudePlugin);
-
-/**
- * Detects if the output contains a sudo password prompt
- */
-function detectSudoPasswordPrompt(output: string): boolean {
-  if (!output || typeof output !== "string") return false;
-  const lowerOutput = output.toLowerCase();
-  return (
-    lowerOutput.includes("sudo") ||
-    lowerOutput.includes("password") ||
-    lowerOutput.includes("authentication")
-  );
-}
 
 interface AgentRequest {
   prompt: string;
@@ -709,8 +697,6 @@ ${insightsContent}
     >();
 
     let generator: AsyncGenerator<AgentMessage>;
-
-    // Track if the generator completed normally
     let generatorCompletedNormally = false;
 
     // Route based on phase
@@ -969,6 +955,7 @@ ${insightsContent}
     }
 
     // Create SSE stream
+    // Track if the generator completed normally
     const readable = createSSEStream(generator, () => {
       // Only abort if generator did not complete normally
       if (!generatorCompletedNormally) {

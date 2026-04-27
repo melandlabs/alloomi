@@ -6,7 +6,7 @@
 //! Shared constants for the Alloomi Tauri application.
 
 /// The port where the Next.js development server runs.
-pub const NEXTJS_PORT: u16 = 3515;
+pub const NEXTJS_PORT: u16 = 3415;
 
 /// The base URL for the Next.js server.
 pub const NEXTJS_BASE_URL: &str = "http://localhost";

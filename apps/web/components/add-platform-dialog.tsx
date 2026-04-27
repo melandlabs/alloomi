@@ -482,6 +482,67 @@ export function AddPlatformContent({
   }, [integrations, t, mutate]);
 
   /**
+   * Start polling session status (Web mode)
+   */
+  const startPollingForSessionStatus = useCallback(
+    (sessionId: string, popupWindow: Window | null) => {
+      let pollCount = 0;
+      const maxPolls = 60; // Poll at most 60 times (3 minutes, every 3 seconds)
+      const pollInterval = 3000; // Poll every 3 seconds
+
+      const pollTimer = setInterval(async () => {
+        pollCount++;
+
+        try {
+          const response = await fetch(`/api/x/status?sessionId=${sessionId}`);
+          const data = await response.json();
+
+          if (data.status === "completed") {
+            clearInterval(pollTimer);
+            popupWindow?.close();
+
+            // Refresh local account list
+            await mutate("/api/integrations");
+
+            toast({
+              type: "success",
+              description: "Twitter connected successfully!",
+            });
+            return;
+          }
+
+          if (data.status === "error") {
+            clearInterval(pollTimer);
+            popupWindow?.close();
+
+            toast({
+              type: "error",
+              description: data.error || "Twitter authorization failed",
+            });
+            return;
+          }
+        } catch (error) {
+          console.error("[Twitter] Polling error:", error);
+          // Continue polling, don't stop due to a single network error
+        }
+
+        if (pollCount >= maxPolls) {
+          clearInterval(pollTimer);
+
+          toast({
+            type: "error",
+            description: "Connection timed out. Please try again.",
+          });
+        }
+      }, pollInterval);
+
+      // Store timer reference for cleanup
+      pollingTimerRef.current = pollTimer;
+    },
+    [mutate, t],
+  );
+
+  /**
    * Execute X (Twitter) OAuth authorization
    */
   const executeTwitterConnect = useCallback(async () => {
@@ -502,7 +563,8 @@ export function AddPlatformContent({
         }
       }
 
-      const authorizationUrl = await getXAuthorizationUrl(authToken);
+      const { authorizationUrl, sessionId } =
+        await getXAuthorizationUrl(authToken);
 
       if (isTauri()) {
         // Tauri environment: use Tauri openUrl API
@@ -512,8 +574,11 @@ export function AddPlatformContent({
         // Start polling cloud accounts (Tauri mode only)
         startPollingForAccounts("twitter");
       } else {
-        // Web environment: use window.open
-        openUrl(authorizationUrl);
+        // Web environment: use window.open and poll session status
+        const popupWindow = window.open(authorizationUrl, "_blank");
+        if (popupWindow) {
+          startPollingForSessionStatus(sessionId, popupWindow);
+        }
       }
     } catch (error) {
       console.error("[Twitter Connect] Error:", error);

@@ -130,6 +130,10 @@ export default defineConfig({
         replacement: alias("../../packages/ai/src/index.ts"),
       },
       {
+        find: "@alloomi/audit",
+        replacement: alias("../../packages/audit/src/index.ts"),
+      },
+      {
         find: "@alloomi/integrations/channels/sources/types",
         replacement: alias(
           "../../packages/integrations/channels/src/sources/types.ts",
@@ -221,6 +225,10 @@ export default defineConfig({
       {
         find: "@alloomi/shared",
         replacement: alias("../../packages/shared/src/index.ts"),
+      },
+      {
+        find: "@alloomi/security/key-manager",
+        replacement: alias("../../packages/security/src/key-manager.ts"),
       },
       {
         find: "@alloomi/security",

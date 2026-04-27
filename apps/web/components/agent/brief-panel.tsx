@@ -63,8 +63,14 @@ export function AgentBriefPanel({
 
   /** Connect Account (tool failures) → Connectors page + add platform */
   useEffect(() => {
-    const handler = () => {
-      router.push("/connectors?addPlatform=true");
+    const handler = (e: Event) => {
+      const platform = (e as CustomEvent).detail?.platform as
+        | string
+        | undefined;
+      const url = platform
+        ? `/connectors?addPlatform=true&platform=${encodeURIComponent(platform)}`
+        : "/connectors?addPlatform=true";
+      router.push(url);
     };
     window.addEventListener("alloomi:request-integration", handler);
     return () =>

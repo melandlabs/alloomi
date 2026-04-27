@@ -8,6 +8,20 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
 
+// Redis connection pool configuration
+const REDIS_POOL_SIZE = Number.parseInt(
+  process.env.REDIS_POOL_SIZE || "10",
+  10,
+);
+const REDIS_COMMAND_TIMEOUT = Number.parseInt(
+  process.env.REDIS_COMMAND_TIMEOUT || "5000",
+  10,
+);
+const REDIS_IDLE_TIMEOUT = Number.parseInt(
+  process.env.REDIS_IDLE_TIMEOUT || "30000",
+  10,
+);
+
 function base64url(data: string | Buffer): string {
   return Buffer.from(data)
     .toString("base64")
@@ -95,6 +109,28 @@ let isRedisEnabled = false;
 let redisReady = false;
 // Promise that resolves when Redis initialization completes and connection is ready
 let redisInitPromise: Promise<void> | null = null;
+let gracefulShutdownSetup = false;
+
+// Setup graceful shutdown for Redis connection
+function setupGracefulShutdown() {
+  const shutdown = async (signal: string) => {
+    console.log(`[Redis] Received ${signal}, shutting down gracefully...`);
+    if (redis && !(redis instanceof Redis)) {
+      // In-memory mock doesn't need graceful shutdown
+      console.log("[Redis] In-memory mode, skipping graceful shutdown");
+      process.exit(0);
+      return;
+    }
+    if (redis && redis instanceof Redis) {
+      await redis.quit();
+      console.log("[Redis] Connection closed");
+    }
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
 
 async function initRedis(): Promise<void> {
   if (isTauriMode()) {
@@ -118,7 +154,12 @@ async function initRedis(): Promise<void> {
         if (times > 3) return null;
         return delay;
       },
+      commandTimeout: REDIS_COMMAND_TIMEOUT,
     });
+
+    console.log(
+      `[Redis] Config: commandTimeout=${REDIS_COMMAND_TIMEOUT}ms, poolSize=${REDIS_POOL_SIZE}`,
+    );
 
     redis.on("error", (err: Error) => {
       console.error("[Redis] Connection error:", err.message);
@@ -161,6 +202,19 @@ async function initRedis(): Promise<void> {
     const RedisMock = (await import("ioredis-mock")).default;
     redis = new RedisMock();
   }
+
+  // Setup graceful shutdown once after initialization
+  if (!gracefulShutdownSetup) {
+    setupGracefulShutdown();
+    gracefulShutdownSetup = true;
+  }
+
+  // Setup keyspace notifications for expired keys (non-blocking)
+  // This enables on_session_finalize hooks to fire when TTL expires
+  // Note: Requires Redis to be configured with: notify-keyspace-events Ex
+  setupKeyspaceNotifications().catch((error) => {
+    console.warn("[Session] Keyspace notification setup failed:", error);
+  });
 }
 
 /**
@@ -170,6 +224,13 @@ async function initRedis(): Promise<void> {
 export async function ensureRedis(): Promise<Redis | InMemoryRedis> {
   // If we have a ready instance, return it
   if (redis && redisReady) {
+    // Periodic health check logging (every 100 calls)
+    if (redis && redis instanceof Redis) {
+      const status = redis.status;
+      if (status !== "ready") {
+        console.log(`[Redis] Health check: status=${status}`);
+      }
+    }
     return redis;
   }
 
@@ -201,6 +262,157 @@ export const INSIGHTS_KEY_PREFIX = "insights_session:";
 export const INSIGHTS_LOCK_PREFIX = "insights_lock:";
 
 export const SESSION_EXPIRE_MS = 1800000;
+
+// ============ Session Finalize Hooks ============
+
+/**
+ * Session finalize hook - called when a session is being cleaned up
+ * Used for releasing resources like Redis connections, file handles, temp files
+ */
+export interface SessionFinalizeHook {
+  /**
+   * Unique name for the hook
+   */
+  name: string;
+  /**
+   * Called when a session is finalized/cleaned up
+   * @param sessionId - The session ID being finalized
+   * @param sessionType - Type of session ('login' | 'insights' | 'task')
+   * @param sessionData - The session data if available (may be null for TTL-expired sessions)
+   */
+  on_session_finalize: (
+    sessionId: string,
+    sessionType: "login" | "insights" | "task",
+    sessionData: LoginSession | InsightSession | null,
+  ) => Promise<void>;
+}
+
+// Registry of session finalize hooks
+const sessionFinalizeHooks: SessionFinalizeHook[] = [];
+
+/**
+ * Whether keyspace notifications are enabled for Redis expiration events
+ */
+let keyspaceNotificationsEnabled = false;
+
+/**
+ * Subscribe to Redis keyspace notifications for expired keys
+ * Requires Redis to be configured with: notify-keyspace-events Ex
+ */
+async function setupKeyspaceNotifications(): Promise<void> {
+  if (!redis || !(redis instanceof Redis)) {
+    return; // Only for real Redis, not ioredis-mock
+  }
+
+  try {
+    // Subscribe to expired key events
+    const subscriber = redis.duplicate();
+    await subscriber.subscribe("__keyevent@0__:expired");
+
+    subscriber.on("pmessage", (_pattern, _channel, message) => {
+      // message is the expired key
+      handleExpiredKey(message);
+    });
+
+    keyspaceNotificationsEnabled = true;
+    console.log("[Session] Keyspace notifications enabled for expired keys");
+  } catch (error) {
+    console.warn(
+      "[Session] Failed to enable keyspace notifications:",
+      error,
+      "- TTL expiration hooks will not fire automatically",
+    );
+  }
+}
+
+/**
+ * Handle an expired Redis key
+ */
+async function handleExpiredKey(key: string): Promise<void> {
+  if (key.startsWith(LOGIN_SESSION_KEY_PREFIX)) {
+    const sessionId = key.slice(LOGIN_SESSION_KEY_PREFIX.length);
+    console.log(`[Session] Login session expired: ${sessionId}`);
+    await executeFinalizeHooks(sessionId, "login", null);
+  } else if (key.startsWith(INSIGHTS_KEY_PREFIX)) {
+    const botId = key.slice(INSIGHTS_KEY_PREFIX.length);
+    console.log(`[Session] Insights session expired: ${botId}`);
+    await executeFinalizeHooks(botId, "insights", null);
+  }
+}
+
+/**
+ * Register a session finalize hook
+ * @param hook - The hook to register
+ * @returns Unsubscribe function
+ */
+export function registerSessionFinalizeHook(
+  hook: SessionFinalizeHook,
+): () => void {
+  sessionFinalizeHooks.push(hook);
+  console.log(`[Session] Registered finalize hook: ${hook.name}`);
+
+  return () => {
+    const index = sessionFinalizeHooks.indexOf(hook);
+    if (index !== -1) {
+      sessionFinalizeHooks.splice(index, 1);
+      console.log(`[Session] Unregistered finalize hook: ${hook.name}`);
+    }
+  };
+}
+
+/**
+ * Execute all finalize hooks for a session
+ */
+async function executeFinalizeHooks(
+  sessionId: string,
+  sessionType: "login" | "insights" | "task",
+  sessionData: LoginSession | InsightSession | null,
+): Promise<void> {
+  const errors: string[] = [];
+
+  for (const hook of sessionFinalizeHooks) {
+    try {
+      await hook.on_session_finalize(sessionId, sessionType, sessionData);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      errors.push(`${hook.name}: ${msg}`);
+      console.error(`[Session] Hook ${hook.name} failed:`, error);
+    }
+  }
+
+  if (errors.length > 0) {
+    console.warn(
+      `[Session] Some hooks failed for ${sessionType}:${sessionId}:`,
+      errors,
+    );
+  }
+}
+
+/**
+ * Execute finalize hooks and cleanup resources
+ */
+async function finalizeSession(
+  sessionId: string,
+  sessionType: "login" | "insights" | "task",
+  sessionData: LoginSession | InsightSession | null,
+): Promise<void> {
+  // First execute all hooks
+  await executeFinalizeHooks(sessionId, sessionType, sessionData);
+
+  // Then cleanup task session directory if it's a task session
+  if (sessionType === "task") {
+    try {
+      const { deleteTaskSession } =
+        await import("@/lib/files/workspace/sessions");
+      deleteTaskSession(sessionId);
+    } catch (error) {
+      console.warn(
+        `[Session] Failed to cleanup task session dir: ${sessionId}`,
+        error,
+      );
+    }
+  }
+}
 
 // ============ File-based storage for Tauri mode ============
 
@@ -368,12 +580,17 @@ export async function getLoginSession(
 
 /**
  * Delete login session from Redis (used on expiration/logout)
+ * Triggers on_session_finalize hooks for cleanup
  * @param sessionId - Session ID
  */
 export async function deleteLoginSession(sessionId: string) {
   if (!isRedisEnabled) {
     return false;
   }
+
+  // Get session data before deletion for hooks
+  const sessionData = await getLoginSession(sessionId);
+
   if (isTauriMode()) {
     const filePath = path.join(
       getTauriStoragePath(),
@@ -385,11 +602,15 @@ export async function deleteLoginSession(sessionId: string) {
     } catch {
       /* ignore */
     }
+    // Execute finalize hooks
+    await finalizeSession(sessionId, "login", sessionData);
     return true;
   }
   try {
     const key = `${LOGIN_SESSION_KEY_PREFIX}${sessionId}`;
     await redis?.del(key);
+    // Execute finalize hooks
+    await finalizeSession(sessionId, "login", sessionData);
     return true;
   } catch {
     return false;
@@ -456,6 +677,10 @@ export async function deleteInsightsSession(botId: string) {
   if (!isRedisEnabled) {
     return false;
   }
+
+  // Get session data before deletion for hooks
+  const sessionData = await getInsightsSession(botId);
+
   if (isTauriMode()) {
     try {
       await rm(path.join(getTauriStoragePath(), "insights", `${botId}.json`), {
@@ -465,12 +690,16 @@ export async function deleteInsightsSession(botId: string) {
       /* ignore */
     }
     await releaseInsightLock(botId);
+    // Execute finalize hooks
+    await finalizeSession(botId, "insights", sessionData);
     return true;
   }
   try {
     const key = `${INSIGHTS_KEY_PREFIX}${botId}`;
     await redis?.del(key);
     await releaseInsightLock(botId);
+    // Execute finalize hooks
+    await finalizeSession(botId, "insights", sessionData);
     return true;
   } catch {
     return false;

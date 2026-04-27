@@ -63,6 +63,18 @@ function isTauriEnvEnabled(): boolean {
   return process.env.NEXT_PUBLIC_FORCE_WEB_AGENT_DEBUG === "true";
 }
 
+function dateTimeInputFromValue(value: string | Date | null | undefined) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 /** Panel ref exposed methods, for independent page to open "New Task" dialog in header */
 export interface ScheduledJobsPanelRef {
   openCreateDialog: () => void;
@@ -393,9 +405,7 @@ export const ScheduledJobsPanel = forwardRef<
       intervalHours: job.intervalMinutes
         ? Math.floor(job.intervalMinutes / 60)
         : 1,
-      scheduledAt: job.scheduledAt
-        ? new Date(job.scheduledAt).toISOString().slice(0, 16)
-        : "",
+      scheduledAt: dateTimeInputFromValue(job.scheduledAt),
       enabled: job.enabled,
       timezone: job.timezone,
     });

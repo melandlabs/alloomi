@@ -80,11 +80,18 @@ export const insightNotes = (currentSchema as any).insightNotes;
 export const insightDocuments = (currentSchema as any).insightDocuments;
 export const insightBriefCategories = (currentSchema as any)
   .insightBriefCategories;
+export const insightCompactionLinks = (currentSchema as any)
+  .insightCompactionLinks;
 // Weight management tables
 export const insightWeights = (currentSchema as any).insightWeights;
 export const insightWeightHistory = (currentSchema as any).insightWeightHistory;
 export const insightViewHistory = (currentSchema as any).insightViewHistory;
 export const insightWeightConfig = (currentSchema as any).insightWeightConfig;
+
+// Credential security tables
+export const credentialRotationHistory = (currentSchema as any)
+  .credentialRotationHistory;
+export const credentialAccessLog = (currentSchema as any).credentialAccessLog;
 
 // Tables only available in PostgreSQL mode
 export const insightProcessingFailures = (currentSchema as any)
@@ -179,6 +186,8 @@ export type {
   InsertInsightDocument,
   InsightBriefCategory,
   InsertInsightBriefCategory,
+  InsightCompactionLink,
+  InsertInsightCompactionLink,
   InsightWeight,
   InsertInsightWeight,
   InsightWeightHistory,
@@ -189,6 +198,10 @@ export type {
   InsertInsightWeightConfig,
   Character,
   InsertCharacter,
+  CredentialRotationHistory,
+  InsertCredentialRotationHistory,
+  CredentialAccessLog,
+  InsertCredentialAccessLog,
 } from "./schema.pg";
 
 // Re-export SQLite-specific types

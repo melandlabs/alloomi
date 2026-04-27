@@ -1,23 +1,26 @@
-import { createHash } from "node:crypto";
+/**
+ * PPTX Render Pipeline
+ *
+ * Server-side PPTX preview rendering via LibreOffice -> PDF -> PNG -> WebP pipeline.
+ * Falls back to client-side rendering when render engine is not available.
+ */
+
+import { execFile } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
-  statSync,
-  type Stats,
   writeFileSync,
+  statSync,
+  unlinkSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
-import { basename, extname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, extname, join, dirname, sep } from "node:path";
 import sharp from "sharp";
-import { getTaskSessionDir } from "@/lib/files/workspace/sessions";
+import { createHash } from "node:crypto";
+import { getTaskSessionDir } from "./workspace/sessions";
+import { workspaceLogger } from "@/lib/utils/logger";
 
-const PPTX_RENDER_CACHE_DIR = ".alloomi-preview/pptx";
-const DEFAULT_SLIDE_WIDTH = 1600;
-const DEFAULT_SLIDE_HEIGHT = 900;
-
-export interface PptxRenderedSlide {
+export interface PptxSlideRender {
   index: number;
   path: string;
   width: number;
@@ -25,376 +28,476 @@ export interface PptxRenderedSlide {
 }
 
 export interface PptxRenderManifest {
-  version: 1;
-  sourcePath: string;
-  sourceMtimeMs: number;
-  sourceSize: number;
-  cacheKey: string;
-  slideCount: number;
-  pdfPath: string;
-  slides: PptxRenderedSlide[];
-  generatedAt: string;
+  task_id: string;
+  source_path: string;
+  cache_key: string;
+  slides: PptxSlideRender[];
+  created_at: string;
+  engine: "bundled" | "system" | "fallback";
 }
 
-function ensureDir(dir: string) {
+// Get render engine paths from environment or bundled location
+function getRenderEnginePaths(): {
+  soffice_bin: string | null;
+  pdftoppm_bin: string | null;
+} {
+  // Environment variables set by Tauri desktop app
+  const soffice_bin = process.env.SOFFICE_BIN || null;
+  const pdftoppm_bin = process.env.PDFTOPPM_BIN || null;
+
+  return { soffice_bin, pdftoppm_bin };
+}
+
+// Get the platform-specific render engine directory
+function getBundledEngineDir(): string | null {
+  const resource_dir = process.env.RESOURCE_DIR || "";
+  if (!resource_dir) return null;
+
+  const platform = getPlatformDir();
+  const engine_dir = join(resource_dir, "render-engine", platform);
+
+  return engine_dir;
+}
+
+function getPlatformDir(): string {
+  const platform = process.platform;
+  const arch = process.arch;
+
+  if (platform === "darwin") {
+    return arch === "arm64" ? "darwin-arm64" : "darwin-x64";
+  }
+  if (platform === "linux") {
+    return "linux-x64";
+  }
+  if (platform === "win32") {
+    return "windows-x64";
+  }
+  return "unknown";
+}
+
+// Find bundled soffice binary
+function findBundledSoffice(): string | null {
+  const engine_dir = getBundledEngineDir();
+  if (!engine_dir || !existsSync(engine_dir)) return null;
+
+  // Check direct soffice binary
+  const soffice_path = join(engine_dir, "soffice");
+  if (existsSync(soffice_path)) {
+    return soffice_path;
+  }
+
+  // Check LibreOffice.app on macOS
+  if (process.platform === "darwin") {
+    const libreoffice_app = join(
+      engine_dir,
+      "LibreOffice.app",
+      "Contents",
+      "MacOS",
+      "soffice",
+    );
+    if (existsSync(libreoffice_app)) {
+      return libreoffice_app;
+    }
+  }
+
+  return null;
+}
+
+// Find bundled pdftoppm binary
+function findBundledPdftoppm(): string | null {
+  const engine_dir = getBundledEngineDir();
+  if (!engine_dir || !existsSync(engine_dir)) return null;
+
+  const pdftoppm_path = join(engine_dir, "pdftoppm");
+  if (existsSync(pdftoppm_path)) {
+    return pdftoppm_path;
+  }
+
+  // Check bin subdirectory
+  const pdftoppm_bin = join(engine_dir, "bin", "pdftoppm");
+  if (existsSync(pdftoppm_bin)) {
+    return pdftoppm_bin;
+  }
+
+  return null;
+}
+
+// Find binary in PATH
+function findInPath(name: string): string | null {
+  const path = process.env.PATH || "";
+  const pathDirs = path.split(process.platform === "win32" ? ";" : ":");
+
+  for (const dir of pathDirs) {
+    const fullPath = join(dir, name);
+    if (existsSync(fullPath)) {
+      return fullPath;
+    }
+    // Also check .cmd on Windows
+    if (process.platform === "win32") {
+      const cmdPath = join(dir, `${name}.cmd`);
+      if (existsSync(cmdPath)) {
+        return cmdPath;
+      }
+    }
+  }
+  return null;
+}
+
+// Validate that the render engine is available
+export function isRenderEngineAvailable(): boolean {
+  const { soffice_bin, pdftoppm_bin } = getRenderEnginePaths();
+
+  // Use env var if set
+  if (soffice_bin && pdftoppm_bin) {
+    return existsSync(soffice_bin) && existsSync(pdftoppm_bin);
+  }
+
+  // Use bundled binaries
+  const soffice = findBundledSoffice();
+  const pdftoppm = findBundledPdftoppm();
+
+  if (soffice && pdftoppm) {
+    return true;
+  }
+
+  // Fallback: check PATH
+  const sofficeInPath = findInPath("soffice");
+  const pdftoppmInPath = findInPath("pdftoppm");
+
+  return !!(sofficeInPath && pdftoppmInPath);
+}
+
+// Get effective soffice binary path
+function getSofficeBin(): string | null {
+  const { soffice_bin } = getRenderEnginePaths();
+  if (soffice_bin && existsSync(soffice_bin)) {
+    return soffice_bin;
+  }
+  const bundled = findBundledSoffice();
+  if (bundled) return bundled;
+  return findInPath("soffice");
+}
+
+// Get effective pdftoppm binary path
+function getPdftoppmBin(): string | null {
+  const { pdftoppm_bin } = getRenderEnginePaths();
+  if (pdftoppm_bin && existsSync(pdftoppm_bin)) {
+    return pdftoppm_bin;
+  }
+  const bundled = findBundledPdftoppm();
+  if (bundled) return bundled;
+  return findInPath("pdftoppm");
+}
+
+// Generate a cache key based on file path and modification time
+async function generateCacheKey(
+  taskId: string,
+  pptxSourcePath: string,
+): Promise<string> {
+  // Handle both absolute and relative paths
+  const fullPath = pptxSourcePath.startsWith("/")
+    ? decodeURIComponent(pptxSourcePath)
+    : join(getTaskSessionDir(taskId), pptxSourcePath);
+
+  let mtime = 0;
+  try {
+    const stats = statSync(fullPath);
+    mtime = stats.mtimeMs;
+  } catch {
+    // Ignore
+  }
+
+  const hash = createHash("sha256");
+  hash.update(`${taskId}:${pptxSourcePath}:${mtime}`);
+  return hash.digest("hex").substring(0, 16);
+}
+
+// Get preview cache directory for a task
+function getPreviewCacheDir(taskId: string): string {
+  const sessionDir = getTaskSessionDir(taskId);
+  return join(sessionDir, ".alloomi-preview", "pptx");
+}
+
+// Ensure directory exists
+function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 }
 
-function toSessionRelative(taskId: string, absolutePath: string): string {
-  const sessionDir = resolve(getTaskSessionDir(taskId));
-  const normalizedSessionDir = sessionDir.endsWith("/")
-    ? sessionDir
-    : `${sessionDir}/`;
+// Run soffice to convert PPTX to PDF
+async function convertPptxToPdf(
+  soffice_bin: string,
+  sourcePath: string,
+  outputDir: string,
+): Promise<string> {
+  // Construct expected PDF path directly (soffice doesn't reliably output to stdout)
+  const baseName = basename(sourcePath, extname(sourcePath));
+  const expectedPdf = join(outputDir, `${baseName}.pdf`);
 
-  if (!absolutePath.startsWith(normalizedSessionDir)) {
-    throw new Error("Rendered preview escaped session directory");
-  }
+  return new Promise((resolve, reject) => {
+    // soffice doesn't accept -- separator; file path goes directly after --outdir
+    const args = [
+      "--headless",
+      "--convert-to",
+      "pdf",
+      "--outdir",
+      outputDir,
+      sourcePath,
+    ];
 
-  return absolutePath.slice(normalizedSessionDir.length);
-}
+    workspaceLogger.info("[pptx-render] Running soffice:", {
+      bin: soffice_bin,
+      args,
+    });
 
-function resolvePptxPath(taskId: string, sourcePath: string): string {
-  const sessionDir = resolve(getTaskSessionDir(taskId));
+    execFile(soffice_bin, args, { timeout: 60000 }, (error, stdout, stderr) => {
+      if (error) {
+        workspaceLogger.error("[pptx-render] soffice error:", error);
+        workspaceLogger.error("[pptx-render] soffice stdout:", stdout);
+        workspaceLogger.error("[pptx-render] soffice stderr:", stderr);
+        reject(new Error(`soffice failed: ${error.message}`));
+        return;
+      }
 
-  if (isAbsolute(sourcePath)) {
-    const resolvedAbsolute = resolve(sourcePath);
-    if (
-      resolvedAbsolute.startsWith(sessionDir + sep) ||
-      resolvedAbsolute === sessionDir
-    ) {
-      return resolvedAbsolute;
-    }
-    throw new Error("PPTX path escaped session directory");
-  }
+      workspaceLogger.info("[pptx-render] soffice stdout:", stdout);
 
-  const resolvedRelative = resolve(join(sessionDir, sourcePath));
-  if (
-    !resolvedRelative.startsWith(sessionDir + sep) &&
-    resolvedRelative !== sessionDir
-  ) {
-    throw new Error("PPTX path escaped session directory");
-  }
+      // soffice may return before file is fully written - wait and retry
+      const maxRetries = 5;
+      const retryDelay = 500;
 
-  return resolvedRelative;
-}
+      const checkFile = (retries: number): void => {
+        if (existsSync(expectedPdf)) {
+          workspaceLogger.info("[pptx-render] PDF created:", expectedPdf);
+          resolve(expectedPdf);
+        } else if (retries > 0) {
+          workspaceLogger.info(
+            `[pptx-render] Waiting for PDF... (${retries} retries left)`,
+          );
+          setTimeout(() => checkFile(retries - 1), retryDelay);
+        } else {
+          workspaceLogger.error(
+            "[pptx-render] PDF not found at expected path:",
+            expectedPdf,
+          );
+          workspaceLogger.error("[pptx-render] soffice stdout:", stdout);
+          workspaceLogger.error("[pptx-render] soffice stderr:", stderr);
+          reject(new Error("soffice did not produce expected PDF output"));
+        }
+      };
 
-function getRepoRoot(): string {
-  return resolve(process.cwd(), "..", "..");
-}
-
-type InstalledRenderEngineRecord = {
-  version: string;
-  installed_at?: string;
-  installedAt?: string;
-  install_dir?: string;
-  installDir?: string;
-  soffice_path?: string;
-  sofficePath?: string;
-  pdftoppm_path?: string;
-  pdftoppmPath?: string;
-  python_path?: string | null;
-  pythonPath?: string | null;
-};
-
-function getInstalledRenderEngineRecordPath(): string {
-  return resolve(
-    process.env.HOME || "",
-    ".alloomi",
-    "render-engines",
-    "office",
-    "installed.json",
-  );
-}
-
-function readInstalledRenderEngine(): {
-  sofficePath: string;
-  pdftoppmPath: string;
-  pythonPath: string | null;
-} | null {
-  const recordPath = getInstalledRenderEngineRecordPath();
-  if (!existsSync(recordPath)) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(
-      readFileSync(recordPath, "utf-8"),
-    ) as InstalledRenderEngineRecord;
-
-    const sofficePath = parsed.soffice_path || parsed.sofficePath;
-    const pdftoppmPath = parsed.pdftoppm_path || parsed.pdftoppmPath;
-    const pythonPath = parsed.python_path ?? parsed.pythonPath ?? null;
-
-    if (!sofficePath || !pdftoppmPath) {
-      return null;
-    }
-
-    return {
-      sofficePath,
-      pdftoppmPath,
-      pythonPath,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getSofficeScriptPath(): string {
-  const repoRoot = getRepoRoot();
-  const scriptPath = join(
-    repoRoot,
-    "skills",
-    "pptx",
-    "scripts",
-    "office",
-    "soffice.py",
-  );
-
-  if (!existsSync(scriptPath)) {
-    throw new Error(`Missing soffice helper script: ${scriptPath}`);
-  }
-
-  return scriptPath;
-}
-
-function getPythonCommand(): string {
-  const installedEngine = readInstalledRenderEngine();
-  if (installedEngine?.pythonPath && existsSync(installedEngine.pythonPath)) {
-    return installedEngine.pythonPath;
-  }
-
-  try {
-    execFileSync("python3", ["--version"], { stdio: "ignore" });
-    return "python3";
-  } catch {
-    try {
-      execFileSync("python", ["--version"], { stdio: "ignore" });
-      return "python";
-    } catch {
-      throw new Error(
-        "Python runtime not found. Install python3 or make `python` available on PATH.",
-      );
-    }
-  }
-}
-
-function getRenderPaths(taskId: string, pptxPath: string, stats: Stats) {
-  const sessionDir = getTaskSessionDir(taskId);
-  const cacheRoot = join(sessionDir, PPTX_RENDER_CACHE_DIR);
-  const cacheKey = createHash("sha256")
-    .update(`${pptxPath}:${stats.size}:${stats.mtimeMs}`)
-    .digest("hex")
-    .slice(0, 24);
-  const renderDir = join(cacheRoot, cacheKey);
-  const manifestPath = join(renderDir, "manifest.json");
-  const pdfPath = join(
-    renderDir,
-    `${basename(pptxPath, extname(pptxPath))}.pdf`,
-  );
-
-  return { cacheRoot, cacheKey, renderDir, manifestPath, pdfPath };
-}
-
-function getSofficeCommand(): string {
-  const installedEngine = readInstalledRenderEngine();
-  if (installedEngine?.sofficePath && existsSync(installedEngine.sofficePath)) {
-    return installedEngine.sofficePath;
-  }
-
-  const explicit = process.env.SOFFICE_BIN;
-  if (explicit && existsSync(explicit)) {
-    return explicit;
-  }
-
-  return "soffice";
-}
-
-function getPdftoppmCommand(): string {
-  const installedEngine = readInstalledRenderEngine();
-  if (
-    installedEngine?.pdftoppmPath &&
-    existsSync(installedEngine.pdftoppmPath)
-  ) {
-    return installedEngine.pdftoppmPath;
-  }
-
-  const explicit = process.env.PDFTOPPM_BIN;
-  if (explicit && existsSync(explicit)) {
-    return explicit;
-  }
-
-  return "pdftoppm";
-}
-
-function isManifestUsable(
-  manifest: Partial<PptxRenderManifest>,
-  pptxPath: string,
-  stats: Stats,
-) {
-  if (manifest.version !== 1) return false;
-  if (manifest.sourcePath !== pptxPath) return false;
-  if (manifest.sourceMtimeMs !== stats.mtimeMs) return false;
-  if (manifest.sourceSize !== stats.size) return false;
-  if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
-    return false;
-  }
-  return manifest.slides.every(
-    (slide) =>
-      typeof slide?.path === "string" && typeof slide?.index === "number",
-  );
-}
-
-function renderPdfFromPptx(pptxPath: string, outDir: string, pdfPath: string) {
-  const scriptPath = getSofficeScriptPath();
-  const pythonCommand = getPythonCommand();
-  const sofficeCommand = getSofficeCommand();
-
-  try {
-    execFileSync(
-      pythonCommand,
-      [
-        scriptPath,
-        "--headless",
-        "--convert-to",
-        "pdf",
-        "--outdir",
-        outDir,
-        "--soffice-bin",
-        sofficeCommand,
-        pptxPath,
-      ],
-      { stdio: "pipe" },
-    );
-  } catch (error) {
-    const stderr =
-      error &&
-      typeof error === "object" &&
-      "stderr" in error &&
-      error.stderr instanceof Buffer
-        ? error.stderr.toString("utf-8").trim()
-        : "";
-    const stdout =
-      error &&
-      typeof error === "object" &&
-      "stdout" in error &&
-      error.stdout instanceof Buffer
-        ? error.stdout.toString("utf-8").trim()
-        : "";
-    const detail = stderr || stdout || "no output";
-    throw new Error(`LibreOffice PDF conversion failed: ${detail}`);
-  }
-
-  if (!existsSync(pdfPath)) {
-    throw new Error("LibreOffice did not produce a preview PDF");
-  }
-}
-
-function renderSlidesFromPdf(pdfPath: string, renderDir: string) {
-  const ppmPrefix = join(renderDir, "slide");
-  const pdftoppmCommand = getPdftoppmCommand();
-  execFileSync(pdftoppmCommand, ["-png", "-r", "180", pdfPath, ppmPrefix], {
-    stdio: "pipe",
+      checkFile(maxRetries);
+    });
   });
-
-  const rawSlides = readdirSync(renderDir)
-    .filter((name) => /^slide-\d+\.png$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-  if (rawSlides.length === 0) {
-    throw new Error("PDF rasterization produced no slide images");
-  }
-
-  return rawSlides;
 }
 
-async function optimizeSlides(
-  taskId: string,
-  renderDir: string,
-  rawSlides: string[],
-): Promise<PptxRenderedSlide[]> {
-  const slides: PptxRenderedSlide[] = [];
+// Run pdftoppm to convert PDF to PNG slides
+async function convertPdfToSlides(
+  pdftoppm_bin: string,
+  pdfPath: string,
+  outputPrefix: string,
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    // -png: output PNG format
+    // -r 150: 150 DPI resolution
+    // -f 1: first page
+    // -l: last page (empty means all pages)
+    const args = ["-png", "-r", "150", "-f", "1", pdfPath, outputPrefix];
 
-  for (let i = 0; i < rawSlides.length; i++) {
-    const rawSlideName = rawSlides[i];
-    const rawSlidePath = join(renderDir, rawSlideName);
-    const optimizedName = `slide-${String(i + 1).padStart(3, "0")}.webp`;
-    const optimizedPath = join(renderDir, optimizedName);
-
-    const transformer = sharp(rawSlidePath).rotate().resize({
-      width: DEFAULT_SLIDE_WIDTH,
-      height: DEFAULT_SLIDE_HEIGHT,
-      fit: "inside",
-      withoutEnlargement: true,
+    workspaceLogger.info("[pptx-render] Running pdftoppm:", {
+      bin: pdftoppm_bin,
+      args,
     });
 
-    const metadata = await transformer.metadata();
-    await transformer.webp({ quality: 88 }).toFile(optimizedPath);
+    execFile(
+      pdftoppm_bin,
+      args,
+      { timeout: 120000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          workspaceLogger.error("[pptx-render] pdftoppm error:", error);
+          reject(new Error(`pdftoppm failed: ${error.message}`));
+          return;
+        }
 
-    slides.push({
-      index: i,
-      path: toSessionRelative(taskId, optimizedPath),
-      width: metadata.width ?? DEFAULT_SLIDE_WIDTH,
-      height: metadata.height ?? DEFAULT_SLIDE_HEIGHT,
-    });
-  }
+        // pdftoppm outputs {prefix}-N.png for each page (e.g., slide-1.png, slide-2.png)
+        const dir = dirname(pdfPath);
+        const prefix = basename(outputPrefix);
 
-  return slides;
+        const slides: string[] = [];
+        let i = 1;
+        while (true) {
+          const slidePath = join(dir, `${prefix}-${i}.png`);
+          if (existsSync(slidePath)) {
+            slides.push(slidePath);
+            i++;
+          } else {
+            break;
+          }
+        }
+
+        if (slides.length === 0) {
+          workspaceLogger.error(
+            "[pptx-render] No slides found with prefix:",
+            prefix,
+          );
+          workspaceLogger.error("[pptx-render] pdftoppm stdout:", stdout);
+          reject(new Error("pdftoppm did not produce expected PNG slides"));
+        } else {
+          resolve(slides);
+        }
+      },
+    );
+  });
 }
 
+// Convert PNG to WebP and get dimensions
+async function convertPngToWebp(
+  pngPath: string,
+  outputPath: string,
+): Promise<{ width: number; height: number }> {
+  const metadata = await sharp(pngPath).metadata();
+  const width = metadata.width || 0;
+  const height = metadata.height || 0;
+
+  await sharp(pngPath).webp({ quality: 85 }).toFile(outputPath);
+
+  return { width, height };
+}
+
+// Get or create PPTX render manifest
 export async function getOrCreatePptxRenderManifest(
   taskId: string,
   pptxSourcePath: string,
-): Promise<PptxRenderManifest> {
-  // Transitional implementation: desktop preview currently routes through the
-  // Next/Tauri local server, but the long-term source of truth should be a
-  // managed render engine owned by the desktop runtime rather than system PATH.
-  const pptxPath = resolvePptxPath(taskId, pptxSourcePath);
+): Promise<PptxRenderManifest | null> {
+  // Check if render engine is available
+  const soffice_bin = getSofficeBin();
+  const pdftoppm_bin = getPdftoppmBin();
 
-  if (!existsSync(pptxPath)) {
-    throw new Error("PPTX file not found");
+  const engine: "bundled" | "system" | "fallback" =
+    soffice_bin && pdftoppm_bin
+      ? process.env.SOFFICE_BIN
+        ? "system"
+        : "bundled"
+      : "fallback";
+
+  if (engine === "fallback") {
+    workspaceLogger.warn(
+      "[pptx-render] Render engine not available, returning fallback manifest",
+    );
+    return null;
   }
 
-  const stats = statSync(pptxPath);
-  if (!stats.isFile()) {
-    throw new Error("PPTX path is not a file");
-  }
+  // Type narrowing: engine is "bundled" or "system", so both bins are guaranteed to be non-null
+  // biome-ignore lint/style/noNonNullAssertion: engine check above guarantees non-null
+  const sofficeBin = soffice_bin!;
+  // biome-ignore lint/style/noNonNullAssertion: engine check above guarantees non-null
+  const pdftoppmBin = pdftoppm_bin!;
 
-  const { cacheRoot, cacheKey, renderDir, manifestPath, pdfPath } =
-    getRenderPaths(taskId, pptxPath, stats);
-  ensureDir(cacheRoot);
-  ensureDir(renderDir);
+  // Generate cache key
+  const cacheKey = await generateCacheKey(taskId, pptxSourcePath);
+  const cacheDir = getPreviewCacheDir(taskId);
+  const outputDir = join(cacheDir, cacheKey);
 
+  // Check if manifest already exists (cached result)
+  const manifestPath = join(outputDir, "manifest.json");
   if (existsSync(manifestPath)) {
     try {
-      const manifest = JSON.parse(
-        readFileSync(manifestPath, "utf-8"),
-      ) as PptxRenderManifest;
-      if (isManifestUsable(manifest, pptxPath, stats)) {
-        return manifest;
-      }
+      const manifestContent = readFileSync(manifestPath, "utf-8");
+      const manifest = JSON.parse(manifestContent) as PptxRenderManifest;
+      workspaceLogger.info("[pptx-render] Using cached manifest:", cacheKey);
+      return manifest;
     } catch {
-      // Ignore stale or partial manifest files.
+      // Invalid cache, regenerate
     }
   }
 
-  renderPdfFromPptx(pptxPath, renderDir, pdfPath);
-  const rawSlides = renderSlidesFromPdf(pdfPath, renderDir);
-  const slides = await optimizeSlides(taskId, renderDir, rawSlides);
+  // Ensure output directory exists
+  ensureDir(outputDir);
 
-  const manifest: PptxRenderManifest = {
-    version: 1,
-    sourcePath: pptxPath,
-    sourceMtimeMs: stats.mtimeMs,
-    sourceSize: stats.size,
-    cacheKey,
-    slideCount: slides.length,
-    pdfPath: toSessionRelative(taskId, pdfPath),
-    slides,
-    generatedAt: new Date().toISOString(),
-  };
+  // Resolve full source path - handle both absolute and relative paths
+  let sourcePath: string;
+  if (pptxSourcePath.startsWith("/")) {
+    // Absolute path - use as-is
+    sourcePath = decodeURIComponent(pptxSourcePath);
+  } else {
+    // Relative path - join with session directory
+    sourcePath = join(getTaskSessionDir(taskId), pptxSourcePath);
+  }
 
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
-  return manifest;
+  if (!existsSync(sourcePath)) {
+    workspaceLogger.error("[pptx-render] Source file not found:", sourcePath);
+    return null;
+  }
+
+  try {
+    // Step 1: Convert PPTX to PDF using soffice
+    workspaceLogger.info("[pptx-render] Converting PPTX to PDF...");
+    const pdfPath = await convertPptxToPdf(sofficeBin, sourcePath, outputDir);
+    workspaceLogger.info("[pptx-render] PDF created:", pdfPath);
+
+    // Step 2: Convert PDF to PNG slides using pdftoppm
+    workspaceLogger.info("[pptx-render] Converting PDF to slides...");
+    const outputPrefix = join(outputDir, "slide");
+    const pngSlides = await convertPdfToSlides(
+      pdftoppmBin,
+      pdfPath,
+      outputPrefix,
+    );
+    workspaceLogger.info("[pptx-render] PNG slides created:", pngSlides.length);
+
+    // Step 3: Convert each PNG to WebP using sharp
+    const slides: PptxSlideRender[] = [];
+    for (let i = 0; i < pngSlides.length; i++) {
+      const pngPath = pngSlides[i];
+      const webpPath = join(outputDir, `slide-${i + 1}.webp`);
+
+      const { width, height } = await convertPngToWebp(pngPath, webpPath);
+
+      // Get relative path from session directory
+      const sessionDir = getTaskSessionDir(taskId);
+      const relativePath = webpPath.replace(sessionDir + sep, "");
+
+      slides.push({
+        index: i + 1,
+        path: relativePath,
+        width,
+        height,
+      });
+
+      // Clean up PNG (we only need WebP)
+      try {
+        unlinkSync(pngPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+
+    // Clean up PDF
+    try {
+      unlinkSync(pdfPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    // Create manifest
+    const manifest: PptxRenderManifest = {
+      task_id: taskId,
+      source_path: pptxSourcePath,
+      cache_key: cacheKey,
+      slides,
+      created_at: new Date().toISOString(),
+      engine,
+    };
+
+    // Write manifest
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+    workspaceLogger.info("[pptx-render] Manifest created:", manifestPath);
+
+    return manifest;
+  } catch (error) {
+    workspaceLogger.error("[pptx-render] Render failed:", error);
+    return null;
+  }
 }

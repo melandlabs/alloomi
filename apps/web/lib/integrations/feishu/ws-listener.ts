@@ -134,6 +134,9 @@ export async function startFeishuConnection(
   const credentials = loadIntegrationCredentials<FeishuCredentials>(account);
   const appId = credentials?.appId?.trim();
   const appSecret = credentials?.appSecret?.trim();
+  const apiDomain: "feishu" | "lark" =
+    credentials?.domain === "lark" ? "lark" : "feishu";
+  const wsDomain = apiDomain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu;
   if (!appId || !appSecret) {
     if (DEBUG)
       console.warn(
@@ -356,6 +359,7 @@ export async function startFeishuConnection(
   const wsClient = new Lark.WSClient({
     appId,
     appSecret,
+    domain: wsDomain,
     loggerLevel: DEBUG ? Lark.LoggerLevel.debug : Lark.LoggerLevel.info,
   });
 
@@ -371,12 +375,22 @@ export async function startFeishuConnection(
   connections.set(accountId, conn);
 
   try {
+    console.log(
+      "[Feishu] Starting WS listener accountId=%s userId=%s apiDomain=%s appIdPrefix=%s",
+      accountId,
+      account.userId,
+      apiDomain,
+      appId.slice(0, 8),
+    );
     await wsClient.start({ eventDispatcher });
-    if (DEBUG)
-      console.log(`[Feishu] WebSocket connected accountId=${accountId}`);
+    console.log(
+      "[Feishu] WebSocket connected accountId=%s apiDomain=%s",
+      accountId,
+      apiDomain,
+    );
   } catch (err) {
     console.error(
-      `[Feishu] WebSocket connection failed accountId=${accountId}`,
+      `[Feishu] WebSocket connection failed accountId=${accountId} apiDomain=${apiDomain}`,
       err,
     );
     connections.delete(accountId);

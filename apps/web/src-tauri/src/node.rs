@@ -25,57 +25,6 @@ use std::thread;
 use std::time::Duration;
 use tauri::Emitter;
 
-fn get_packaged_render_engine_paths(resource_dir: &std::path::Path) -> Option<(String, String)> {
-    #[cfg(target_os = "macos")]
-    let platform_dir = resource_dir
-        .join("resources")
-        .join("render-engine")
-        .join("darwin-arm64");
-
-    #[cfg(target_os = "windows")]
-    let platform_dir = resource_dir
-        .join("resources")
-        .join("render-engine")
-        .join("win32-x64");
-
-    #[cfg(target_os = "linux")]
-    let platform_dir = resource_dir
-        .join("resources")
-        .join("render-engine")
-        .join("linux-x64");
-
-    #[cfg(target_os = "macos")]
-    let soffice_path = platform_dir
-        .join("LibreOffice.app")
-        .join("Contents")
-        .join("MacOS")
-        .join("soffice");
-
-    #[cfg(target_os = "windows")]
-    let soffice_path = platform_dir.join("LibreOffice").join("program").join("soffice.exe");
-
-    #[cfg(target_os = "linux")]
-    let soffice_path = platform_dir.join("libreoffice").join("program").join("soffice");
-
-    #[cfg(target_os = "macos")]
-    let pdftoppm_path = platform_dir.join("poppler").join("bin").join("pdftoppm");
-
-    #[cfg(target_os = "windows")]
-    let pdftoppm_path = platform_dir.join("poppler").join("Library").join("bin").join("pdftoppm.exe");
-
-    #[cfg(target_os = "linux")]
-    let pdftoppm_path = platform_dir.join("poppler").join("bin").join("pdftoppm");
-
-    if soffice_path.exists() && pdftoppm_path.exists() {
-        return Some((
-            soffice_path.to_string_lossy().to_string(),
-            pdftoppm_path.to_string_lossy().to_string(),
-        ));
-    }
-
-    None
-}
-
 // Base64 decode (standard alphabet) for double-base64 encoded secrets
 pub fn base64_decode(input: &str) -> Result<Vec<u8>, &'static str> {
     const BASE64_TABLE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -933,6 +882,73 @@ pub fn download_and_install_node(home: &str) -> Option<String> {
     }
 }
 
+/// Get the platform-specific render engine directory name
+fn get_platform_dir() -> String {
+    let os = if cfg!(target_os = "windows") {
+        "windows-x64"
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "darwin-arm64"
+        } else {
+            "darwin-x64"
+        }
+    } else if cfg!(target_os = "linux") {
+        "linux-x64"
+    } else {
+        "unknown"
+    };
+    os.to_string()
+}
+
+/// Get the packaged render engine paths (soffice and pdftoppm)
+/// Returns (soffice_path, pdftoppm_path) tuple if found
+fn get_packaged_render_engine_paths(
+    resource_dir: &std::path::Path,
+) -> (Option<String>, Option<String>) {
+    let engine_dir = resource_dir.join("render-engine").join(get_platform_dir());
+
+    // Find soffice
+    let soffice_path = {
+        let direct = engine_dir.join("soffice");
+        if direct.exists() {
+            Some(direct.to_string_lossy().to_string())
+        } else {
+            #[cfg(target_os = "macos")]
+            {
+                let libreoffice_app = engine_dir
+                    .join("LibreOffice.app")
+                    .join("Contents")
+                    .join("MacOS")
+                    .join("soffice");
+                if libreoffice_app.exists() {
+                    Some(libreoffice_app.to_string_lossy().to_string())
+                } else {
+                    None
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            None
+        }
+    };
+
+    // Find pdftoppm
+    let pdftoppm_path = {
+        let direct = engine_dir.join("pdftoppm");
+        if direct.exists() {
+            Some(direct.to_string_lossy().to_string())
+        } else {
+            let in_bin = engine_dir.join("bin").join("pdftoppm");
+            if in_bin.exists() {
+                Some(in_bin.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        }
+    };
+
+    (soffice_path, pdftoppm_path)
+}
+
 /// Attempt to start Next.js server with the given Node.js binary
 #[cfg(not(debug_assertions))]
 pub fn try_start_nextjs(
@@ -1081,12 +1097,19 @@ pub fn try_start_nextjs(
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped());
 
-    if let Some(soffice_bin) = packaged_soffice_bin {
-        cmd.env("SOFFICE_BIN", soffice_bin);
-    }
-    if let Some(pdftoppm_bin) = packaged_pdftoppm_bin {
-        cmd.env("PDFTOPPM_BIN", pdftoppm_bin);
-    }
+    // Set render engine paths if available
+    let cmd = if let Some(soffice_bin) = packaged_soffice_bin {
+        if let Some(pdftoppm_bin) = packaged_pdftoppm_bin {
+            println!("📂 Using bundled render engine: soffice={}", soffice_bin);
+            println!("📂 Using bundled render engine: pdftoppm={}", pdftoppm_bin);
+            cmd.env("SOFFICE_BIN", soffice_bin)
+                .env("PDFTOPPM_BIN", pdftoppm_bin)
+        } else {
+            cmd
+        }
+    } else {
+        cmd
+    };
 
     // Capture stderr to a temp file so we can read error output on failure
     let stderr_path = std::env::temp_dir().join("alloomi_node_stderr.log");
@@ -1346,6 +1369,17 @@ pub fn start_nextjs_server() {
     let db_path_str = db_path.to_string_lossy().to_string();
     let code_tmpdir_str = code_tmpdir.to_string_lossy().to_string();
 
+    // Get render engine paths for soffice and pdftoppm
+    let (soffice_path, pdftoppm_path) = get_packaged_render_engine_paths(&resource_dir);
+    if soffice_path.is_some() || pdftoppm_path.is_some() {
+        println!(
+            "📂 Render engine found: soffice={:?}, pdftoppm={:?}",
+            soffice_path, pdftoppm_path
+        );
+    } else {
+        println!("📂 No bundled render engine found, high-fidelity PPTX preview will use client-side rendering");
+    }
+
     println!("📍 Environment variables being passed to Node.js:");
 
     thread::spawn(move || {
@@ -1408,8 +1442,8 @@ pub fn start_nextjs_server() {
                 &env_user,
                 &env_shell,
                 &code_tmpdir_str,
-                packaged_render_engine.as_ref().map(|(soffice, _)| soffice.as_str()),
-                packaged_render_engine.as_ref().map(|(_, pdftoppm)| pdftoppm.as_str()),
+                soffice_path.as_deref(),
+                pdftoppm_path.as_deref(),
             ) {
                 Ok(_) => {
                     println!("⏳ Waiting for server to be ready...");

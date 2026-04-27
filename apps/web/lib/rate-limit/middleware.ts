@@ -9,6 +9,8 @@ import {
   type RateLimitResult,
   RateLimitPresets,
 } from "./rate-limiter";
+import { ensureRedis } from "@/lib/session/context";
+import type Redis from "ioredis";
 
 // Re-export RateLimitPresets for convenience
 export { RateLimitPresets };
@@ -17,26 +19,14 @@ export { RateLimitPresets };
 let rateLimiter: RedisRateLimiter | null = null;
 
 /**
- * Get rate limiter instance
+ * Get rate limiter instance using shared Redis connection
  */
-function getRateLimiter(): RedisRateLimiter {
+async function getRateLimiter(): Promise<RedisRateLimiter> {
   if (!rateLimiter) {
-    // Dynamically import Redis to avoid errors in Edge Runtime
-    const Redis = require("ioredis");
-    const redisUrl = process.env.REDIS_URL;
-
-    if (!redisUrl) {
-      throw new Error("REDIS_URL is not configured");
-    }
-
-    const redis = new Redis(redisUrl, {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: false,
-    });
-
-    rateLimiter = new RedisRateLimiter(redis);
+    const redis = await ensureRedis();
+    // RedisRateLimiter requires a real ioredis instance, not the in-memory mock
+    rateLimiter = new RedisRateLimiter(redis as Redis);
   }
-
   return rateLimiter;
 }
 
@@ -70,7 +60,7 @@ export async function checkRateLimit(
   config: { window: number; maxRequests: number },
 ): Promise<RateLimitResult> {
   try {
-    const limiter = getRateLimiter();
+    const limiter = await getRateLimiter();
     return await limiter.check(identifier, config);
   } catch (error) {
     console.error("[RateLimit] Check failed:", error);

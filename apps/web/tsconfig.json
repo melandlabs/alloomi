@@ -97,6 +97,7 @@
       "@alloomi/integrations/feishu": ["../../packages/integrations/feishu/src/index.ts"],
       "@alloomi/integrations/feishu/app-registration": ["../../packages/integrations/feishu/src/app-registration.ts"],
       "@alloomi/integrations/feishu/registration-cookie": ["../../packages/integrations/feishu/src/registration-cookie.ts"],
+      "@alloomi/integrations/feishu/conversation-store": ["../../packages/integrations/feishu/src/conversation-store.ts"],
       "@alloomi/integrations/jira": ["../../packages/integrations/jira/src/index.ts"],
       "@alloomi/integrations/facebook-messenger": ["../../packages/integrations/facebook-messenger/src/index.ts"],
       "@alloomi/integrations/dingtalk": ["../../packages/integrations/dingtalk/src/index.ts"],
@@ -113,7 +114,8 @@
       "@alloomi/integrations/imessage/*": ["../../packages/integrations/imessage/src/*"],
       "@alloomi/security": ["../../packages/security/src/index.ts"],
       "@alloomi/security/token-encryption": ["../../packages/security/src/token-encryption.ts"],
-      "@alloomi/security/url-validator": ["../../packages/security/src/url-validator.ts"]
+      "@alloomi/security/url-validator": ["../../packages/security/src/url-validator.ts"],
+      "@alloomi/security/key-manager": ["../../packages/security/src/key-manager.ts"]
     },
     "typeRoots": ["./node_modules/@types"]
   },

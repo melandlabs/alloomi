@@ -60,6 +60,46 @@ export interface JobExecutionResult {
 }
 
 /**
+ * Streamed events emitted by manual job executions for interactive chat UI.
+ */
+export type JobAgentStreamEvent =
+  | {
+      type: "execution_start";
+      chatId: string;
+      executionId: string;
+      message: string;
+      userMessageId: string;
+      assistantMessageId: string;
+    }
+  | { type: "text"; content: string; messageId?: string }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: unknown;
+      messageId?: string;
+    }
+  | {
+      type: "tool_result";
+      toolUseId: string;
+      output: unknown;
+      isError?: boolean;
+      messageId?: string;
+    }
+  | { type: "error"; content: string }
+  | {
+      type: "execution_done";
+      executionId: string;
+      status: "success" | "error" | "timeout";
+    };
+
+export interface ExecuteJobOptions {
+  userMessageId?: string;
+  assistantMessageId?: string;
+  onAgentEvent?: (event: JobAgentStreamEvent) => void | Promise<void>;
+}
+
+/**
  * Cron job with computed fields
  */
 export interface CronJob extends ScheduledJob {

@@ -418,6 +418,11 @@ async function checkWeixinContextToken(
  */
 async function handleCloudMode(user: { id: string }) {
   try {
+    // Strip cloud_ prefix if present (authenticateCloudRequest may return prefixed userId)
+    const userId = user.id.startsWith("cloud_")
+      ? user.id.substring(6)
+      : user.id;
+
     const accounts = await db
       .select({
         id: integrationAccounts.id,
@@ -432,7 +437,7 @@ async function handleCloudMode(user: { id: string }) {
         updatedAt: integrationAccounts.updatedAt,
       })
       .from(integrationAccounts)
-      .where(eq(integrationAccounts.userId, user.id));
+      .where(eq(integrationAccounts.userId, userId));
 
     // Enhance accounts with hasValidContextToken for WeChat
     const enhancedAccounts = await Promise.all(
@@ -461,7 +466,7 @@ async function handleCloudMode(user: { id: string }) {
           // For WeChat, check if bot has valid context token
           if (account.platform === "weixin") {
             const hasValidContextToken = await checkWeixinContextToken(
-              user.id,
+              userId,
               acc.id,
             );
             (account as any).hasValidContextToken = hasValidContextToken;

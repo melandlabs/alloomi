@@ -68,8 +68,12 @@ export async function refreshActiveBotInsight(
       return result;
     }
 
-    // Skip insight processing for weixin that do not support message insights
-    if (bot.adapter === "weixin") {
+    // Skip insight processing for weixin and x/twitter that do not support message insights
+    if (
+      bot.adapter === "weixin" ||
+      bot.adapter === "x" ||
+      bot.adapter === "twitter"
+    ) {
       return result;
     }
 

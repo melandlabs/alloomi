@@ -179,6 +179,9 @@ export const integrationAccounts = sqliteTable(
     metadata: text("metadata"), // JSON string
     credentialsEncrypted: text("credentials_encrypted").notNull(),
     encryptionKeyId: text("encryption_key_id"),
+    lastRotatedAt: integer("last_rotated_at", { mode: "timestamp" }),
+    rotationCount: integer("rotation_count").notNull().default(0),
+    keyVersion: integer("key_version").notNull().default(1),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -197,6 +200,80 @@ export const integrationAccounts = sqliteTable(
 export type IntegrationAccount = InferSelectModel<typeof integrationAccounts>;
 export type InsertIntegrationAccount = InferInsertModel<
   typeof integrationAccounts
+>;
+
+// Credential Rotation History - stores previous credentials during rotation
+export const credentialRotationHistory = sqliteTable(
+  "credential_rotation_history",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => integrationAccounts.id, { onDelete: "cascade" }),
+    credentialsEncrypted: text("credentials_encrypted").notNull(),
+    encryptionKeyId: text("encryption_key_id"),
+    rotatedAt: integer("rotated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    rotatedBy: text("rotated_by"),
+    reason: text("reason"),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    accountIdx: index("credential_rotation_history_account_idx").on(
+      table.accountId,
+    ),
+    expiresIdx: index("credential_rotation_history_expires_idx").on(
+      table.expiresAt,
+    ),
+  }),
+);
+
+export type CredentialRotationHistory = InferSelectModel<
+  typeof credentialRotationHistory
+>;
+export type InsertCredentialRotationHistory = InferInsertModel<
+  typeof credentialRotationHistory
+>;
+
+// Credential Access Log - audit log for credential operations
+export const credentialAccessLog = sqliteTable(
+  "credential_access_log",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => integrationAccounts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    accessedAt: integer("accessed_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    metadata: text("metadata"), // JSON string
+    success: integer("success", { mode: "boolean" }).notNull().default(true),
+    errorMessage: text("error_message"),
+  },
+  (table) => ({
+    accountIdx: index("credential_access_log_account_idx").on(table.accountId),
+    userIdx: index("credential_access_log_user_idx").on(table.userId),
+    actionIdx: index("credential_access_log_action_idx").on(table.action),
+  }),
+);
+
+export type CredentialAccessLog = InferSelectModel<typeof credentialAccessLog>;
+export type InsertCredentialAccessLog = InferInsertModel<
+  typeof credentialAccessLog
 >;
 
 export const integrationCatalog = sqliteTable(
@@ -560,6 +637,8 @@ export const insight = sqliteTable("Insight", {
     "role_attribution",
   ).$type<InsightRoleAttribution | null>(), // JSON string
   alerts: text("alerts").$type<InsightAlert[] | null>(), // JSON string
+  compactedIntoInsightId: text("compacted_into_insight_id"),
+  pendingDeletionAt: integer("pending_deletion_at", { mode: "timestamp" }),
   isArchived: integer("is_archived", { mode: "boolean" })
     .notNull()
     .default(false),
@@ -581,6 +660,45 @@ export const insight = sqliteTable("Insight", {
 export type Insight = InferSelectModel<typeof insight>;
 export type InsertInsight = InferInsertModel<typeof insight>;
 
+export const insightCompactionLinks = sqliteTable(
+  "insight_compaction_links",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    compactedInsightId: text("compacted_insight_id")
+      .notNull()
+      .references(() => insight.id, { onDelete: "cascade" }),
+    sourceInsightId: text("source_insight_id")
+      .notNull()
+      .references(() => insight.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    uniqueCompactedSource: uniqueIndex(
+      "insight_compaction_links_compacted_source_idx",
+    ).on(table.compactedInsightId, table.sourceInsightId),
+    userIdx: index("insight_compaction_links_user_idx").on(table.userId),
+    compactedIdx: index("insight_compaction_links_compacted_idx").on(
+      table.compactedInsightId,
+    ),
+    sourceIdx: index("insight_compaction_links_source_idx").on(
+      table.sourceInsightId,
+    ),
+  }),
+);
+
+export type InsightCompactionLink = InferSelectModel<
+  typeof insightCompactionLinks
+>;
+export type InsertInsightCompactionLink = InferInsertModel<
+  typeof insightCompactionLinks
+>;
 // ============================================================================
 // Insight Notes
 // ============================================================================
@@ -722,6 +840,9 @@ export const userInsightSettings = sqliteTable("user_insight_settings", {
     mode: "timestamp",
   }),
   lastActiveAt: integer("last_active_at", { mode: "timestamp" }),
+  lastInsightMaintenanceRunAt: integer("last_insight_maintenance_run_at", {
+    mode: "timestamp",
+  }),
   activityTier: text("activity_tier").notNull().default("low"),
   lastUpdated: integer("last_updated", { mode: "timestamp" })
     .notNull()
@@ -857,6 +978,7 @@ export type InsightSettings = {
   identityWorkDescription: string | null;
   lastMessageProcessedAt: Date | null;
   lastActiveAt: Date | null;
+  lastInsightMaintenanceRunAt?: Date | null;
   activityTier: "high" | "medium" | "low" | "dormant";
   lastUpdated: Date;
 };
@@ -883,6 +1005,7 @@ export function parseInsightSettings(
     identityWorkDescription: dbSettings.identityWorkDescription ?? null,
     lastMessageProcessedAt: dbSettings.lastMessageProcessedAt ?? null,
     lastActiveAt: dbSettings.lastActiveAt ?? null,
+    lastInsightMaintenanceRunAt: dbSettings.lastInsightMaintenanceRunAt ?? null,
     activityTier: normalizeActivityTier(dbSettings.activityTier),
     lastUpdated: dbSettings.lastUpdated,
   };
@@ -906,6 +1029,7 @@ export function serializeInsightSettings(
     identityWorkDescription: settings.identityWorkDescription ?? null,
     lastMessageProcessedAt: settings.lastMessageProcessedAt,
     lastActiveAt: settings.lastActiveAt,
+    lastInsightMaintenanceRunAt: settings.lastInsightMaintenanceRunAt,
     activityTier: settings.activityTier,
   };
 }

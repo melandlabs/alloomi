@@ -9,6 +9,7 @@ import {
   ilike,
   inArray,
   isNull,
+  isNotNull,
   lt,
   max,
   ne,
@@ -91,6 +92,7 @@ import {
   insightDocuments,
   insightProcessingFailures,
   type InsertInsightProcessingFailure,
+  credentialAccessLog,
 } from "./schema";
 import { generateUUID } from "../utils";
 import { generateHashedPassword } from "./utils";
@@ -1071,7 +1073,6 @@ export async function saveMessages({
     // Batch insert to avoid SQLite parameter binding limit
     for (let i = 0; i < serializedMessages.length; i += DB_INSERT_CHUNK_SIZE) {
       const chunk = serializedMessages.slice(i, i + DB_INSERT_CHUNK_SIZE);
-      // Use onConflictDoUpdate to update existing messages with new parts
       await db
         .insert(message)
         .values(chunk)
@@ -1080,7 +1081,7 @@ export async function saveMessages({
           set: {
             parts: sql`excluded.parts`,
             attachments: sql`excluded.attachments`,
-            updatedAt: new Date(),
+            metadata: sql`excluded.metadata`,
           },
         });
     }
@@ -2385,11 +2386,77 @@ export async function deleteIntegrationAccount({
 
 export function loadIntegrationCredentials<T = Record<string, unknown>>(
   account: IntegrationAccount | null,
+): T | null;
+export function loadIntegrationCredentials<T = Record<string, unknown>>(
+  account: IntegrationAccount | null,
+  auditContext?: {
+    userId: string;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): T | null;
+export function loadIntegrationCredentials<T = Record<string, unknown>>(
+  account: IntegrationAccount | null,
+  auditContext?: {
+    userId: string;
+    ipAddress?: string;
+    userAgent?: string;
+  },
 ): T | null {
   if (!account || !account.credentialsEncrypted) {
     return null;
   }
+
+  // Log credential access if audit context is provided
+  if (auditContext) {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { logCredentialAccess } = require("@alloomi/audit");
+      logCredentialAccess({
+        accountId: account.id,
+        userId: auditContext.userId,
+        action: "read",
+        ipAddress: auditContext.ipAddress,
+        userAgent: auditContext.userAgent,
+        success: true,
+      });
+    } catch {
+      // Ignore audit logging errors - should not break credential loading
+    }
+  }
+
   return decryptPayload<T>(account.credentialsEncrypted);
+}
+
+/**
+ * Logs credential access to the database
+ *
+ * @param params - Credential access log parameters
+ */
+export async function logCredentialAccessToDb(params: {
+  accountId: string;
+  userId: string;
+  action: "read" | "update" | "rotate" | "delete";
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+  success: boolean;
+  errorMessage?: string;
+}): Promise<void> {
+  try {
+    await db.insert(credentialAccessLog).values({
+      accountId: params.accountId,
+      userId: params.userId,
+      action: params.action,
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+      metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      success: params.success,
+      errorMessage: params.errorMessage,
+    });
+  } catch {
+    // Ignore database audit logging errors - should not break operations
+  }
 }
 
 export async function getIntegrationAccountById({
@@ -3123,7 +3190,10 @@ export async function getStoredInsightsByBotIds({
     const isPaginationEnabled = typeof limit === "number" && limit > 0;
     const extendedLimit = isPaginationEnabled ? limit + 1 : undefined;
 
-    const whereConditions = [inArray(insight.botId, ids)];
+    const whereConditions = [
+      inArray(insight.botId, ids),
+      isNull(insight.pendingDeletionAt),
+    ];
     // Only apply time filter when days is explicitly specified and greater than 0
     // If days is 0 or negative, return all data
     if (days > 0) {
@@ -3271,7 +3341,10 @@ export async function getStoredInsightsByBotIdAndGroups({
     const isPaginationEnabled = typeof limit === "number" && limit > 0;
     const extendedLimit = isPaginationEnabled ? limit + 1 : undefined;
 
-    const whereConditions = [eq(insight.botId, id)];
+    const whereConditions = [
+      eq(insight.botId, id),
+      isNull(insight.pendingDeletionAt),
+    ];
 
     // Add group filter: insight.groups parameter groups may overlap
     // Use PostgreSQL's && operator to check array overlap
@@ -3555,6 +3628,8 @@ export async function updateInsightById({
         historySummary: serializeField(payload.historySummary),
         roleAttribution: serializeField(payload.roleAttribution),
         alerts: serializeField(payload.alerts),
+        pendingDeletionAt: null,
+        compactedIntoInsightId: null,
         updatedAt: new Date(),
       })
       .where(and(eq(insight.id, insightId), eq(insight.botId, botId)))
@@ -3760,6 +3835,11 @@ export async function appendInsightsByBotId({
         .values(formattedSummaries)
         .returning({ id: insight.id }); // Specify to return ID field
 
+      await revivePendingDeletionInsightsForBot({
+        tx,
+        botId: id,
+        candidates: insightPayloads,
+      });
       return result.map((item: any) => item.id);
     });
   } catch (error) {
@@ -3963,6 +4043,105 @@ function calculateSimilarity(str1: string, str2: string): number {
   return (longer.length - editDistance(longer, shorter)) / longer.length;
 }
 
+type InsightRevivalCandidate = {
+  dedupeKey?: string | null;
+  title?: string | null;
+  projectName?: string | null;
+  client?: string | null;
+  account?: string | null;
+  signalType?: string | null;
+};
+
+function normalizeInsightRevivalPart(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+// Build several lightweight lookup keys so a resurfaced insight can clear its pending-deletion state even if only part of the context matches.
+function buildInsightRevivalKeys(candidate: InsightRevivalCandidate) {
+  const keys = new Set<string>();
+  const dedupeKey = normalizeInsightRevivalPart(candidate.dedupeKey);
+  const title = normalizeInsightRevivalPart(candidate.title);
+  const projectName = normalizeInsightRevivalPart(candidate.projectName);
+  const client = normalizeInsightRevivalPart(candidate.client);
+  const account = normalizeInsightRevivalPart(candidate.account);
+
+  if (dedupeKey) keys.add(`dedupe:${dedupeKey}`);
+  if (title) keys.add(`title:${title}`);
+  if (title && projectName) keys.add(`title-project:${title}|${projectName}`);
+  if (title && client) keys.add(`title-client:${title}|${client}`);
+  if (title && account) keys.add(`title-account:${title}|${account}`);
+
+  return keys;
+}
+
+// If a user brings an old topic back, revive the matching pending-deletion insights instead of treating them as forgotten forever.
+async function revivePendingDeletionInsightsForBot({
+  tx,
+  botId,
+  candidates,
+}: {
+  tx: any;
+  botId: string;
+  candidates: InsightRevivalCandidate[];
+}) {
+  const liveCandidates = candidates.filter(
+    (candidate) => candidate.signalType !== "compaction_digest",
+  );
+
+  if (liveCandidates.length === 0) {
+    return [] as string[];
+  }
+
+  const incomingKeys = new Set<string>();
+  for (const candidate of liveCandidates) {
+    for (const key of buildInsightRevivalKeys(candidate)) {
+      incomingKeys.add(key);
+    }
+  }
+
+  if (incomingKeys.size === 0) {
+    return [] as string[];
+  }
+
+  const pendingInsights = await tx
+    .select({
+      id: insight.id,
+      dedupeKey: insight.dedupeKey,
+      title: insight.title,
+      projectName: insight.projectName,
+      client: insight.client,
+      account: insight.account,
+    })
+    .from(insight)
+    .where(and(eq(insight.botId, botId), isNotNull(insight.pendingDeletionAt)));
+
+  const revivedIds = pendingInsights
+    .filter((pending: any) => {
+      for (const key of buildInsightRevivalKeys(pending)) {
+        if (incomingKeys.has(key)) {
+          return true;
+        }
+      }
+      return false;
+    })
+    .map((pending: any) => pending.id);
+
+  if (revivedIds.length === 0) {
+    return [] as string[];
+  }
+
+  await tx
+    .update(insight)
+    .set({
+      pendingDeletionAt: null,
+      compactedIntoInsightId: null,
+      updatedAt: new Date(),
+    })
+    .where(inArray(insight.id, revivedIds));
+
+  return revivedIds;
+}
 /**
  * Merge existing and incoming timeline events server-side.
  * Deduplicates by event ID first, then adds existing events not in incoming.
@@ -4153,6 +4332,8 @@ export async function upsertInsightsByBotId({
             isFavorited: existingInsight.isFavorited,
             favoritedAt: existingInsight.favoritedAt,
             isArchived: existingInsight.isArchived,
+            pendingDeletionAt: null,
+            compactedIntoInsightId: null,
             updatedAt: new Date(),
           };
 
@@ -4249,6 +4430,12 @@ export async function upsertInsightsByBotId({
           resultIds.push(newInsightId);
         }
       }
+
+      await revivePendingDeletionInsightsForBot({
+        tx,
+        botId: id,
+        candidates: insightPayloads,
+      });
 
       return resultIds;
     });
@@ -5183,6 +5370,30 @@ export async function insertInsightRecords(
         .returning({ id: insight.id });
       results.push(...inserted.map((row: any) => row.id));
     }
+
+    const candidatesByBot = new Map<string, InsightRevivalCandidate[]>();
+    for (const entry of entries) {
+      if (!entry.botId) continue;
+      const existing = candidatesByBot.get(entry.botId) ?? [];
+      existing.push({
+        dedupeKey: entry.dedupeKey ?? null,
+        title: entry.title,
+        projectName: entry.projectName ?? null,
+        client: entry.client ?? null,
+        account: entry.account ?? null,
+        signalType: entry.signalType ?? null,
+      });
+      candidatesByBot.set(entry.botId, existing);
+    }
+
+    for (const [botId, candidates] of candidatesByBot.entries()) {
+      await revivePendingDeletionInsightsForBot({
+        tx: db,
+        botId,
+        candidates,
+      });
+    }
+
     return results;
   } catch (error) {
     throw new AppError(
@@ -5225,6 +5436,7 @@ export async function updateUserInsightSettings(
       refreshIntervalMinutes: 30,
       lastMessageProcessedAt: null,
       lastActiveAt: null,
+      lastInsightMaintenanceRunAt: null,
       activityTier: "low",
       aiSoulPrompt: null,
       identityIndustries: null,

@@ -22,6 +22,7 @@ export type ToolOutputFileRef = {
   path: string;
   type: string;
   isTemporary?: boolean;
+  modifiedTime?: string;
 };
 
 type ToolNativePart = {

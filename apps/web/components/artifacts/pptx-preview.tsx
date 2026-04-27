@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import * as JSZipModule from "jszip";
-import { getRenderEngineStatus } from "@/lib/tauri";
 
 /** JSZip module type (export = JSZip, with both constructor and static methods like loadAsync) */
 type JSZipType = import("jszip");
@@ -38,9 +37,9 @@ interface PptxSlide {
   title: string;
   content: string[];
   imageUrl?: string;
+  renderedImageUrl?: string;
   shapes: PptxShape[];
   background?: string;
-  renderedImageUrl?: string;
 }
 
 interface PptxPreviewProps {
@@ -48,6 +47,7 @@ interface PptxPreviewProps {
     path: string;
     name: string;
   };
+  /** Optional taskId for workspace files - enables server-side high-fidelity rendering */
   taskId?: string;
 }
 
@@ -141,89 +141,118 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
         }
       }, 30000); // 30 second timeout
 
-      try {
-        setServerRenderWarning(null);
-        setRenderEngineStatusMessage(null);
-        let shouldAttemptServerRender = true;
+      // Check if in Tauri environment and taskId is provided for server-side rendering
+      const isTauri = !!(window as any).__TAURI__;
 
-        const isTauri = !!(window as any).__TAURI__;
-        if (isTauri) {
-          const nativeRenderEngineStatus = await getRenderEngineStatus();
-
-          if (!nativeRenderEngineStatus?.available) {
-            const reason = nativeRenderEngineStatus?.reason || "error";
-            shouldAttemptServerRender = false;
-
-            if (reason === "not_installed") {
-              setRenderEngineStatusMessage(
-                t(
-                  "common.pptxPreview.renderEngineMissing",
-                  "High-fidelity render engine is unavailable in this app build. Preview is using the simplified built-in renderer for now.",
-                ),
-              );
-            } else if (reason === "invalid_record" || reason === "error") {
-              setRenderEngineStatusMessage(
-                t(
-                  "common.pptxPreview.renderEngineUnavailable",
-                  "High-fidelity render engine is unavailable right now. Preview is using the simplified built-in renderer.",
-                ),
-              );
-            }
-          }
-        }
-
-        if (taskId && shouldAttemptServerRender) {
-          const previewRes = await fetch(
-            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${encodeURIComponent(artifact.path)}`,
+      // Always try server-side rendering when taskId is available, regardless of render engine status
+      // The server will determine if binaries are available (bundled, PATH, or unavailable)
+      if (isTauri && taskId) {
+        try {
+          // Fetch server-side rendered slides (server handles binary availability check internally)
+          const pptxPath = encodeURIComponent(artifact.path);
+          const response = await fetch(
+            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
           );
 
-          if (previewRes.ok) {
-            const manifest = (await previewRes.json()) as {
-              slides?: Array<{
+          if (response.ok) {
+            const manifest = await response.json();
+            console.log(
+              "[PptxPreview] Server-side rendering successful:",
+              manifest,
+            );
+
+            // Build slide data with rendered image URLs
+            // Image URLs are served via /api/workspace/file/{taskId}/{path}?binary=true
+            const serverSlides: PptxSlide[] = manifest.slides.map(
+              (slide: {
                 index: number;
                 path: string;
-                width?: number;
-                height?: number;
-              }>;
-            };
-
-            if (manifest.slides?.length) {
-              if (isCancelled) return;
-
-              const renderedSlides: PptxSlide[] = manifest.slides.map(
-                (slide) => ({
-                  index: slide.index + 1,
-                  title: `${t("common.pptxPreview.slide")} ${slide.index + 1}`,
-                  content: [],
-                  shapes: [],
-                  background: "#ffffff",
-                  renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
-                }),
-              );
-
-              setSlides(renderedSlides);
-              setError(null);
-              setLoading(false);
-              return;
-            }
-
-            setServerRenderWarning(
-              t(
-                "common.pptxPreview.serverRenderUnavailable",
-                "Server-rendered preview unavailable. Showing simplified preview instead.",
-              ),
-            );
-          } else {
-            setServerRenderWarning(
-              t("common.pptxPreview.serverRenderUnavailableWithReason", {
-                defaultValue:
-                  "Server-rendered preview unavailable ({{reason}}). Showing simplified preview instead.",
-                reason: `${previewRes.status} ${previewRes.statusText || "request failed"}`,
+                width: number;
+                height: number;
+              }) => ({
+                index: slide.index,
+                title: `Slide ${slide.index}`,
+                content: [],
+                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                shapes: [],
+                background: "#ffffff",
               }),
             );
-          }
-        }
 
+            setSlides(serverSlides);
+            setRenderEngineStatusMessage(
+              "Using high-fidelity server-side rendering",
+            );
+            setLoading(false);
+            return;
+          }
+
+          // 503 means render engine unavailable on server - try client-side
+          if (response.status === 503) {
+            const errorData = await response.json().catch(() => ({}));
+            console.warn(
+              "[PptxPreview] Server-side rendering unavailable:",
+              errorData.message || response.statusText,
+            );
+            setServerRenderWarning(
+              errorData.message ||
+                "High-fidelity rendering not available. Using simplified preview.",
+            );
+          } else {
+            console.warn(
+              "[PptxPreview] Server-side rendering request failed:",
+              response.status,
+            );
+            setServerRenderWarning("Server-side rendering request failed");
+          }
+        } catch (err) {
+          console.error(
+            "[PptxPreview] Error during server-side rendering:",
+            err,
+          );
+          setServerRenderWarning("Could not connect to render server");
+        }
+      } else if (taskId) {
+        // Non-Tauri environment: try API without render engine check
+        try {
+          const pptxPath = encodeURIComponent(artifact.path);
+          const response = await fetch(
+            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
+          );
+
+          if (response.ok) {
+            const manifest = await response.json();
+            const serverSlides: PptxSlide[] = manifest.slides.map(
+              (slide: {
+                index: number;
+                path: string;
+                width: number;
+                height: number;
+              }) => ({
+                index: slide.index,
+                title: `Slide ${slide.index}`,
+                content: [],
+                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                shapes: [],
+                background: "#ffffff",
+              }),
+            );
+            setSlides(serverSlides);
+            setRenderEngineStatusMessage(
+              "Using high-fidelity server-side rendering",
+            );
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn(
+            "[PptxPreview] Non-Tauri server-side rendering failed:",
+            err,
+          );
+        }
+      }
+
+      try {
         // Only use custom commands in Tauri desktop environment
         const { readFileBinary, fileStat } = await import("@/lib/tauri");
 
@@ -728,6 +757,15 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
 
   return (
     <div className="bg-muted/30 flex h-full flex-col">
+      {/* Server render warning banner */}
+      {serverRenderWarning && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+          <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <RemixIcon name="alert" size="size-4" />
+            <span>{serverRenderWarning}</span>
+          </div>
+        </div>
+      )}
       {/* Slide display */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
         {/* Navigation buttons */}
@@ -770,32 +808,9 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           className="relative aspect-[16/9] w-full max-w-4xl overflow-hidden rounded-lg shadow-xl"
           style={{ backgroundColor: slide.background || "#ffffff" }}
         >
-          {renderEngineStatusMessage ? (
-            <div className="absolute inset-x-4 top-4 z-20 rounded-md border border-sky-300 bg-sky-50/95 px-3 py-2 text-xs text-sky-950 shadow-sm backdrop-blur-sm">
-              {renderEngineStatusMessage}
-            </div>
-          ) : null}
-
-          {serverRenderWarning ? (
-            <div
-              className={cn(
-                "absolute inset-x-4 z-20 rounded-md border border-amber-300 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-sm backdrop-blur-sm",
-                renderEngineStatusMessage ? "top-16" : "top-4",
-              )}
-            >
-              {serverRenderWarning}
-            </div>
-          ) : null}
-
           {/* Render shapes */}
           <div className="absolute inset-0">
-            {slide.renderedImageUrl ? (
-              <img
-                src={slide.renderedImageUrl}
-                alt={slide.title}
-                className="h-full w-full object-contain"
-              />
-            ) : slide.shapes && slide.shapes.length > 0 ? (
+            {slide.shapes && slide.shapes.length > 0 ? (
               slide.shapes.map((shape) => {
                 // Convert EMU units (English Metric Units) to pixels
                 // 914400 EMU = 1 inch, typical slide is 10x7.5 inches
@@ -880,6 +895,24 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
 
                 return null;
               })
+            ) : slide.renderedImageUrl ? (
+              // Server-rendered high-fidelity slide image
+              <div className="relative h-full w-full">
+                <img
+                  src={slide.renderedImageUrl}
+                  alt={slide.title}
+                  className="h-full w-full object-contain"
+                />
+                {(slide.title || slide.content.length > 0) && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-6">
+                    {slide.title && (
+                      <h2 className="mb-2 text-xl font-bold text-white">
+                        {slide.title}
+                      </h2>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : slide.imageUrl ? (
               // Legacy: Fallback to old image-based rendering
               <div className="relative h-full w-full">
@@ -924,36 +957,6 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           <div className="text-muted-foreground bg-muted/80 absolute right-4 bottom-4 rounded-md px-3 py-1.5 text-xs">
             {currentSlide + 1} / {slides.length}
           </div>
-
-          {/* Preview hint & Open in PowerPoint button */}
-          <div className="bg-background/90 backdrop-blur-sm absolute left-4 bottom-4 flex max-w-md flex-col gap-2 rounded-md border p-2 text-xs shadow-sm">
-            <div className="text-muted-foreground flex items-start gap-2 px-1">
-              <span className="font-medium">
-                {t("common.pptxPreview.renderingNotice")}:
-              </span>
-              <span className="flex-1">
-                {t("common.pptxPreview.previewHint")}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleShowInFolder}
-                className="bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
-              >
-                <RemixIcon name="folder_open" size="size-3" />
-                {t("common.preview.showInFolder", "Show in Folder")}
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenExternal}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
-              >
-                <RemixIcon name="external_link" size="size-3" />
-                {t("common.pptxPreview.openInPowerPoint")}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -972,13 +975,7 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
                   : "border-border hover:border-primary/50",
               )}
             >
-              {s.renderedImageUrl ? (
-                <img
-                  src={s.renderedImageUrl}
-                  alt={s.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : s.shapes && s.shapes.length > 0 ? (
+              {s.shapes && s.shapes.length > 0 ? (
                 <div
                   className="absolute inset-0"
                   style={{ backgroundColor: s.background || "#ffffff" }}
@@ -1028,6 +1025,12 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
                     return null;
                   })}
                 </div>
+              ) : s.renderedImageUrl ? (
+                <img
+                  src={s.renderedImageUrl}
+                  alt={s.title}
+                  className="h-full w-full object-cover"
+                />
               ) : s.imageUrl ? (
                 <img
                   src={s.imageUrl}
