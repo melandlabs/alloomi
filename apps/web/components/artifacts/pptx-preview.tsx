@@ -144,82 +144,96 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
       // Check if in Tauri environment and taskId is provided for server-side rendering
       const isTauri = !!(window as any).__TAURI__;
 
+      // Always try server-side rendering when taskId is available, regardless of render engine status
+      // The server will determine if binaries are available (bundled, PATH, or unavailable)
       if (isTauri && taskId) {
         try {
-          const { getRenderEngineStatus } = await import("@/lib/tauri");
-          const engineStatus = await getRenderEngineStatus();
+          // Fetch server-side rendered slides (server handles binary availability check internally)
+          const pptxPath = encodeURIComponent(artifact.path);
+          const response = await fetch(
+            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
+          );
 
-          if (engineStatus?.available) {
+          if (response.ok) {
+            const manifest = await response.json();
             console.log(
-              "[PptxPreview] Render engine available, trying server-side rendering:",
-              engineStatus.reason,
+              "[PptxPreview] Server-side rendering successful:",
+              manifest,
             );
 
-            // Fetch server-side rendered slides
-            const pptxPath = encodeURIComponent(artifact.path);
-            const response = await fetch(
-              `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
-            );
-
-            if (response.ok) {
-              const manifest = await response.json();
-              console.log(
-                "[PptxPreview] Server-side rendering successful:",
-                manifest,
-              );
-
-              // Build slide data with rendered image URLs
-              // Image URLs are served via /api/workspace/file/{taskId}/{path}?binary=true
-              const serverSlides: PptxSlide[] = manifest.slides.map(
-                (slide: {
-                  index: number;
-                  path: string;
-                  width: number;
-                  height: number;
-                }) => ({
-                  index: slide.index,
-                  title: `Slide ${slide.index}`,
-                  content: [],
-                  renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
-                  shapes: [],
-                  background: "#ffffff",
-                }),
-              );
-
-              setSlides(serverSlides);
-              setRenderEngineStatusMessage(
-                engineStatus.reason ||
-                  "Using high-fidelity server-side rendering",
-              );
-              setLoading(false);
-              return;
-            }
-            console.warn(
-              "[PptxPreview] Server-side rendering failed, falling back to client-side:",
-              response.status,
-            );
-            setServerRenderWarning(
-              "High-fidelity rendering unavailable, using simplified preview",
-            );
-          } else {
-            console.log(
-              "[PptxPreview] Render engine not available:",
-              engineStatus?.reason,
-            );
-            setRenderEngineStatusMessage(
-              engineStatus?.reason || "Render engine not installed",
-            );
-            setServerRenderWarning(
-              t("common.pptxPreview.serverRenderUnavailableWithReason", {
-                defaultValue:
-                  "Server-rendered preview unavailable ({{reason}}). Showing simplified preview instead.",
-                reason: `${previewRes.status} ${previewRes.statusText || "request failed"}`,
+            // Build slide data with rendered image URLs
+            // Image URLs are served via /api/workspace/file/{taskId}/{path}?binary=true
+            const serverSlides: PptxSlide[] = manifest.slides.map(
+              (slide: {
+                index: number;
+                path: string;
+                width: number;
+                height: number;
+              }) => ({
+                index: slide.index,
+                title: `Slide ${slide.index}`,
+                content: [],
+                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                shapes: [],
+                background: "#ffffff",
               }),
             );
+
+            setSlides(serverSlides);
+            setRenderEngineStatusMessage("Using high-fidelity server-side rendering");
+            setLoading(false);
+            return;
+          }
+
+          // 503 means render engine unavailable on server - try client-side
+          if (response.status === 503) {
+            const errorData = await response.json().catch(() => ({}));
+            console.warn(
+              "[PptxPreview] Server-side rendering unavailable:",
+              errorData.message || response.statusText,
+            );
+            setServerRenderWarning(
+              errorData.message ||
+                "High-fidelity rendering not available. Using simplified preview.",
+            );
+          } else {
+            console.warn(
+              "[PptxPreview] Server-side rendering request failed:",
+              response.status,
+            );
+            setServerRenderWarning("Server-side rendering request failed");
           }
         } catch (err) {
-          console.error("[PptxPreview] Error checking render engine:", err);
-          setServerRenderWarning("Could not check render engine status");
+          console.error("[PptxPreview] Error during server-side rendering:", err);
+          setServerRenderWarning("Could not connect to render server");
+        }
+      } else if (taskId) {
+        // Non-Tauri environment: try API without render engine check
+        try {
+          const pptxPath = encodeURIComponent(artifact.path);
+          const response = await fetch(
+            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
+          );
+
+          if (response.ok) {
+            const manifest = await response.json();
+            const serverSlides: PptxSlide[] = manifest.slides.map(
+              (slide: { index: number; path: string; width: number; height: number }) => ({
+                index: slide.index,
+                title: `Slide ${slide.index}`,
+                content: [],
+                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                shapes: [],
+                background: "#ffffff",
+              }),
+            );
+            setSlides(serverSlides);
+            setRenderEngineStatusMessage("Using high-fidelity server-side rendering");
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("[PptxPreview] Non-Tauri server-side rendering failed:", err);
         }
       }
 
