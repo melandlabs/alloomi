@@ -225,10 +225,6 @@ export const PersonalizationBasicSettings = forwardRef<
         language={language}
         onLanguageChange={(code) => {
           setLanguage(code);
-          if (code) {
-            i18n.changeLanguage(code);
-            saveLanguage(code);
-          }
         }}
         currentLang={i18n.language}
         onUiLanguageChange={(code) => {

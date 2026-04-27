@@ -69,11 +69,13 @@ export function PersonalizationLinkedAccounts({
   isAddConnectorDialogOpen,
   onAddConnectorDialogOpenChange,
   initialAddPanelTab = "apps",
+  linkingPlatform,
 }: {
   open: boolean;
   isAddConnectorDialogOpen?: boolean;
   onAddConnectorDialogOpenChange?: (open: boolean) => void;
   initialAddPanelTab?: "apps" | "rss";
+  linkingPlatform?: IntegrationId | null;
 }) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -582,6 +584,7 @@ export function PersonalizationLinkedAccounts({
                               openIMessageAuthFromConnectorDialog
                             }
                             onSelectPlatform={handleSelectPlatformForInlineForm}
+                            linkingPlatform={linkingPlatform}
                           />
                         </Suspense>
                       </TabsContent>

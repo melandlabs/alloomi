@@ -9,6 +9,7 @@ type StartRequest = {
 
 type StartResponse = {
   authorizationUrl: string;
+  sessionId?: string;
   redirectUri?: string;
 };
 
@@ -186,10 +187,48 @@ export async function getDiscordAuthorizationUrl(
   );
 }
 
-export async function getXAuthorizationUrl(token?: string): Promise<string> {
+export async function getXAuthorizationUrl(
+  token?: string,
+): Promise<{ authorizationUrl: string; sessionId: string }> {
   // Always use local API, server decides whether to forward to cloud
   // In Tauri mode, pass Bearer token
-  return requestAuthorizationUrl("/api/x/oauth", "/x-authorized", token);
+  const response = await fetch("/api/x/oauth", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      redirectPath: "/x-authorized",
+      token,
+    } satisfies StartRequest),
+  });
+
+  if (!response.ok) {
+    let message = "Failed to start OAuth flow";
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body?.error) {
+        message = body.error;
+      }
+    } catch {
+      // ignore JSON parse errors and use default message
+    }
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as StartResponse;
+  if (!data.authorizationUrl) {
+    throw new Error("OAuth endpoint did not return an authorization URL");
+  }
+  if (!data.sessionId) {
+    throw new Error("OAuth endpoint did not return a session ID");
+  }
+
+  return {
+    authorizationUrl: data.authorizationUrl,
+    sessionId: data.sessionId,
+  };
 }
 
 export async function getTeamsAuthorizationUrl(): Promise<string> {
