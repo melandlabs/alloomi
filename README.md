@@ -143,19 +143,19 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 - Mutliple Connectors
 
-<img src="screenshots/app/connector.png" alt="Connector" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+<img src="screenshots/app/connectors.gif" alt="Connector" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Automation & Cron Jobs
 
-<img src="screenshots/app/automation.png" alt="Automation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+<img src="screenshots/app/automation.gif" alt="Automation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Library
 
-<img src="screenshots/app/library.png" alt="Library" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+<img src="screenshots/app/library.gif" alt="Library" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Skills
 
-<img src="screenshots/app/skill.png" alt="Skill" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+<img src="screenshots/app/skills.gif" alt="Skill" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Message Apps
 
