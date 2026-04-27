@@ -50,6 +50,7 @@ import {
   DEFAULT_API_PORT,
   DEFAULT_WORK_DIR,
 } from "@/lib/env/config/constants";
+import { DEFAULT_AI_MODEL } from "@/lib/env/constants";
 import {
   PDF_MAX_PAGES,
   PDF_MAX_SIZE_MB,
@@ -1579,6 +1580,13 @@ export class ClaudeAgent extends BaseAgent {
         env.ANTHROPIC_DEFAULT_HAIKU_MODEL = undefined;
         env.ANTHROPIC_DEFAULT_OPUS_MODEL = undefined;
       }
+    } else {
+      // When neither model nor apiKey is specified, use the default AI model
+      // to prevent SDK from reading invalid model from ~/.claude/settings.json
+      env.ANTHROPIC_MODEL = DEFAULT_AI_MODEL;
+      env.ANTHROPIC_DEFAULT_SONNET_MODEL = DEFAULT_AI_MODEL;
+      env.ANTHROPIC_DEFAULT_HAIKU_MODEL = DEFAULT_AI_MODEL;
+      env.ANTHROPIC_DEFAULT_OPUS_MODEL = DEFAULT_AI_MODEL;
     }
 
     // Set thinking configuration based on thinkingLevel
