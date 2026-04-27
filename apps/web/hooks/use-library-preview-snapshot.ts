@@ -19,6 +19,10 @@ export type LibraryPreviewKind =
   | "pptx"
   | "docx"
   | "image"
+  | "video"
+  | "audio"
+  | "archive"
+  | "mindmap"
   | "generic";
 
 export type { LibrarySpreadsheetSnapshot };
@@ -68,12 +72,25 @@ const libraryImageDataUrlMemoryCache = new Map<
 >();
 
 /**
+ * Convert a Blob to a data URL.
+ */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
  * Determines the rendering type for library thumbnail/inline preview based on file extension.
  */
 export function getLibraryPreviewKindFromExt(ext: string): LibraryPreviewKind {
   const e = ext.toLowerCase();
   if (["html", "htm", "h5"].includes(e)) return "website";
   if (e === "md") return "markdown";
+  if (e === "mmark") return "mindmap";
   if (["txt", "text"].includes(e)) return "text";
   if (e === "pdf") return "pdf";
   if (["csv", "xlsx", "xls", "xlsm", "ods"].includes(e)) return "spreadsheet";
@@ -81,6 +98,9 @@ export function getLibraryPreviewKindFromExt(ext: string): LibraryPreviewKind {
   if (e === "docx") return "docx";
   if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(e))
     return "image";
+  if (["mp4", "webm", "mov", "avi", "mkv", "flv"].includes(e)) return "video";
+  if (["mp3", "wav", "flac", "aac", "ogg", "m4a"].includes(e)) return "audio";
+  if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(e)) return "archive";
   return "generic";
 }
 
@@ -438,6 +458,50 @@ export function useLibraryPreviewSnapshot(
         setSnapshotLoading(true);
         setPptxThumbDataUrl("");
         try {
+          // For workspace_file, try render engine first
+          if (item.kind === "workspace_file" && item.workspaceFile) {
+            const { taskId, path } = item.workspaceFile;
+
+            try {
+              const { getRenderEngineStatus } = await import("@/lib/tauri");
+              const engineStatus = await getRenderEngineStatus();
+
+              if (engineStatus?.available) {
+                // Use server-side rendering via LibreOffice
+                const pptxPath = encodeURIComponent(path);
+                const response = await fetch(
+                  `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
+                );
+
+                if (response.ok) {
+                  const manifest = await response.json();
+                  // manifest.slides[0] contains the first slide's rendered image path
+                  if (manifest.slides?.length > 0) {
+                    const firstSlide = manifest.slides[0];
+                    const imageUrl = `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(firstSlide.path)}?binary=true`;
+
+                    const imgResponse = await fetch(imageUrl);
+                    if (imgResponse.ok && !cancelled) {
+                      const blob = await imgResponse.blob();
+                      const dataUrl = await blobToDataUrl(blob);
+                      setPptxThumbDataUrl(dataUrl);
+                      if (thumbKey) {
+                        libraryPptxThumbMemoryCache.set(thumbKey, {
+                          dataUrl,
+                          updatedAt,
+                        });
+                      }
+                      return;
+                    }
+                  }
+                }
+              }
+            } catch {
+              // Render engine not available or failed, fall through to client-side rendering
+            }
+          }
+
+          // Fallback to client-side JSZip rendering
           const bytes = await fetchLibraryItemBytes(item);
           if (cancelled || !bytes?.length) return;
           const { renderPptxFirstPageToPngDataUrl } =
