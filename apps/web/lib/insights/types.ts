@@ -53,10 +53,12 @@ export type GeneratedInsightPayload = {
   followUps?: FollowUpData[] | null;
   actionRequired?: boolean | null;
   actionRequiredDetails?: ActionRequirementDetails | null;
+  isUnreplied?: boolean | null;
   myTasks?: InsightTaskItem[] | null;
   waitingForMe?: InsightTaskItem[] | null;
   waitingForOthers?: InsightTaskItem[] | null;
   clarifyNeeded?: boolean | null;
+  priority?: number | null;
   categories?: string[];
   learning?: string | null;
   experimentIdeas?: ExperimentIdeaData[] | null;
@@ -83,7 +85,7 @@ export type GeneratedInsightPayload = {
 export type OverlayDescriptor = {
   role: string;
   name?: string;
-  priority?: number;
+  priority?: number | null;
   fieldToggles?: Record<string, boolean>;
   [key: string]: unknown;
 };

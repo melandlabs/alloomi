@@ -28,6 +28,7 @@ import {
 } from "../ai/subagents/insights";
 import { AppError } from "@alloomi/shared/errors";
 import type { ExtractedMessageInfo } from "@alloomi/integrations/channels/sources/types";
+import { TelegramAdapter } from "@alloomi/integrations/telegram";
 import { FacebookMessengerAdapter } from "@alloomi/integrations/facebook-messenger";
 import type { InsertRssItem } from "@alloomi/rss";
 import { maxChunkSummaryCount } from "@/lib/env/constants";
@@ -44,6 +45,8 @@ import {
   type WhatsAppDialogInfo,
 } from "../integrations/whatsapp";
 import { whatsappClientRegistry } from "@/lib/integrations/whatsapp/client-registry";
+import { telegramClientRegistry } from "@/lib/integrations/telegram/client-registry";
+import { handleTelegramAuthFailure } from "@/lib/integrations/telegram/session";
 import { fileIngester } from "../integrations/providers/file-ingester";
 import {
   getIntegrationAccountByBotId,
@@ -220,6 +223,7 @@ export async function getInsightsByBotId({
   rawMessages?: RawMessageData[];
   processedGroups?: string[];
 }> {
+  const disableFeishuInsightsFetch = true; // process.env.DISABLE_FEISHU_INSIGHTS_FETCH === "true";
   const botId = bot.id;
   const actualUserId = user.id;
   const userType = user.type;
@@ -897,15 +901,6 @@ export async function getInsightsByBotId({
         typeof configuredBotToken === "string"
           ? (configuredBotToken as string)
           : undefined;
-      const [
-        { TelegramAdapter },
-        { telegramClientRegistry },
-        { handleTelegramAuthFailure },
-      ] = await Promise.all([
-        import("@alloomi/integrations/telegram"),
-        import("@/lib/integrations/telegram/client-registry"),
-        import("@/lib/integrations/telegram/session"),
-      ]);
 
       const adapter = new TelegramAdapter({
         botId: bot.id,
@@ -2447,6 +2442,18 @@ export async function getInsightsByBotId({
         await deleteInsightsSession(botId);
       }
     } else if (bot.adapter === "feishu") {
+      if (disableFeishuInsightsFetch) {
+        console.warn(
+          `[Bot ${bot.id}] Skipping Feishu/Lark insights fetch because DISABLE_FEISHU_INSIGHTS_FETCH=true`,
+        );
+        await deleteInsightsSession(botId);
+        return {
+          payload: [],
+          originalMsgCount: 0,
+          locked: false,
+          rawMessages: [],
+        };
+      }
       console.log(
         `[Bot ${bot.id}] uses Feishu platform manager to ingest messages for insights`,
       );

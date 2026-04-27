@@ -34,6 +34,7 @@ export async function ensureUserInsightSettings(
         refreshIntervalMinutes: 30,
         lastMessageProcessedAt: null,
         lastActiveAt: null,
+        lastInsightMaintenanceRunAt: null,
         activityTier: "low",
       });
       settings = await getUserInsightSettings(userId);
@@ -59,6 +60,7 @@ export async function ensureUserInsightSettings(
           refreshIntervalMinutes: 30,
           lastMessageProcessedAt: null,
           lastActiveAt: null,
+          lastInsightMaintenanceRunAt: null,
           activityTier: "low",
           aiSoulPrompt: null,
           lastUpdated: new Date(),
