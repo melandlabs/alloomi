@@ -230,6 +230,8 @@ function processTextWithFilePaths(
     "mp3",
     "wav",
     "ogg",
+    // Mind map files
+    "mmark",
   ];
   // Sort extensions by length descending, ensure matching longer extensions first (e.g., .tsx before .ts)
   const sortedExtensions = [...previewableExtensions].sort(
@@ -1004,6 +1006,8 @@ function NonMemoizedMarkdownWithCitations({
           "mp3",
           "wav",
           "ogg",
+          // Mind map files
+          "mmark",
         ];
         const sortedExtensions = [...previewableExtensions].sort(
           (a, b) => b.length - a.length,
@@ -1300,6 +1304,8 @@ function NonMemoizedMarkdownWithCitations({
           "mp3",
           "wav",
           "ogg",
+          // Mind map files
+          "mmark",
         ];
         const sortedExtensions = [...previewableExtensions].sort(
           (a, b) => b.length - a.length,

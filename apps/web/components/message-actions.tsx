@@ -138,8 +138,10 @@ export function PureMessageActions({
     const msgAny = message as {
       createdAt?: string | number | Date;
       timestamp?: string | number | Date;
+      metadata?: { createdAt?: string | number | Date };
     };
-    const raw = msgAny.createdAt ?? msgAny.timestamp;
+    const raw =
+      msgAny.createdAt ?? msgAny.timestamp ?? msgAny.metadata?.createdAt;
     if (raw != null && !Number.isNaN(new Date(raw).getTime())) {
       return new Date(raw);
     }

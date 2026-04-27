@@ -48,6 +48,7 @@ export function WebsitePreview({
   const [iframeKey, setIframeKey] = useState(0);
   const [inlineContent, setInlineContent] = useState<string>(content);
   const [isInlining, setIsInlining] = useState(false);
+  const [extractedTaskId, setExtractedTaskId] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Inline CSS and JS resources when content or filePath changes
@@ -68,7 +69,6 @@ export function WebsitePreview({
       setIsInlining(true);
       try {
         let fileDir = "";
-        let taskId = "";
 
         // Extract fileDir from filePath
         const lastSlashIndex = filePath.lastIndexOf("/");
@@ -77,10 +77,14 @@ export function WebsitePreview({
         // Extract taskId from path if available
         const sessionMatch = filePath.match(/\/\.alloomi\/sessions\/([^\/]+)/);
         if (sessionMatch) {
-          taskId = sessionMatch[1];
+          setExtractedTaskId(sessionMatch[1]);
         }
 
-        const processed = await inlineResources(content, fileDir, taskId);
+        const processed = await inlineResources(
+          content,
+          fileDir,
+          sessionMatch?.[1] ?? "",
+        );
         setInlineContent(processed);
       } catch (error) {
         console.error("[WebsitePreview] Failed to inline resources:", error);
@@ -100,7 +104,7 @@ export function WebsitePreview({
   );
 
   const openExternalTooltip = useMemo(() => {
-    if (isTauri() && filePath && taskId) {
+    if (isTauri() && filePath && (taskId || extractedTaskId)) {
       return t(
         "common.filePreview.openWithDefaultApp",
         "Open with Default App",
@@ -128,9 +132,10 @@ export function WebsitePreview({
   const handleOpenExternal = async () => {
     try {
       // If in Tauri and have a taskId, use the workspace file function which handles relative paths
-      if (isTauri() && filePath && taskId) {
+      const effectiveTaskId = taskId || extractedTaskId;
+      if (isTauri() && filePath && effectiveTaskId) {
         const result = await openWorkspaceFileInSystemDefaultApp({
-          taskId,
+          taskId: effectiveTaskId,
           path: filePath,
         });
         if (!result.ok) {
@@ -163,13 +168,14 @@ export function WebsitePreview({
 
   // Handle show in folder
   const handleShowInFolder = async () => {
-    if (!filePath || !taskId) {
+    const effectiveTaskId = taskId || extractedTaskId;
+    if (!filePath || !effectiveTaskId) {
       toast.error("File path is not available");
       return;
     }
     try {
       const result = await revealWorkspaceFileInParentFolder({
-        taskId,
+        taskId: effectiveTaskId,
         path: filePath,
       });
       if (!result.ok) {
@@ -227,7 +233,7 @@ export function WebsitePreview({
                   className="animate-spin text-muted-foreground"
                 />
                 <p className="text-muted-foreground text-sm">
-                  Inlining resources...
+                  {t("common.filePreview.inliningResources")}
                 </p>
               </div>
             </div>
@@ -239,7 +245,7 @@ export function WebsitePreview({
                 srcDoc={previewSrcDoc}
                 className="block size-full min-h-0 border-0"
                 title={filename}
-                sandbox="allow-same-origin allow-popups"
+                sandbox="allow-scripts allow-same-origin allow-popups"
               />
             </div>
           )
