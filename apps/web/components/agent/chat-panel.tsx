@@ -159,7 +159,9 @@ export function AgentChatPanel({
       setInput(newInput);
     } else if (!prevChatId) {
       // Initial load: try to load saved input or use initialInput
-      const initialInputValue = loadChatInput(chatId, initialInput ?? "");
+      const initialInputValue = initialInput?.trim()
+        ? initialInput
+        : loadChatInput(chatId, "");
       setInput(initialInputValue);
     }
 
