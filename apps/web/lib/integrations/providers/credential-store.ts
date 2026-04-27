@@ -14,6 +14,12 @@ import {
   updateIntegrationAccount,
   upsertIntegrationAccount,
 } from "@/lib/db/queries";
+import {
+  rotateCredentials as doRotateCredentials,
+  getCredentialRotationHistory,
+  revertToPreviousCredential,
+  type RotationHistoryEntry,
+} from "@/lib/credentials/rotation-service";
 
 /**
  * Implementation of CredentialStore that uses apps/web database queries
@@ -82,6 +88,48 @@ export class WebCredentialStore {
       metadata: params.metadata ?? null,
       status: params.status ?? "active",
     });
+  }
+
+  /**
+   * Rotate credentials for an integration account
+   *
+   * @param params - Rotation parameters including accountId, userId, new credentials, and optional reason
+   */
+  async rotateCredentials(params: {
+    accountId: string;
+    userId: string;
+    newCredentials: Record<string, unknown>;
+    reason?: string;
+  }): Promise<void> {
+    await doRotateCredentials({
+      ...params,
+      rotatedBy: params.userId,
+    });
+  }
+
+  /**
+   * Get rotation history for an integration account
+   *
+   * @param accountId - The account ID to get history for
+   * @returns Array of rotation history entries
+   */
+  async getRotationHistory(accountId: string): Promise<RotationHistoryEntry[]> {
+    return getCredentialRotationHistory(accountId);
+  }
+
+  /**
+   * Revert to a previous credential from rotation history
+   *
+   * @param accountId - The account ID
+   * @param historyId - The rotation history entry ID to revert to
+   * @param userId - The user performing the revert
+   */
+  async revertToPreviousCredential(
+    accountId: string,
+    historyId: string,
+    userId: string,
+  ): Promise<void> {
+    await revertToPreviousCredential(accountId, historyId, userId);
   }
 }
 
