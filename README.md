@@ -7,7 +7,7 @@
 </br>
 </br>
 
-[![Node.js Version](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](https://nodejs.org) [![Tauri](https://img.shields.io/badge/Tauri-Desktop-24C8D5?logo=tauri)](https://tauri.app) [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-4B4B4B?logo=linux&logoColor=white)](https://alloomi.ai) [![License](https://img.shields.io/badge/License-Apache%202.0-F8D52A?logo=apache)](https://www.apache.org/licenses/LICENSE-2.0) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv)
+[![Node.js Version](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](https://nodejs.org) [![Tauri](https://img.shields.io/badge/Tauri-Desktop-24C8D5?logo=tauri)](https://tauri.app) [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-4B4B4B?logo=linux&logoColor=white)](https://alloomi.ai) [![License](https://img.shields.io/badge/License-Apache%202.0-F8D52A?logo=apache)](https://www.apache.org/licenses/LICENSE-2.0) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv) [![X](https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white)](https://x.com/AlloomiAI)
 
 #### _Proactive AI workspace — understands your intent, orchestrates execution, and gets things done._
 
@@ -18,6 +18,17 @@
 
 Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
 
+> This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**
+
+<p align="center">
+<a href="#features">Features</a>&nbsp;|&nbsp;
+<a href="#what-makes-alloomi-different">Difference</a>&nbsp;|&nbsp;
+<a href="#use-cases">Use Cases</a>&nbsp;|&nbsp;
+<a href="#installation">Installation</a>&nbsp;|&nbsp;
+<a href="#documentation">Documentation</a>&nbsp;|&nbsp;
+<a href="#developing">Developing</a>
+</p>
+
 ## Features
 
 ### Core Capabilities
@@ -25,7 +36,7 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - **📡 Proactive Awareness** — monitors signals across Slack, Email, Calendar, Documents and alerts you proactively before issues escalate
 - **🧠 Long-Term Memory (Context Atlas)** — persistent knowledge graphs of people, projects, and decisions; remembers context even months later
 - **🎯 95% Noise Filtering** — hundreds of daily messages refined into one focused panel; tells you what you should act on
-- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end
+- **⚡ Autonomous Execution** — drafts replies, schedules meetings, generates reports, tracks and validates results end-to-end; supports **scheduled tasks** (cron-like recurring jobs) and **proactively triggered tasks** (event-driven actions based on signals from Slack, Email, Calendar, etc.)
 - **💬 Natural Chat** — assign tasks in plain language; no complex commands to learn with powerful skills and MCP tools
 
 ### Built-in File Preview
@@ -51,12 +62,20 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 ### Agent Runtime Integrations
 
-- **Claude Code** — Anthropic's coding agent _(Default)_
+- **Claude Code** — Anthropic's coding agent (auto-inherits `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` from environment & [skills](https://code.claude.com/docs/en/skills) in `~/.claude/skills`) _(Default)_
 - **Codex** — OpenAI's code generation agent _(Coming Soon)_
 - **Gemmi** — General-purpose AI agent _(Coming Soon)_
 - **Pi** — Inflection AI's personal agent _(Coming Soon)_
 - **OpenClaw** — Open agent protocol & ecosystem _(Coming Soon)_
 - **Hermes Agent** — NousResearch's agent framework _(Coming Soon)_
+
+### Hybrid Model Architecture (Coming Soon)
+
+- **🤖 Hybrid Model Routing** — dynamically routes tasks to optimal models (Claude, GPT, Gemini, open-source) based on complexity, cost, and latency requirements
+- **🧪 Reinforcement Learning from Feedback (RLHF) & LoRA** — continuously improves task execution quality through human feedback signals
+- **🔄 Multi-Agent Debate** — multiple specialized agents collaborate and debate to reach higher-quality decisions
+- **📊 Outcome Validation** — end-to-end result verification with automated checks and human-in-the-loop approval workflows
+- **🧬 Adaptive Personalization** — learns your communication style, preferences, and workflows over time
 
 ## What Makes Alloomi Different?
 
@@ -77,6 +96,8 @@ from all your connected sources. An agent without this loop can only respond bas
 every conversation—and every moment—makes Alloomi smarter and more aligned with you. When you create a custom
 agent role in Alloomi to handle one-off or scheduled tasks, this brain acts as the orchestrator, dramatically
 improving execution quality.
+
+<img src="screenshots/arch.png" alt="Architecture" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 Alloomi implements a complete **"Receive → Process → Remember → Understand → Serve"** loop:
 
@@ -107,31 +128,48 @@ See [here](https://alloomi.ai/docs) for more features and use cases.
 
 ## Screenshots
 
-- Chat
+- Document Previews — Docx, PPTx & Xlsx
 
-![Chat Interface](screenshots/chat.png)
+<table align="center">
+<tr>
+<td><img src="screenshots/app/docx.gif" alt="Docx" style="border:1px solid #ddd; border-radius:8px;"></td>
+<td><img src="screenshots/app/excel.gif" alt="Excel" style="border:1px solid #ddd; border-radius:8px;"></td>
+</tr>
+</table>
 
-- Connectors
+- Website Generation
 
-![Connector](screenshots/connector.png)
+<img src="screenshots/app/website.gif" alt="Website Generation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Mutliple Connectors
+
+<img src="screenshots/app/connector.png" alt="Connector" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Automation & Cron Jobs
 
-![Automation](screenshots/automation.png)
+<img src="screenshots/app/automation.png" alt="Automation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Library
 
-![Library](screenshots/library.png)
+<img src="screenshots/app/library.png" alt="Library" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
-- Skill
+- Skills
 
-![Skill](screenshots/skill.png)
+<img src="screenshots/app/skill.png" alt="Skill" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 - Message Apps
 
-![Message App](screenshots/message-app.png)
+<img src="screenshots/app/message-app.png" alt="Message App" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 See [alloomi.ai](https://alloomi.ai) for more information.
+
+## Installation
+
+For more information about installation, please check the Installation Guide on the [Alloomi GitHub Releases](https://github.com/melandlabs/release).
+
+## Documentation
+
+Detailed documentation is available at [Alloomi Website](https://alloomi.ai/docs).
 
 ## Developing
 
@@ -203,6 +241,7 @@ LLM_EMBEDDING_MODEL=text-embedding-3-small
 
 Requirements: Node.js 22+, pnpm 9+, Rust Cargo 1.88+
 
+
 ## Install
 
 ```bash
@@ -222,7 +261,3 @@ pnpm lint         # Lint
 pnpm lint:fix     # Fix lint issues
 pnpm test         # Run tests
 ```
-
-## Note
-
-This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**

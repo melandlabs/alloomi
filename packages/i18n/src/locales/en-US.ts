@@ -39,6 +39,7 @@ const enUS = {
     never: "Never",
     remove: "Remove",
     done: "Done",
+    completed: "Completed",
     today: "Today",
     copy: "Copy",
     forward: "Forward",
@@ -57,6 +58,7 @@ const enUS = {
     previewImage: "Preview Image",
     preview: "Preview",
     pin: "Pin",
+    showInFolder: "Show in Folder",
     myIntegrations: "My Integrations",
     connectPlatformDesc:
       "After authorization, we'll get the necessary permissions to read and send messages—helping you centrally manage communications across all your integrations.", // Streamlined; added em dash for flow
@@ -71,6 +73,7 @@ const enUS = {
     connect: "Connect",
     connected: "Connected",
     authorizeBtn: "Authorize",
+    justNow: "just now",
     minAgo: "minutes ago",
     hourAgo: "hours ago",
     dayAgo: "days ago",
@@ -97,6 +100,7 @@ const enUS = {
     guestInputPlaceholder: "Send a message...",
     youCanTry: "Start with the contexts above",
     noMoreData: "No more data",
+    noResults: "No results",
     loadingMore: "Loading more details...",
     prev: "Previous",
     previous: "Previous",
@@ -2562,8 +2566,9 @@ const enUS = {
       "Tell Alloomi how you prefer understandings to be generated so we can prioritize the messages and tone that matter most.",
     loading: "Loading your preferences…",
     languageLabel: "Output Language",
-    languageDescription:
-      "The language Alloomi uses when generating insights and replies.",
+    languageDescription: "AI will prioritize replying in this language.",
+    uiLanguageLabel: "Interface Language",
+    uiLanguageDescription: "Switch the interface language.",
     languagePlaceholder: "Select a language",
     language: {
       auto: "Detect automatically",
@@ -3321,6 +3326,7 @@ const enUS = {
     language: "Language Settings",
     /** Settings sidebar trigger: bilingual label, distinct from account menu */
     languageSidebar: "Language",
+    followSystem: "Follow system",
     logout: "Sign Out", // Aligns with common/signOut
     select: "Select Language",
     selecting: "Selecting...",
@@ -3412,8 +3418,11 @@ const enUS = {
     targetChannel: "Target Channel",
     source: "Source",
     addSource: "Add Source",
+    addMate: "Add Mate",
     newCharacter: "New Character",
     createMate: "Create Mate",
+    createMateManual: "Create Manually",
+    createMateFromMarketplace: "Add from Marketplace",
     enable: "Enable",
     disable: "Pause",
     latestResult: "Output",
@@ -3458,6 +3467,7 @@ const enUS = {
     cancel: "Cancel",
     executeNow: "Execute Now",
     noOutputYet: "No output yet.",
+    taskRunFailed: "Execution failed. Please try again later.",
     executing: "Executing...",
     currentlyExecuting: "Currently executing",
     previousResult: "Previous result",
@@ -3556,6 +3566,7 @@ const enUS = {
     sourceInfo: "Source Info",
     selectInsight: "Select insight",
     noSourceMessages: "No source messages available",
+    noTasks: "No tasks yet",
     event: "Event",
     topics: "Topics",
     topicsDescription:
@@ -3714,6 +3725,7 @@ const enUS = {
     viewList: "List",
     viewGrid: "Grid",
     storage: "Storage",
+    storageManagement: "Manage",
     storageTab: "Storage",
     storageTotalUsage: "Total disk usage",
     storageCategory: {
@@ -4839,7 +4851,7 @@ const enUS = {
     currentPlan: "Current Plan",
     accountEdit: "Account",
     accountSettings: "Account",
-    alloomiSettings: "Alloomi settings",
+    alloomiSettings: "Language",
     profileSoulPageTitle: "Personalization",
     profileSoulNavTitle: "Personalization",
     profileDescription: "Update how your name and avatar appear across Alloomi",

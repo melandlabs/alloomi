@@ -47,7 +47,7 @@ function buildArtifactPathPatterns(): RegExp[] {
       "gi",
     ),
     new RegExp(
-      `/Users/[^/\\\\]+/\\.alloomi/sessions/[^/\\\\]+/.+?\\.(${ext})${b}`,
+      `/Users/[^/\\\\]+/\\.alloomi/sessions/[^/\\\\]+(?:/[^/\\\\]+)?/.+?\\.(${ext})${b}`,
       "gi",
     ),
     new RegExp(`/(?:Users|home)/[^/\\\\].+?\\.(${ext})${b}`, "gi"),
@@ -56,7 +56,7 @@ function buildArtifactPathPatterns(): RegExp[] {
       "gi",
     ),
     new RegExp(
-      `[A-Za-z]:(?:\\\\|/)Users(?:\\\\|/)[^/\\\\\\n\\r]+(?:\\\\|/)\\.alloomi(?:\\\\|/)sessions(?:\\\\|/)[^/\\\\\\n\\r]+(?:\\\\|/).+?\\.(${ext})${b}`,
+      `[A-Za-z]:(?:\\\\|/)Users(?:\\\\|/)[^/\\\\\\n\\r]+(?:\\\\|/)\\.alloomi(?:\\\\|/)sessions(?:\\\\|/)[^/\\\\\\n\\r]+(?:\\\\|/)(?:[^/\\\\\\n\\r]+(?:\\\\|/))?.+?\\.(${ext})${b}`,
       "gi",
     ),
     new RegExp(

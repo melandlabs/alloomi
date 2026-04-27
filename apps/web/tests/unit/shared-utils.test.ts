@@ -113,8 +113,8 @@ describe("shared utils", () => {
   describe("timeBeforeHoursMs", () => {
     // SU-10: timeBeforeHoursMs
     it("SU-10: should return milliseconds timestamp N hours ago", () => {
-      const now = Date.now();
       const twoHoursAgo = timeBeforeHoursMs(2);
+      const now = Date.now();
       // 2 hours = 7200 seconds = 7200000 ms
       expect(now - twoHoursAgo).toBe(7200000);
     });

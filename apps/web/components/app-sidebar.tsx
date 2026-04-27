@@ -330,7 +330,7 @@ export function AppSidebar() {
     return items.map((item) => ({
       ...item,
       preservedUrl:
-        item.url === "/" && chatId ? `${item.url}chat/${chatId}` : item.url,
+        item.url === "/" && chatId ? `/?page=chat&chatId=${chatId}` : item.url,
     }));
   }, [isGuest, canManageCoupons, chatId]);
 

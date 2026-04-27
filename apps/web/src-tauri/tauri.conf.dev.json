@@ -45,8 +45,7 @@
       "signingIdentity": null
     },
     "resources": [
-      "../../../skills/**/*",
-      "../cli-bundle/**/*"
+      "../../../skills/**/*"
     ]
   },
   "plugins": {

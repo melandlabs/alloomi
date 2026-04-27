@@ -7,9 +7,11 @@ import { LRUCache } from "lru-cache";
 import { sendReplyByBotId } from "@/lib/bots/send-reply";
 import {
   type IntegrationAccountWithBot,
+  getContact,
   getUserById,
   getUserTypeForService,
   loadIntegrationCredentials,
+  upsertContact,
 } from "@/lib/db/queries";
 import type { UserType } from "@/app/(auth)/auth";
 import { DEFAULT_AI_MODEL, AI_PROXY_BASE_URL } from "@/lib/env/constants";
@@ -164,6 +166,29 @@ async function processWeixinInboundMessage(
 
   const LOG = process.env.DEBUG_WEIXIN === "true";
   let userType: UserType;
+
+  // Persist contextToken for future proactive push (cron notifications)
+  if (params.contextToken?.trim()) {
+    try {
+      const existingContact = await getContact(userId, params.fromUserId);
+      const currentMeta =
+        (existingContact?.contactMeta as Record<string, any>) ?? {};
+      await upsertContact({
+        userId,
+        botId: bot.id,
+        contactId: params.fromUserId,
+        contactName: existingContact?.contactName ?? params.fromUserId,
+        type: existingContact?.type ?? "p2p",
+        contactMeta: {
+          ...currentMeta,
+          lastContextToken: params.contextToken.trim(),
+          lastContextTokenAt: Date.now(),
+        },
+      });
+    } catch (e) {
+      weixinLogger.warn("Failed to persist weixin contextToken:", e);
+    }
+  }
 
   try {
     userType = await getUserTypeForService(userId);

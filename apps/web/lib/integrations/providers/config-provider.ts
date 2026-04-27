@@ -42,7 +42,7 @@ export class WebConfigProvider implements AppConfigProvider {
    * Get the AI proxy base URL
    */
   getAIProxyBaseUrl(): string {
-    return AI_PROXY_BASE_URL ?? "";
+    return AI_PROXY_BASE_URL;
   }
 
   /**

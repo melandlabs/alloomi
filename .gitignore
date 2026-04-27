@@ -127,4 +127,4 @@ Note.md
 # Tauri bundled app resources (contains embedded .env with secrets)
 **/*.app/Contents/Resources/_up_/
 
-pnpm-lock.yaml
+# pnpm-lock.yaml - kept in version control for reproducible builds

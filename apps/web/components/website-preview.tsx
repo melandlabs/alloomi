@@ -4,7 +4,11 @@ import { useState, useRef, useEffect, useMemo, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { RemixIcon } from "@/components/remix-icon";
 import { toast } from "sonner";
-import { openUrl, openPathCustom, revealItemInDir, isTauri } from "@/lib/tauri";
+import { openUrl, isTauri } from "@/lib/tauri";
+import {
+  openWorkspaceFileInSystemDefaultApp,
+  revealWorkspaceFileInParentFolder,
+} from "@/lib/files/open-workspace-file-locally";
 import { inlineResources } from "@/lib/files/inline-resources";
 import { FilePreviewDrawerHeader } from "@/components/file-preview-drawer-header";
 import { FilePreviewDrawerRichTextToolbar } from "@/components/file-preview-drawer-rich-text-toolbar";
@@ -22,6 +26,7 @@ export interface WebsitePreviewProps {
   content: string;
   filename?: string;
   filePath?: string;
+  taskId?: string;
   onClose?: () => void;
   className?: string;
 }
@@ -33,6 +38,7 @@ export function WebsitePreview({
   content,
   filename = "index.html",
   filePath,
+  taskId,
   onClose,
   className,
 }: WebsitePreviewProps) {
@@ -94,14 +100,14 @@ export function WebsitePreview({
   );
 
   const openExternalTooltip = useMemo(() => {
-    if (isTauri() && filePath) {
+    if (isTauri() && filePath && taskId) {
       return t(
         "common.filePreview.openWithDefaultApp",
         "Open with Default App",
       );
     }
     return t("common.filePreview.openInNewTab", "Open in New Tab");
-  }, [filePath, t]);
+  }, [filePath, taskId, t]);
 
   // Use srcdoc instead of blob URL to avoid CSP restrictions in dev mode
   // (Vite dev server CSP blocks blob: in frame-src)
@@ -121,16 +127,25 @@ export function WebsitePreview({
   // Handle open in new tab
   const handleOpenExternal = async () => {
     try {
-      // In Tauri environment with local file path, open local file with system command
-      if (isTauri() && filePath) {
-        const success = await openPathCustom(filePath);
-        if (!success) {
-          toast.error("Failed to open file");
+      // If in Tauri and have a taskId, use the workspace file function which handles relative paths
+      if (isTauri() && filePath && taskId) {
+        const result = await openWorkspaceFileInSystemDefaultApp({
+          taskId,
+          path: filePath,
+        });
+        if (!result.ok) {
+          const reasonMessages: Record<string, string> = {
+            not_tauri: "Not running in desktop app",
+            no_home: "Could not determine home directory",
+            missing_file: "File not found",
+            open_failed: "Failed to open file",
+          };
+          toast.error(reasonMessages[result.reason] ?? "Failed to open file");
         }
         return;
       }
 
-      // In browser environment or without local path, use blob URL
+      // Fallback: open in new tab
       const blob = new Blob([inlineContent], { type: "text/html" });
       const blobUrl = URL.createObjectURL(blob);
 
@@ -148,9 +163,26 @@ export function WebsitePreview({
 
   // Handle show in folder
   const handleShowInFolder = async () => {
-    if (!filePath) return;
+    if (!filePath || !taskId) {
+      toast.error("File path is not available");
+      return;
+    }
     try {
-      await revealItemInDir(filePath);
+      const result = await revealWorkspaceFileInParentFolder({
+        taskId,
+        path: filePath,
+      });
+      if (!result.ok) {
+        const reasonMessages: Record<string, string> = {
+          not_tauri: "Not running in desktop app",
+          no_home: "Could not determine home directory",
+          missing_file: "File not found",
+          reveal_failed: "Failed to show in folder",
+        };
+        toast.error(
+          reasonMessages[result.reason] ?? "Failed to show in folder",
+        );
+      }
     } catch (error) {
       console.error("Failed to show in folder:", error);
       toast.error("Failed to show in folder");

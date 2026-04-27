@@ -48,7 +48,6 @@
     },
     "resources": [
       "../../../skills/**/*",
-      "../cli-bundle/**/*",
       "../.next/standalone/**/*",
       "../.next/standalone/apps/web/.next/**/*",
       "../.next/standalone/apps/web/lib/**/*",
