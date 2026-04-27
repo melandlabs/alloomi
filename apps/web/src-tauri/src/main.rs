@@ -283,13 +283,13 @@ fn main() {
             update::finish_update_download,
             update::download_and_install_update,
             update::restart_for_update,
-            // Render engine
-            render_engine::get_render_engine_status,
             // Telegram
             telegram::desktop::detect_telegram_desktop,
             telegram::desktop::check_custom_telegram_path,
             // Notification
             notify::send_notification,
+            // Render engine
+            render_engine::get_render_engine_status_cmd,
         ])
         .setup(|app| {
             // Deliver AppHandle to the background server thread immediately

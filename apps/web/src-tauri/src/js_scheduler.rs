@@ -14,7 +14,7 @@ use std::time::Duration;
 /// timer callbacks execute after the app closes.
 pub fn stop_js_scheduler() {
     let stop_url = format!(
-        "{}/api/scheduled-jobs/internal/scheduler/stop",
+        "{}/api/scheduled-jobs/internal/scheduler",
         constants::nextjs_url()
     );
     let client = match reqwest::blocking::Client::builder()

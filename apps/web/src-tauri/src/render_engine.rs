@@ -3,304 +3,265 @@
 // Use of this source code is governed by a license that can be
 // found in the LICENSE file in the root of this source tree.
 
+//! Render engine management module — handles bundled LibreOffice and poppler binaries
+//! for high-fidelity PPTX preview rendering.
+
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct InstalledRenderEngine {
-    pub version: String,
-    pub installed_at: String,
-    pub install_dir: String,
-    pub soffice_path: String,
-    pub pdftoppm_path: String,
-    pub python_path: Option<String>,
-}
-
-#[derive(Serialize, Clone)]
+/// Render engine status returned to the frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RenderEngineStatus {
+    /// Whether the render engine is available and usable
     pub available: bool,
-    pub install_dir: String,
-    pub installed: Option<InstalledRenderEngine>,
-    pub reason: String,
+    /// Directory where the render engine binaries are installed
+    pub install_dir: Option<String>,
+    /// Whether the engine was found and validated
+    pub installed: bool,
+    /// Human-readable reason for the status
+    pub reason: Option<String>,
+    /// Error message if not available
     pub error_message: Option<String>,
 }
 
-fn get_install_root() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(userprofile) = std::env::var("USERPROFILE") {
-            return PathBuf::from(userprofile)
-                .join(".alloomi")
-                .join("render-engines")
-                .join("office");
+/// Get the platform-specific render engine directory name
+fn get_platform_dir() -> String {
+    let os = if cfg!(target_os = "windows") {
+        "windows-x64"
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "darwin-arm64"
+        } else {
+            "darwin-x64"
         }
+    } else if cfg!(target_os = "linux") {
+        "linux-x64"
+    } else {
+        "unknown"
+    };
+    os.to_string()
+}
 
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            return PathBuf::from(appdata)
-                .join("Alloomi")
-                .join("render-engines")
-                .join("office");
-        }
+/// Find binary in PATH
+fn find_in_path(name: &str) -> Option<PathBuf> {
+    std::env::var("PATH").ok().and_then(|path| {
+        path.split(if cfg!(target_os = "windows") { ";" } else { ":" })
+            .filter_map(|dir| {
+                let full_path = PathBuf::from(dir).join(name);
+                if full_path.exists() {
+                    Some(full_path)
+                } else {
+                    None
+                }
+            })
+            .next()
+    })
+}
+
+/// Check if the bundled render engine is available
+/// This checks both the legacy path (~/.alloomi/render-engines/office/installed.json)
+/// and the bundled path (resources/render-engine/{platform}/)
+pub fn get_render_engine_status() -> RenderEngineStatus {
+    // First, check the legacy installed.json path
+    if let Some(status) = check_legacy_install() {
+        return status;
     }
 
-    if let Ok(home) = std::env::var("HOME") {
-        return PathBuf::from(home)
-            .join(".alloomi")
-            .join("render-engines")
-            .join("office");
+    // Then, check the bundled resources path
+    let bundled = check_bundled_engine();
+    if bundled.available {
+        return bundled;
     }
 
-    PathBuf::from(".alloomi")
+    // Fallback: check PATH
+    check_path_engine()
+}
+
+/// Check the legacy install location (~/.alloomi/render-engines/office/installed.json)
+fn check_legacy_install() -> Option<RenderEngineStatus> {
+    let home = std::env::var("HOME").ok()?;
+    let installed_json = PathBuf::from(&home)
+        .join(".alloomi")
         .join("render-engines")
         .join("office")
-}
+        .join("installed.json");
 
-fn get_install_record_path() -> PathBuf {
-    get_install_root().join("installed.json")
-}
-
-fn current_platform_target() -> String {
-    let os = if cfg!(target_os = "macos") {
-        "darwin"
-    } else if cfg!(target_os = "windows") {
-        "win32"
-    } else {
-        "linux"
-    };
-
-    let arch = if cfg!(target_arch = "aarch64") {
-        "arm64"
-    } else {
-        "x64"
-    };
-
-    format!("{}-{}", os, arch)
-}
-
-fn get_resource_dir() -> Result<PathBuf, String> {
-    #[cfg(debug_assertions)]
-    {
-        let current_dir = std::env::current_dir()
-            .map_err(|e| format!("Failed to get current dir for resources: {}", e))?;
-        let candidates = [current_dir.join("src-tauri"), current_dir.clone()];
-
-        for candidate in candidates {
-            if candidate.join("resources").exists() {
-                return Ok(candidate);
-            }
-        }
-
-        return Err(format!(
-            "Failed to locate Tauri resource dir from {}",
-            current_dir.display()
-        ));
+    if !installed_json.exists() {
+        return None;
     }
 
-    #[cfg(not(debug_assertions))]
-    {
-        let resource_dir = std::env::current_exe()
-            .ok()
-            .and_then(|path| path.parent().map(|p| p.to_path_buf()))
-            .unwrap_or_else(|| PathBuf::from("."));
+    let content = std::fs::read_to_string(&installed_json).ok()?;
+    let info: serde_json::Value = serde_json::from_str(&content).ok()?;
 
-        let resource_dir = if resource_dir.ends_with("MacOS") {
-            resource_dir
-                .parent()
-                .map(|p| p.join("Resources"))
-                .unwrap_or(resource_dir)
+    let soffice_path = info.get("soffice_path")?.as_str()?.to_string();
+    let pdftoppm_path = info.get("pdftoppm_path")?.as_str()?.to_string();
+
+    // Validate paths exist
+    let soffice_exists = PathBuf::from(&soffice_path).exists();
+    let pdftoppm_exists = PathBuf::from(&pdftoppm_path).exists();
+
+    if soffice_exists && pdftoppm_exists {
+        Some(RenderEngineStatus {
+            available: true,
+            install_dir: Some(
+                installed_json
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+            ),
+            installed: true,
+            reason: Some("Using legacy render engine installation".to_string()),
+            error_message: None,
+        })
+    } else {
+        Some(RenderEngineStatus {
+            available: false,
+            install_dir: Some(
+                installed_json
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+            ),
+            installed: false,
+            reason: Some("Legacy install found but binaries missing".to_string()),
+            error_message: if !soffice_exists {
+                Some(format!("soffice not found at: {}", soffice_path))
+            } else {
+                Some(format!("pdftoppm not found at: {}", pdftoppm_path))
+            },
+        })
+    }
+}
+
+/// Check the bundled render engine in resources
+fn check_bundled_engine() -> RenderEngineStatus {
+    // Get the resource directory (where the tauri app is installed)
+    let resource_dir = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    let resource_dir = if resource_dir.ends_with("MacOS") {
+        resource_dir
+            .parent()
+            .and_then(|p| p.join("Resources").canonicalize().ok())
+    } else {
+        Some(resource_dir.clone())
+    }
+    .unwrap_or(resource_dir);
+
+    let platform_dir = get_platform_dir();
+    let engine_dir = resource_dir.join("render-engine").join(&platform_dir);
+
+    let soffice_path = find_soffice_binary(&engine_dir);
+    let pdftoppm_path = find_pdftoppm_binary(&engine_dir);
+
+    let soffice_exists = soffice_path.is_some();
+    let pdftoppm_exists = pdftoppm_path.is_some();
+
+    if soffice_exists && pdftoppm_exists {
+        RenderEngineStatus {
+            available: true,
+            install_dir: Some(engine_dir.to_string_lossy().to_string()),
+            installed: true,
+            reason: Some("Using bundled render engine".to_string()),
+            error_message: None,
+        }
+    } else {
+        let missing = if !soffice_exists && !pdftoppm_exists {
+            "both soffice and pdftoppm"
+        } else if !soffice_exists {
+            "soffice"
         } else {
-            resource_dir
+            "pdftoppm"
         };
 
-        return Ok(resource_dir);
+        RenderEngineStatus {
+            available: false,
+            install_dir: Some(engine_dir.to_string_lossy().to_string()),
+            installed: false,
+            reason: Some(format!("Bundled engine incomplete - missing {}", missing)),
+            error_message: Some(format!(
+                "Expected soffice at: {}/soffice or {}/LibreOffice.app/Contents/MacOS/soffice, \
+                 Expected pdftoppm at: {}/pdftoppm",
+                engine_dir.display(),
+                engine_dir.display(),
+                engine_dir.display()
+            )),
+        }
     }
 }
 
-fn get_packaged_engine_root() -> Result<PathBuf, String> {
-    let resource_dir = get_resource_dir()?;
-    Ok(resource_dir
-        .join("resources")
-        .join("render-engine")
-        .join(current_platform_target()))
-}
-
-fn read_installed_record() -> Result<InstalledRenderEngine, String> {
-    let record_path = get_install_record_path();
-    let raw = fs::read_to_string(&record_path).map_err(|e| {
-        format!(
-            "Failed to read install record {}: {}",
-            record_path.display(),
-            e
-        )
-    })?;
-    serde_json::from_str::<InstalledRenderEngine>(&raw)
-        .map_err(|e| format!("Failed to parse install record: {}", e))
-}
-
-fn remove_install_record_if_invalid() {
-    let path = get_install_record_path();
-    let _ = fs::remove_file(path);
-}
-
-fn get_python_path(install_dir: &Path) -> Option<String> {
-    let bundled = install_dir.join("python").join("bin").join("python3");
-    if bundled.exists() {
-        return Some(bundled.to_string_lossy().to_string());
+/// Find the soffice binary in the engine directory
+fn find_soffice_binary(engine_dir: &PathBuf) -> Option<PathBuf> {
+    // Check for direct soffice binary
+    let direct = engine_dir.join("soffice");
+    if direct.exists() {
+        return Some(direct);
     }
 
-    if Command::new("python3")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    // Check for LibreOffice.app on macOS
+    #[cfg(target_os = "macos")]
     {
-        return Some("python3".to_string());
+        let libreoffice_app = engine_dir
+            .join("LibreOffice.app")
+            .join("Contents")
+            .join("MacOS")
+            .join("soffice");
+        if libreoffice_app.exists() {
+            return Some(libreoffice_app);
+        }
     }
 
     None
 }
 
-fn build_installed_record(
-    version: &str,
-    install_dir: &Path,
-) -> Result<InstalledRenderEngine, String> {
-    #[cfg(target_os = "macos")]
-    let soffice_path = install_dir
-        .join("LibreOffice.app")
-        .join("Contents")
-        .join("MacOS")
-        .join("soffice");
-
-    #[cfg(target_os = "windows")]
-    let soffice_path = install_dir
-        .join("LibreOffice")
-        .join("program")
-        .join("soffice.exe");
-
-    #[cfg(target_os = "linux")]
-    let soffice_path = install_dir
-        .join("libreoffice")
-        .join("program")
-        .join("soffice");
-
-    #[cfg(target_os = "macos")]
-    let pdftoppm_path = install_dir.join("poppler").join("bin").join("pdftoppm");
-
-    #[cfg(target_os = "windows")]
-    let pdftoppm_path = install_dir
-        .join("poppler")
-        .join("Library")
-        .join("bin")
-        .join("pdftoppm.exe");
-
-    #[cfg(target_os = "linux")]
-    let pdftoppm_path = install_dir.join("poppler").join("bin").join("pdftoppm");
-
-    if !soffice_path.exists() {
-        return Err(format!(
-            "Missing soffice binary at {}",
-            soffice_path.display()
-        ));
-    }
-    if !pdftoppm_path.exists() {
-        return Err(format!(
-            "Missing pdftoppm binary at {}",
-            pdftoppm_path.display()
-        ));
+/// Find the pdftoppm binary in the engine directory
+fn find_pdftoppm_binary(engine_dir: &PathBuf) -> Option<PathBuf> {
+    let pdftoppm = engine_dir.join("pdftoppm");
+    if pdftoppm.exists() {
+        return Some(pdftoppm);
     }
 
-    Ok(InstalledRenderEngine {
-        version: version.to_string(),
-        installed_at: "bundled".to_string(),
-        install_dir: install_dir.to_string_lossy().to_string(),
-        soffice_path: soffice_path.to_string_lossy().to_string(),
-        pdftoppm_path: pdftoppm_path.to_string_lossy().to_string(),
-        python_path: get_python_path(install_dir),
-    })
+    // Also check in a bin subdirectory
+    let pdftoppm_bin = engine_dir.join("bin").join("pdftoppm");
+    if pdftoppm_bin.exists() {
+        return Some(pdftoppm_bin);
+    }
+
+    None
 }
 
-fn read_packaged_engine_record() -> Result<InstalledRenderEngine, String> {
-    let install_dir = get_packaged_engine_root()?;
-    build_installed_record("bundled", &install_dir)
-}
+/// Check for engines available in PATH
+fn check_path_engine() -> RenderEngineStatus {
+    let soffice_path = find_in_path("soffice");
+    let pdftoppm_path = find_in_path("pdftoppm");
 
-fn find_in_path(binary: &str) -> Option<String> {
-    Command::new("which")
-        .arg(binary)
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
-fn check_path_based_engine() -> Option<InstalledRenderEngine> {
-    let soffice_path = find_in_path("soffice")?;
-    let pdftoppm_path = find_in_path("pdftoppm")?;
-
-    let python_path = if Command::new("python3")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-    {
-        Some("python3".to_string())
+    if soffice_path.is_some() && pdftoppm_path.is_some() {
+        RenderEngineStatus {
+            available: true,
+            install_dir: Some("PATH".to_string()),
+            installed: true,
+            reason: Some("Using system PATH render engine".to_string()),
+            error_message: None,
+        }
     } else {
-        None
-    };
-
-    Some(InstalledRenderEngine {
-        version: "system".to_string(),
-        installed_at: "path".to_string(),
-        install_dir: "system".to_string(),
-        soffice_path,
-        pdftoppm_path,
-        python_path,
-    })
+        RenderEngineStatus {
+            available: false,
+            install_dir: None,
+            installed: false,
+            reason: Some("No render engine found in bundled resources or PATH".to_string()),
+            error_message: Some(
+                "soffice and pdftoppm not found. Install LibreOffice and poppler-utils, or add them to PATH."
+                    .to_string(),
+            ),
+        }
+    }
 }
 
+/// Tauri command to get render engine status
 #[tauri::command]
-pub fn get_render_engine_status() -> RenderEngineStatus {
-    if let Ok(record) = read_packaged_engine_record() {
-        return RenderEngineStatus {
-            available: true,
-            install_dir: record.install_dir.clone(),
-            installed: Some(record),
-            reason: "available".to_string(),
-            error_message: None,
-        };
-    }
-
-    let install_dir = get_install_root().to_string_lossy().to_string();
-    if let Ok(record) = read_installed_record() {
-        return RenderEngineStatus {
-            available: true,
-            install_dir,
-            installed: Some(record),
-            reason: "available".to_string(),
-            error_message: None,
-        };
-    }
-
-    if let Some(record) = check_path_based_engine() {
-        return RenderEngineStatus {
-            available: true,
-            install_dir: record.install_dir.clone(),
-            installed: Some(record),
-            reason: "available".to_string(),
-            error_message: None,
-        };
-    }
-
-    remove_install_record_if_invalid();
-    RenderEngineStatus {
-        available: false,
-        install_dir,
-        installed: None,
-        reason: "not_installed".to_string(),
-        error_message: None,
-    }
+pub fn get_render_engine_status_cmd() -> RenderEngineStatus {
+    get_render_engine_status()
 }
