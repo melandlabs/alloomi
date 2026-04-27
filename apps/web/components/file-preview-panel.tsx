@@ -81,16 +81,31 @@ export function FilePreviewPanel({
   const [CsvPreviewComp, setCsvPreviewComp] = useState<any>(null);
   const [WebsitePreviewComp, setWebsitePreviewComp] = useState<any>(null);
   const [MarkdownPreviewComp, setMarkdownPreviewComp] = useState<any>(null);
+  const [VideoPreviewComp, setVideoPreviewComp] = useState<any>(null);
+  const [AudioPreviewComp, setAudioPreviewComp] = useState<any>(null);
+  const [ArchivePreviewComp, setArchivePreviewComp] = useState<any>(null);
+  const [MindMapPreviewComp, setMindMapPreviewComp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [codeContent, setCodeContent] = useState<string | null>(null);
   const [pdfContent, setPdfContent] = useState<Uint8Array | null>(null);
   const [fileTooLarge, setFileTooLarge] = useState<number | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [fullArtifactPath, setFullArtifactPath] = useState<string | null>(null);
 
-  // Clean file type: remove whitespace (including newlines)
-  const cleanType = file?.type?.trim() || "";
+  // Clean file type: remove whitespace (including newlines) and convert MIME type to extension
+  const rawType = file?.type?.trim() || "";
+  // If rawType looks like a MIME type (contains "/"), convert it to a file extension
+  const cleanType = rawType.includes("/")
+    ? (() => {
+        const subtype = rawType.split("/")[1] ?? "";
+        // Normalize common MIME type subtypes to extensions
+        if (subtype === "jpeg") return "jpg";
+        if (subtype === "tiff") return "jpg"; // Treat TIFF from phones as JPG
+        return subtype;
+      })()
+    : rawType;
 
   const isPdfDrawerPreview =
     Boolean(file) &&
@@ -116,6 +131,10 @@ export function FilePreviewPanel({
       import("./artifacts/csv-preview"),
       import("./website-preview"),
       import("./markdown-preview"),
+      import("./artifacts/video-preview"),
+      import("./artifacts/audio-preview"),
+      import("./artifacts/archive-preview"),
+      import("./artifacts/mindmap-preview"),
     ])
       .then(
         ([
@@ -126,6 +145,10 @@ export function FilePreviewPanel({
           csvModule,
           websiteModule,
           markdownModule,
+          videoModule,
+          audioModule,
+          archiveModule,
+          mindmapModule,
         ]) => {
           setPptxPreview(() => pptxModule.PptxPreview);
           setDocxPreviewComp(() => docxModule.DocxPreview);
@@ -134,6 +157,10 @@ export function FilePreviewPanel({
           setCsvPreviewComp(() => csvModule.CsvPreview);
           setWebsitePreviewComp(() => websiteModule.WebsitePreview);
           setMarkdownPreviewComp(() => markdownModule.MarkdownPreview);
+          setVideoPreviewComp(() => videoModule.VideoPreview);
+          setAudioPreviewComp(() => audioModule.AudioPreview);
+          setArchivePreviewComp(() => archiveModule.ArchivePreview);
+          setMindMapPreviewComp(() => mindmapModule.MindMapPreview);
           setLoading(false);
         },
       )
@@ -169,6 +196,13 @@ export function FilePreviewPanel({
     const isPdfFile = cleanType === "pdf";
     const isImageFile = imageFileTypes.includes(cleanType);
     const isAppleFile = isAppleDocumentFile(cleanType);
+    const videoFileTypes = ["mp4", "webm", "mov", "avi", "mkv", "flv"];
+    const audioFileTypes = ["mp3", "wav", "flac", "aac", "ogg", "m4a"];
+    const archiveFileTypes = ["zip", "rar", "7z", "tar", "gz", "bz2"];
+    const isVideoFile = videoFileTypes.includes(cleanType);
+    const isAudioFile = audioFileTypes.includes(cleanType);
+    const isArchiveFile = archiveFileTypes.includes(cleanType);
+    const isMindMapFile = cleanType === "mmark";
 
     if (
       !isCodeFile &&
@@ -176,7 +210,11 @@ export function FilePreviewPanel({
       !isMarkdownFile &&
       !isPdfFile &&
       !isImageFile &&
-      !isAppleFile
+      !isAppleFile &&
+      !isVideoFile &&
+      !isAudioFile &&
+      !isArchiveFile &&
+      !isMindMapFile
     )
       return;
 
@@ -229,6 +267,56 @@ export function FilePreviewPanel({
                 );
               }
             }
+            return;
+          }
+
+          // For video, audio, and archive files, fetch binary data and create blob URL
+          if (isVideoFile || isAudioFile || isArchiveFile) {
+            const mimeTypeMap: Record<string, string> = {
+              mp4: "video/mp4",
+              webm: "video/webm",
+              mov: "video/quicktime",
+              avi: "video/x-msvideo",
+              mkv: "video/x-matroska",
+              flv: "video/x-flv",
+              mp3: "audio/mpeg",
+              wav: "audio/wav",
+              flac: "audio/flac",
+              aac: "audio/aac",
+              ogg: "audio/ogg",
+              m4a: "audio/mp4",
+              zip: "application/zip",
+              rar: "application/vnd.rar",
+              "7z": "application/x-7z-compressed",
+              tar: "application/x-tar",
+              gz: "application/gzip",
+              bz2: "application/x-bzip2",
+            };
+            const mimeType =
+              mimeTypeMap[cleanType] || "application/octet-stream";
+            const res = await fetch(
+              `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(file.path)}?binary=true`,
+              {
+                headers: {
+                  Accept: mimeType,
+                },
+              },
+            );
+            if (!res.ok) {
+              if (res.status === 404) {
+                setError(
+                  t("common.filePreview.fileNotFound") || "File not found",
+                );
+              } else {
+                setError(
+                  t("common.filePreview.loadFailed") || "Failed to load file",
+                );
+              }
+              return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            setMediaUrl(url);
             return;
           }
 
@@ -353,6 +441,39 @@ export function FilePreviewPanel({
                 "No preview available for this Apple document",
             );
           }
+        } else if (isVideoFile || isAudioFile || isArchiveFile) {
+          // Video, audio, or archive file: create blob URL
+          const uint8Array = new Uint8Array(
+            data.buffer,
+            data.byteOffset,
+            data.byteLength,
+          );
+          const mimeTypeMap: Record<string, string> = {
+            mp4: "video/mp4",
+            webm: "video/webm",
+            mov: "video/quicktime",
+            avi: "video/x-msvideo",
+            mkv: "video/x-matroska",
+            flv: "video/x-flv",
+            mp3: "audio/mpeg",
+            wav: "audio/wav",
+            flac: "audio/flac",
+            aac: "audio/aac",
+            ogg: "audio/ogg",
+            m4a: "audio/mp4",
+            zip: "application/zip",
+            rar: "application/vnd.rar",
+            "7z": "application/x-7z-compressed",
+            tar: "application/x-tar",
+            gz: "application/gzip",
+            bz2: "application/x-bzip2",
+          };
+          const mimeType = mimeTypeMap[cleanType] || "application/octet-stream";
+          const blob = new Blob([new Uint8Array(uint8Array)], {
+            type: mimeType,
+          });
+          const url = URL.createObjectURL(blob);
+          setMediaUrl(url);
         } else {
           // Code file: decode to text
           const decoder = new TextDecoder("utf-8");
@@ -462,6 +583,27 @@ export function FilePreviewPanel({
       pages: "file_text",
       numbers: "file_spreadsheet",
       keynote: "presentation",
+      // Video formats
+      mp4: "video",
+      webm: "video",
+      mov: "video",
+      avi: "video",
+      mkv: "video",
+      flv: "video",
+      // Audio formats
+      mp3: "music_2",
+      wav: "music_2",
+      flac: "music_2",
+      aac: "music_2",
+      ogg: "music_2",
+      m4a: "music_2",
+      // Archive formats
+      zip: "file_archive",
+      rar: "file_archive",
+      "7z": "file_archive",
+      tar: "file_archive",
+      gz: "file_archive",
+      bz2: "file_archive",
     };
     return iconMap[type] ?? "file";
   };
@@ -561,6 +703,17 @@ export function FilePreviewPanel({
         filename={file.name}
         filePath={fullArtifactPath || undefined}
         onClose={onClose}
+      />
+    );
+  }
+
+  // Mind map file preview
+  if (cleanType === "mmark" && MindMapPreviewComp && codeContent) {
+    return (
+      <MindMapPreviewComp
+        content={codeContent}
+        filename={file.name}
+        maxHeight="calc(100vh - 8rem)"
       />
     );
   }
@@ -909,6 +1062,72 @@ export function FilePreviewPanel({
           </div>
         )}
 
+        {/* Video file preview */}
+        {["mp4", "webm", "mov", "avi", "mkv", "flv"].includes(cleanType) &&
+          VideoPreviewComp && (
+            <div className="flex items-center justify-center p-4 h-full bg-neutral-900">
+              {mediaUrl ? (
+                <VideoPreviewComp
+                  src={mediaUrl}
+                  filename={file.name}
+                  className="w-full max-w-3xl aspect-video"
+                />
+              ) : (
+                <div className="flex items-center justify-center">
+                  <RemixIcon
+                    name="loader_2"
+                    size="size-6"
+                    className="animate-spin text-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+        {/* Audio file preview */}
+        {["mp3", "wav", "flac", "aac", "ogg", "m4a"].includes(cleanType) &&
+          AudioPreviewComp && (
+            <div className="flex items-center justify-center p-4 h-full bg-neutral-50 dark:bg-neutral-900">
+              {mediaUrl ? (
+                <AudioPreviewComp
+                  src={mediaUrl}
+                  filename={file.name}
+                  className="w-full max-w-md"
+                />
+              ) : (
+                <div className="flex items-center justify-center">
+                  <RemixIcon
+                    name="loader_2"
+                    size="size-6"
+                    className="animate-spin text-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+        {/* Archive file preview */}
+        {["zip", "rar", "7z", "tar", "gz", "bz2"].includes(cleanType) &&
+          ArchivePreviewComp && (
+            <div className="flex items-center justify-center p-4 h-full">
+              {mediaUrl ? (
+                <ArchivePreviewComp
+                  src={mediaUrl}
+                  filename={file.name}
+                  className="w-full max-w-md"
+                />
+              ) : (
+                <div className="flex items-center justify-center">
+                  <RemixIcon
+                    name="loader_2"
+                    size="size-6"
+                    className="animate-spin text-primary"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
         {/* Other file types */}
         {!["pptx", "docx", "doc", "pdf", "xlsx", "xls", "csv"]
           .concat([
@@ -923,6 +1142,7 @@ export function FilePreviewPanel({
             "json",
             "md",
             "markdown",
+            "mmark",
             "txt",
             "sh",
             "bash",
@@ -938,6 +1158,27 @@ export function FilePreviewPanel({
             "pages",
             "numbers",
             "keynote",
+            // Video formats
+            "mp4",
+            "webm",
+            "mov",
+            "avi",
+            "mkv",
+            "flv",
+            // Audio formats
+            "mp3",
+            "wav",
+            "flac",
+            "aac",
+            "ogg",
+            "m4a",
+            // Archive formats
+            "zip",
+            "rar",
+            "7z",
+            "tar",
+            "gz",
+            "bz2",
           ])
           .includes(cleanType) && (
           <div className="flex flex-col items-center justify-center p-8 text-center h-full">

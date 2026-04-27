@@ -12,9 +12,8 @@ import {
   getTaskSessionDir,
   listSessionFiles,
   writeSessionFile,
-  getSessionSize,
   formatFileSize,
-  getAllFilesRecursive,
+  getAllFilesAtPathWithSize,
   getAllWorkspaceFilesRecursive,
 } from "@/lib/files/workspace/sessions";
 import { db } from "@/lib/db/queries";
@@ -195,12 +194,15 @@ export async function GET(req: NextRequest) {
     }
 
     const files = listSessionFiles(taskId, path);
-    const size = getSessionSize(taskId);
+    let size = 0;
 
-    // If root directory request (path is empty), recursively fetch all files to build complete file tree
+    // If root directory request (path is empty), recursively fetch all files
+    // and compute total size in a single traversal.
     let allFiles = files;
     if (!path) {
-      allFiles = getAllFilesRecursive(taskId);
+      const result = getAllFilesAtPathWithSize(getTaskSessionDir(taskId));
+      allFiles = result.files;
+      size = result.size;
     }
 
     // Clean file data: trim whitespace from all string fields

@@ -128,8 +128,13 @@ fn get_packaged_engine_root() -> Result<PathBuf, String> {
 
 fn read_installed_record() -> Result<InstalledRenderEngine, String> {
     let record_path = get_install_record_path();
-    let raw = fs::read_to_string(&record_path)
-        .map_err(|e| format!("Failed to read install record {}: {}", record_path.display(), e))?;
+    let raw = fs::read_to_string(&record_path).map_err(|e| {
+        format!(
+            "Failed to read install record {}: {}",
+            record_path.display(),
+            e
+        )
+    })?;
     serde_json::from_str::<InstalledRenderEngine>(&raw)
         .map_err(|e| format!("Failed to parse install record: {}", e))
 }
@@ -157,7 +162,10 @@ fn get_python_path(install_dir: &Path) -> Option<String> {
     None
 }
 
-fn build_installed_record(version: &str, install_dir: &Path) -> Result<InstalledRenderEngine, String> {
+fn build_installed_record(
+    version: &str,
+    install_dir: &Path,
+) -> Result<InstalledRenderEngine, String> {
     #[cfg(target_os = "macos")]
     let soffice_path = install_dir
         .join("LibreOffice.app")
@@ -166,22 +174,35 @@ fn build_installed_record(version: &str, install_dir: &Path) -> Result<Installed
         .join("soffice");
 
     #[cfg(target_os = "windows")]
-    let soffice_path = install_dir.join("LibreOffice").join("program").join("soffice.exe");
+    let soffice_path = install_dir
+        .join("LibreOffice")
+        .join("program")
+        .join("soffice.exe");
 
     #[cfg(target_os = "linux")]
-    let soffice_path = install_dir.join("libreoffice").join("program").join("soffice");
+    let soffice_path = install_dir
+        .join("libreoffice")
+        .join("program")
+        .join("soffice");
 
     #[cfg(target_os = "macos")]
     let pdftoppm_path = install_dir.join("poppler").join("bin").join("pdftoppm");
 
     #[cfg(target_os = "windows")]
-    let pdftoppm_path = install_dir.join("poppler").join("Library").join("bin").join("pdftoppm.exe");
+    let pdftoppm_path = install_dir
+        .join("poppler")
+        .join("Library")
+        .join("bin")
+        .join("pdftoppm.exe");
 
     #[cfg(target_os = "linux")]
     let pdftoppm_path = install_dir.join("poppler").join("bin").join("pdftoppm");
 
     if !soffice_path.exists() {
-        return Err(format!("Missing soffice binary at {}", soffice_path.display()));
+        return Err(format!(
+            "Missing soffice binary at {}",
+            soffice_path.display()
+        ));
     }
     if !pdftoppm_path.exists() {
         return Err(format!(
@@ -205,6 +226,42 @@ fn read_packaged_engine_record() -> Result<InstalledRenderEngine, String> {
     build_installed_record("bundled", &install_dir)
 }
 
+fn find_in_path(binary: &str) -> Option<String> {
+    Command::new("which")
+        .arg(binary)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+fn check_path_based_engine() -> Option<InstalledRenderEngine> {
+    let soffice_path = find_in_path("soffice")?;
+    let pdftoppm_path = find_in_path("pdftoppm")?;
+
+    let python_path = if Command::new("python3")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        Some("python3".to_string())
+    } else {
+        None
+    };
+
+    Some(InstalledRenderEngine {
+        version: "system".to_string(),
+        installed_at: "path".to_string(),
+        install_dir: "system".to_string(),
+        soffice_path,
+        pdftoppm_path,
+        python_path,
+    })
+}
+
 #[tauri::command]
 pub fn get_render_engine_status() -> RenderEngineStatus {
     if let Ok(record) = read_packaged_engine_record() {
@@ -218,23 +275,32 @@ pub fn get_render_engine_status() -> RenderEngineStatus {
     }
 
     let install_dir = get_install_root().to_string_lossy().to_string();
-    match read_installed_record() {
-        Ok(record) => RenderEngineStatus {
+    if let Ok(record) = read_installed_record() {
+        return RenderEngineStatus {
             available: true,
             install_dir,
             installed: Some(record),
             reason: "available".to_string(),
             error_message: None,
-        },
-        Err(error) => {
-            remove_install_record_if_invalid();
-            RenderEngineStatus {
-                available: false,
-                install_dir,
-                installed: None,
-                reason: "not_installed".to_string(),
-                error_message: Some(error),
-            }
-        }
+        };
+    }
+
+    if let Some(record) = check_path_based_engine() {
+        return RenderEngineStatus {
+            available: true,
+            install_dir: record.install_dir.clone(),
+            installed: Some(record),
+            reason: "available".to_string(),
+            error_message: None,
+        };
+    }
+
+    remove_install_record_if_invalid();
+    RenderEngineStatus {
+        available: false,
+        install_dir,
+        installed: None,
+        reason: "not_installed".to_string(),
+        error_message: None,
     }
 }

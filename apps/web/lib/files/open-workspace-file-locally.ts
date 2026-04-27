@@ -46,14 +46,29 @@ export function sessionRelativePathFromStoredPath(
   return base.replace(/^\/+/, "");
 }
 
+function looksLikeAbsolutePath(filePath: string): boolean {
+  return (
+    filePath.startsWith("/") ||
+    /^[a-zA-Z]:[\\/]/.test(filePath) ||
+    filePath.startsWith("\\\\")
+  );
+}
+
 export async function resolveWorkspaceSessionAbsolutePath(
   taskId: string,
   relativePath: string,
 ): Promise<string | null> {
   if (!isTauri()) return null;
+
+  const candidate = relativePath.trim();
+  if (looksLikeAbsolutePath(candidate)) {
+    const exists = await fileExists(candidate);
+    if (exists) return candidate;
+  }
+
   const home = await homeDirCustom();
   if (!home) return null;
-  const norm = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const norm = candidate.replace(/\\/g, "/").replace(/^\/+/, "");
   const isWin =
     typeof navigator !== "undefined" &&
     /Windows|Win32|Win64/i.test(navigator.userAgent);

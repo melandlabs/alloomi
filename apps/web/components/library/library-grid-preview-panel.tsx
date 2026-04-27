@@ -16,6 +16,15 @@ import type { ExcelSheet } from "@/hooks/use-library-preview-snapshot";
 import { LibraryPdfInlinePreview } from "@/components/library/library-pdf-inline-preview";
 import { LibraryDocxInlinePreview } from "@/components/library/library-docx-inline-preview";
 import { LibrarySpreadsheetInlinePreview } from "@/components/library/library-spreadsheet-inline-preview";
+import dynamic from "next/dynamic";
+
+const MindMapPreview = dynamic(
+  () =>
+    import("@/components/artifacts/mindmap-preview").then(
+      (mod) => mod.MindMapPreview,
+    ),
+  { ssr: false },
+);
 
 export interface LibraryGridPreviewPanelProps {
   /** Preview type: website snapshot, Markdown, or generic icon */
@@ -349,6 +358,36 @@ export function LibraryGridPreviewPanel({
               </div>
             )}
           </div>
+        ) : previewKind === "mindmap" ? (
+          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full overflow-hidden bg-card">
+            {loading ? (
+              <div className="flex items-center justify-center flex-1">
+                <p className="text-sm text-muted-foreground">
+                  {t("common.loading", "Loading")}
+                </p>
+              </div>
+            ) : (
+              <MindMapPreview
+                content={snapshotText || titleLine}
+                maxHeight="100%"
+                className="flex-1"
+              />
+            )}
+          </div>
+        ) : previewKind === "video" ||
+          previewKind === "audio" ||
+          previewKind === "archive" ? (
+          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-border/60 bg-card/80 p-2 shadow-sm">
+              <img
+                src={fileIconSrc}
+                alt=""
+                draggable={false}
+                className="h-8 w-8 object-contain pointer-events-none"
+                aria-hidden
+              />
+            </div>
+          </div>
         ) : (
           <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-border/60 bg-card/80 p-2 shadow-sm">
@@ -582,6 +621,43 @@ export function LibraryGridPreviewPanel({
               </div>
             </div>
           )}
+        </div>
+      ) : previewKind === "mindmap" ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-500/5 to-violet-500/5">
+          {loading ? (
+            <p className="text-[10px] text-muted-foreground">
+              {t("common.loading", "Loading")}
+            </p>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 p-3 shadow-sm">
+                <img
+                  src={fileIconSrc}
+                  alt=""
+                  draggable={false}
+                  className="h-8 w-8 object-contain brightness-0 invert"
+                  aria-hidden
+                />
+              </div>
+              <p className="text-[9px] text-muted-foreground truncate max-w-full px-2">
+                {titleLine || snapshotText?.slice(0, 50) || "Mind Map"}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : previewKind === "video" ||
+        previewKind === "audio" ||
+        previewKind === "archive" ? (
+        <div className="absolute inset-0 p-2 flex items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20">
+          <div className="rounded-md flex items-center justify-center size-10 shrink-0">
+            <img
+              src={fileIconSrc}
+              alt=""
+              draggable={false}
+              className="h-6 w-6 object-contain pointer-events-none"
+              aria-hidden
+            />
+          </div>
         </div>
       ) : (
         <div className="absolute inset-0 p-2 flex items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20">

@@ -243,10 +243,14 @@ export function LibraryItemRow({
       onPreviewKnowledgeFile,
     );
 
-  const dateLabel = item.date.toLocaleString(undefined, {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
+  // Skip showing date for epoch (1970) - used when date should not be displayed
+  const showDate = item.date.getTime() > 0;
+  const dateLabel = showDate
+    ? item.date.toLocaleString(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : null;
 
   const handleOpenWorkspaceFileLocally = async (e: MouseEvent) => {
     e.stopPropagation();
@@ -599,7 +603,11 @@ export function LibraryItemRow({
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground truncate">{dateLabel}</p>
+          {dateLabel && (
+            <p className="text-xs text-muted-foreground truncate">
+              {dateLabel}
+            </p>
+          )}
         </div>
         <div className="shrink-0 flex items-center gap-1">{titleMenu}</div>
       </div>

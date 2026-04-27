@@ -924,36 +924,6 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           <div className="text-muted-foreground bg-muted/80 absolute right-4 bottom-4 rounded-md px-3 py-1.5 text-xs">
             {currentSlide + 1} / {slides.length}
           </div>
-
-          {/* Preview hint & Open in PowerPoint button */}
-          <div className="bg-background/90 backdrop-blur-sm absolute left-4 bottom-4 flex max-w-md flex-col gap-2 rounded-md border p-2 text-xs shadow-sm">
-            <div className="text-muted-foreground flex items-start gap-2 px-1">
-              <span className="font-medium">
-                {t("common.pptxPreview.renderingNotice")}:
-              </span>
-              <span className="flex-1">
-                {t("common.pptxPreview.previewHint")}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleShowInFolder}
-                className="bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
-              >
-                <RemixIcon name="folder_open" size="size-3" />
-                {t("common.preview.showInFolder", "Show in Folder")}
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenExternal}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
-              >
-                <RemixIcon name="external_link" size="size-3" />
-                {t("common.pptxPreview.openInPowerPoint")}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

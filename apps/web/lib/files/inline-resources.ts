@@ -28,6 +28,16 @@ export async function inlineResources(
       cssPath.startsWith("http://") || cssPath.startsWith("https://");
 
     if (isRemote) {
+      // Google Fonts - keep as-is since browsers can load them directly
+      // (fonts.googleapis.com has CORS headers allowing cross-origin)
+      const googleFontsDomains = ["fonts.googleapis.com", "fonts.gstatic.com"];
+      const isGoogleFonts = googleFontsDomains.some((domain) =>
+        cssPath.includes(domain),
+      );
+      if (isGoogleFonts) {
+        continue;
+      }
+
       // Fetch and inline remote CSS/CDN resources for CSP compatibility
       // Use server-side proxy to avoid browser CSP/CORS restrictions
       try {

@@ -10,6 +10,16 @@ export const FILE_TYPE_CONFIG = {
   // Video types
   mp4: { mime: "video/mp4", extensions: [".mp4"], label: "MP4" },
   webm: { mime: "video/webm", extensions: [".webm"], label: "WebM" },
+  mov: { mime: "video/quicktime", extensions: [".mov"], label: "QuickTime" },
+  avi: { mime: "video/x-msvideo", extensions: [".avi"], label: "AVI" },
+  mkv: { mime: "video/x-matroska", extensions: [".mkv"], label: "MKV" },
+  // Audio types
+  mp3: { mime: "audio/mpeg", extensions: [".mp3"], label: "MP3" },
+  wav: { mime: "audio/wav", extensions: [".wav"], label: "WAV" },
+  flac: { mime: "audio/flac", extensions: [".flac"], label: "FLAC" },
+  aac: { mime: "audio/aac", extensions: [".aac"], label: "AAC" },
+  ogg: { mime: "audio/ogg", extensions: [".ogg"], label: "OGG" },
+  m4a: { mime: "audio/mp4", extensions: [".m4a"], label: "M4A" },
   // Document types
   pdf: { mime: "application/pdf", extensions: [".pdf"], label: "PDF" },
   doc: {
@@ -65,6 +75,19 @@ export const FILE_TYPE_CONFIG = {
   },
   // Archive types
   zip: { mime: "application/zip", extensions: [".zip"], label: "ZIP" },
+  rar: { mime: "application/vnd.rar", extensions: [".rar"], label: "RAR" },
+  "7z": {
+    mime: "application/x-7z-compressed",
+    extensions: [".7z"],
+    label: "7Z",
+  },
+  tar: { mime: "application/x-tar", extensions: [".tar"], label: "TAR" },
+  gz: { mime: "application/gzip", extensions: [".gz"], label: "GZIP" },
+  bz2: {
+    mime: "application/x-bzip2",
+    extensions: [".bz2"],
+    label: "BZIP2",
+  },
 } as const;
 
 export type FileTypeKey = keyof typeof FILE_TYPE_CONFIG;
@@ -106,6 +129,16 @@ export const SUPPORTED_ATTACHMENT_MIME_TYPES = [
   // Video
   "video/mp4",
   "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+  // Audio
+  "audio/mpeg",
+  "audio/wav",
+  "audio/flac",
+  "audio/aac",
+  "audio/ogg",
+  "audio/mp4",
   // Documents
   "application/pdf",
   "application/msword",
@@ -127,6 +160,11 @@ export const SUPPORTED_ATTACHMENT_MIME_TYPES = [
   "application/x-iwork-keynote-sffkeynote",
   // Archives
   "application/zip",
+  "application/vnd.rar",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-bzip2",
 ] as const;
 
 export type SupportedAttachmentMediaType =
