@@ -25,8 +25,9 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 <a href="#what-makes-alloomi-different">Difference</a>&nbsp;|&nbsp;
 <a href="#use-cases">Use Cases</a>&nbsp;|&nbsp;
 <a href="#installation">Installation</a>&nbsp;|&nbsp;
-<a href="#documentation">Documentation</a>&nbsp;|&nbsp;
-<a href="#developing">Developing</a>
+<a href="#developing">Developing</a>&nbsp;|&nbsp;
+<a href="https://alloomi.ai/docs">Documentation</a>&nbsp;|&nbsp;
+<a href="https://alloomi.ai/blogs">Blogs</a>
 </p>
 
 ## Features
