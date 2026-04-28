@@ -17,7 +17,6 @@ import {
   insightFilterDefinitionSchema,
 } from "@/lib/insights/filter-schema";
 import { filterInsights } from "@/lib/insights/filter-utils";
-import { getInsightHistoryDays } from "@alloomi/billing/entitlements";
 import { formatInsight, INSIGHT_FILTER_KINDS } from "./shared";
 
 type InsightsNotesDocumentsMap = Awaited<
@@ -477,7 +476,7 @@ export function createChatInsightTool(session: Session) {
         }
 
         const targetBotIds = bots.bots.map((b) => b.id);
-        const historyDays = getInsightHistoryDays(session.user.type);
+        const historyDays = 1;
         const { insights: insightItems } = await getStoredInsightsByBotIds({
           ids: targetBotIds,
           days: Math.min(historyDays, days),

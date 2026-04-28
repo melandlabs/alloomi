@@ -19,7 +19,6 @@ import {
 } from "drizzle-orm/pg-core";
 import type { DetailData, TimelineData } from "../ai/subagents/insights";
 import type { ContactMeta } from "@alloomi/integrations/contacts";
-import { entitlementsByUserType } from "@alloomi/billing/entitlements";
 import type { InsightFilter } from "@/lib/insights/filter-schema";
 
 export const user = pgTable("User", {
@@ -1587,7 +1586,7 @@ export const userFreeQuota = pgTable(
       .references(() => user.id),
     totalQuota: integer("total_quota")
       .notNull()
-      .default(entitlementsByUserType.guest.totalQuota),
+      .default(2048),
     usedQuota: integer("used_quota").notNull().default(0),
     lastAdjustedAt: timestamp("last_adjusted_at").defaultNow(),
   },

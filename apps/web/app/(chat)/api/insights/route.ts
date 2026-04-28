@@ -16,7 +16,6 @@ import {
   deriveActivityTier,
   ensureUserInsightSettings,
 } from "@/lib/insights/service";
-import { getInsightHistoryDays } from "@alloomi/billing/entitlements";
 import { filterInsights } from "@/lib/insights/filter-utils";
 import { getUserCategoryOverrides } from "@/lib/insights/brief-category-override";
 import type { NextRequest } from "next/server";
@@ -59,7 +58,7 @@ export async function GET(request: NextRequest) {
     const historyDays =
       customDays !== null
         ? customDays
-        : getInsightHistoryDays(session.user.type);
+        : 1;
     const nowRef = new Date();
     const now = nowRef;
     const derivedTier = deriveActivityTier(now, settings.lastActiveAt);

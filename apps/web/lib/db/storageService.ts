@@ -4,7 +4,6 @@ import type { FileStorageProvider } from "@/lib/files/config";
 
 import { db } from "./queries";
 import { userFileUsage, userFiles } from "./schema";
-import { entitlementsByUserType } from "@alloomi/billing/entitlements";
 import { AppError } from "@alloomi/shared/errors";
 
 type StorageQuota = {
@@ -12,16 +11,11 @@ type StorageQuota = {
   usedBytes: number;
 };
 
-function resolveStorageQuota(userType: UserType): number {
-  const entitlements = entitlementsByUserType[userType];
-  return entitlements?.storageQuotaBytes ?? 0;
-}
-
 export async function getUserStorageUsage(
   userId: string,
   userType: UserType,
 ): Promise<StorageQuota> {
-  const quotaBytes = resolveStorageQuota(userType);
+  const quotaBytes = 2048_00;
   await db
     .insert(userFileUsage)
     .values({
@@ -60,7 +54,7 @@ type CreateUserFileInput = {
 
 export async function createUserFile(input: CreateUserFileInput) {
   const storageProvider = input.storageProvider ?? "vercel_blob";
-  const quotaBytes = resolveStorageQuota(input.userType);
+  const quotaBytes = 2048_00;
   if (quotaBytes <= 0) {
     throw new AppError(
       "forbidden:chat",

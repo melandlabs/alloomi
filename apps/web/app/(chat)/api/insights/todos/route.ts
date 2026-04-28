@@ -4,7 +4,6 @@ import {
   computeInsightPayload,
   ensureUserInsightSettings,
 } from "@/lib/insights/service";
-import { getInsightHistoryDays } from "@alloomi/billing/entitlements";
 import type { NextRequest } from "next/server";
 import type { Insight } from "@/lib/db/schema";
 
@@ -46,7 +45,7 @@ export async function GET(request: NextRequest) {
     const historyDays =
       customDays !== null
         ? customDays
-        : getInsightHistoryDays(session.user.type);
+        : 1;
 
     const data = await computeInsightPayload(userId, {
       historyDays,

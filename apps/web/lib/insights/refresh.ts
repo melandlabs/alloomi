@@ -8,7 +8,6 @@ import {
   getFailedGroupsToRetry,
 } from "../db/queries";
 import type { BotWithAccount } from "../db/queries";
-import { isPaidUser } from "@alloomi/billing/entitlements";
 import {
   timeBeforeHours,
   timeBeforeMinutes,
@@ -100,7 +99,7 @@ export async function refreshActiveBotInsight(
       platformAccountPrompt;
 
     // Get old summaries from the last 1 day
-    const historicalInsightsDays = isPaidUser(userType) ? 30 : 7;
+    const historicalInsightsDays = 30;
     const { insights: oldInsights } = await getStoredInsightsByBotId({
       id,
       days: historicalInsightsDays,
@@ -181,7 +180,7 @@ export async function refreshActiveBotInsight(
     } else {
       // No old summary found, fetch data by default
       since =
-        (isPaidUser(userType) || !botNeedsOldInsights(bot)
+        (!botNeedsOldInsights(bot)
           ? timeBeforeHours(sinceMaxHour)
           : timeBeforeHours(sinceHour)) + 1;
       isFirstLanding = botNeedsOldInsights(bot);
@@ -238,7 +237,7 @@ export async function refreshActiveBotInsight(
 
         if (timeDiffMs < 0) {
           // Old summary exists but time is invalid, default to 24 hours ago in seconds (floor, note: need to add 1s for floor)
-          since = (isPaidUser(userType) ? timeBeforeHours(24) : since) + 1;
+          since = timeBeforeHours(24) + 1;
         }
 
         // Skip interval check for single group refresh, allow immediate refresh
