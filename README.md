@@ -131,11 +131,7 @@ Detailed documentation is available at [here](https://alloomi.ai/docs).
 
 ## Community
 
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv)
-
-[![X](https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white)](https://x.com/AlloomiAI)
-
-[![Email Us](https://img.shields.io/badge/Email_Us-developer@alloomi.ai-24C8D5?logo=email&logoColor=white)](mailto:developer@alloomi.ai)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/xkJaJyWcsv) [![X](https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white)](https://x.com/AlloomiAI) [![Email Us](https://img.shields.io/badge/Email_Us-developer@alloomi.ai-24C8D5?logo=email&logoColor=white)](mailto:developer@alloomi.ai)
 
 ## License
 
