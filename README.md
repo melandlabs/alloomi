@@ -18,8 +18,6 @@
 
 Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
 
-> ⚠️ **Open-source vs Full Product**: This is the open-source core. For the full ready-to-use product, download from **[alloomi.ai](https://alloomi.ai)**
-
 ## What Problems Does Alloomi Solve?
 
 | Without Alloomi                                       | With Alloomi                                       |
@@ -32,15 +30,7 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 
 ## Quick Start
 
-### Option 1: Desktop Client (Recommended)
-
-```bash
-# Download desktop client (macOS / Windows / Linux)
-# Visit: https://github.com/melandlabs/release
-# Or: https://alloomi.ai
-```
-
-### Option 2: Run from Source
+### Run from Source
 
 ```bash
 # 1. Clone the repo
@@ -67,11 +57,6 @@ LLM_MODEL=gpt-4o
 pnpm install
 pnpm tauri:dev
 ```
-
-> ⚠️ **Open Source vs Full Version**
->
-> - **Open Source**: Core modules + bring your own API keys + configure MCPs
-> - **Full Version**: [alloomi.ai](https://alloomi.ai) — download and use immediately
 
 ## Screenshots
 
