@@ -18,17 +18,109 @@
 
 Alloomi is a **proactive AI workspace** that monitors business signals, orchestrates tasks autonomously, and tracks and validates results end-to-end. Unlike traditional AI assistants that are passive workflow tools, Alloomi acts as a **proactive AI workspace** that watches, learns, remembers, and acts on your behalf.
 
-> This is the **open-source core** of Alloomi. It includes the core infrastructure and modules, but requires you to configure your own LLM API Key, authentication, authorization, AI MCPs and skills. For the full ready-to-use product with all features enabled, please download from the official website: **[alloomi.ai](https://alloomi.ai)**
+> ⚠️ **Open-source vs Full Product**: This is the open-source core. For the full ready-to-use product, download from **[alloomi.ai](https://alloomi.ai)**
 
 <p align="center">
+<a href="#quick-start">Quick Start</a>&nbsp;|&nbsp;
+<a href="#screenshots">Screenshots</a>&nbsp;|&nbsp;
 <a href="#features">Features</a>&nbsp;|&nbsp;
-<a href="#what-makes-alloomi-different">Difference</a>&nbsp;|&nbsp;
-<a href="#use-cases">Use Cases</a>&nbsp;|&nbsp;
-<a href="#installation">Installation</a>&nbsp;|&nbsp;
-<a href="#developing">Developing</a>&nbsp;|&nbsp;
+<a href="#quick-questions">Q & A</a>&nbsp;|&nbsp;
 <a href="https://alloomi.ai/docs">Documentation</a>&nbsp;|&nbsp;
 <a href="https://alloomi.ai/blogs">Blogs</a>
 </p>
+
+## What Problems Does Alloomi Solve?
+
+| Without Alloomi | With Alloomi |
+|-----------------|--------------|
+| Switching between WeChat, Telegram, WhatsApp to reply | **One interface, reply to all** |
+| Manually check Slack, Email, Calendar for updates | **AI proactively alerts you** |
+| Repetitive tasks done manually every day | **Set scheduled tasks, AI executes automatically** |
+| Forget context after months | **Long-term memory that remembers everything** |
+
+---
+
+## Quick Start
+
+### Option 1: Desktop Client (Recommended)
+
+```bash
+# Download desktop client (macOS / Windows / Linux)
+# Visit: https://github.com/melandlabs/release
+# Or: https://alloomi.ai
+```
+
+### Option 2: Run from Source
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/melandlabs/alloomi
+cd alloomi
+
+# 2. Copy environment config
+cp apps/web/.env.example apps/web/.env
+
+# 3. Generate keys
+openssl rand -base64 32  # AUTH_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"  # ENCRYPTION_KEY
+
+# 4. Configure AI API
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-6
+
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o
+
+# 5. Start
+pnpm install
+pnpm tauri:dev
+```
+
+> ⚠️ **Open Source vs Full Version**
+> - **Open Source**: Core modules + bring your own API keys + configure MCPs
+> - **Full Version**: [alloomi.ai](https://alloomi.ai) — download and use immediately
+
+
+## Screenshots
+
+- Document Previews — Docx, PPTx, Xlsx & Mind Map
+
+<table align="center">
+<tr>
+<td><img src="screenshots/app/docx.gif" alt="Docx" style="border:1px solid #ddd; border-radius:8px;"></td>
+<td><img src="screenshots/app/excel.gif" alt="Excel" style="border:1px solid #ddd; border-radius:8px;"></td>
+</tr>
+<tr>
+<td><img src="screenshots/app/pptx.gif" alt="PPTx" style="border:1px solid #ddd; border-radius:8px;"></td>
+<td><img src="screenshots/app/mmark.gif" alt="MindMap" style="border:1px solid #ddd; border-radius:8px;"></td>
+</tr>
+</table>
+
+- Website Generation
+
+<img src="screenshots/app/website.gif" alt="Website Generation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Mutliple Connectors
+
+<img src="screenshots/app/connectors.gif" alt="Connector" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Automation & Cron Jobs
+
+<img src="screenshots/app/automation.gif" alt="Automation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Library
+
+<img src="screenshots/app/library.gif" alt="Library" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Skills
+
+<img src="screenshots/app/skills.gif" alt="Skill" style="width:100%; border:1px solid #ddd; border-radius:8px;">
+
+- Message Apps
+
+<img src="screenshots/app/message-app.png" alt="Message App" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
 ## Features
 
@@ -78,7 +170,14 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 - **📊 Outcome Validation** — end-to-end result verification with automated checks and human-in-the-loop approval workflows
 - **🧬 Adaptive Personalization** — learns your communication style, preferences, and workflows over time
 
-## What Makes Alloomi Different?
+## Documentation
+
+Detailed documentation is available at [Alloomi Website](https://alloomi.ai/docs).
+
+## Quick Questions
+
+<details>
+<summary><b>What Makes Alloomi Different?</b></summary>
 
 Most AI assistants are **workflow tools**—you give commands, they execute tasks, with no knowledge of
 who you are. Sometimes they surprise you in ways you didn't expect. But usually, most of the time, they
@@ -117,151 +216,18 @@ Alloomi implements a complete **"Receive → Process → Remember → Understand
 - **Contextual memory** — recent conversation state, temporary context
 - **Knowledge-base memory** — long-term people/projects/preferences knowledge graph
 
-## Use Cases
+</details>
 
-- **🌍 Global Managers** — Filter time zone and language noise, capture high-value opportunities 24/7
-- **🧑‍💻 Engineers & Product Teams** — Team memory that never decays, auto-generate weekly reports, eliminate context rot
-- **🚀 Founders & Salespeople** — Maintain hundreds of client relationships, auto follow-ups, personalized proposals at scale
-- **🧑‍💻 Engineering Teams** — Automated dev reports, issue triaging, GitHub-Linear sync
-- **📱 Social Media Managers** — Autopilot X (Twitter) account with approval workflow
+<details>
+<summary><b>Is it free?</b></summary>
 
-See [here](https://alloomi.ai/docs) for more features and use cases.
+Yes! Alloomi is **completely free and open source**. You can use any AI API keys you prefer. If you prefer a hosted, fully-managed experience without setup, you can also choose the commercial version at [alloomi.ai](https://alloomi.ai).
 
-## Screenshots
+</details>
 
-- Document Previews — Docx, PPTx, Xlsx & Mind Map
+<details>
+<summary><b>Is my data secure?</b></summary>
 
-<table align="center">
-<tr>
-<td><img src="screenshots/app/docx.gif" alt="Docx" style="border:1px solid #ddd; border-radius:8px;"></td>
-<td><img src="screenshots/app/excel.gif" alt="Excel" style="border:1px solid #ddd; border-radius:8px;"></td>
-</tr>
-<tr>
-<td><img src="screenshots/app/pptx.gif" alt="PPTx" style="border:1px solid #ddd; border-radius:8px;"></td>
-<td><img src="screenshots/app/mmark.gif" alt="MindMap" style="border:1px solid #ddd; border-radius:8px;"></td>
-</tr>
-</table>
+Yes! All data is stored on your machine.
 
-- Website Generation
-
-<img src="screenshots/app/website.gif" alt="Website Generation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-- Mutliple Connectors
-
-<img src="screenshots/app/connectors.gif" alt="Connector" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-- Automation & Cron Jobs
-
-<img src="screenshots/app/automation.gif" alt="Automation" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-- Library
-
-<img src="screenshots/app/library.gif" alt="Library" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-- Skills
-
-<img src="screenshots/app/skills.gif" alt="Skill" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-- Message Apps
-
-<img src="screenshots/app/message-app.png" alt="Message App" style="width:100%; border:1px solid #ddd; border-radius:8px;">
-
-See [alloomi.ai](https://alloomi.ai) for more information.
-
-## Installation
-
-For more information about installation, please check the Installation Guide on the [Alloomi GitHub Releases](https://github.com/melandlabs/release).
-
-## Documentation
-
-Detailed documentation is available at [Alloomi Website](https://alloomi.ai/docs).
-
-## Developing
-
-### Environment Setup
-
-Download Node.js 22+, pnpm 9+, Rust Cargo 1.88+
-
-Copy the example environment file and configure your credentials:
-
-```bash
-git clone https://github.com/melandlabs/alloomi
-cd alloomi
-cp apps/web/.env.example apps/web/.env
-```
-
-#### Required Variables
-
-Set required variables in `apps/web/.env`
-
-```bash
-# Generate AUTH_SECRET
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-| Variable         | Description                           |
-| ---------------- | ------------------------------------- |
-| `AUTH_SECRET`    | Authentication secret (32+ chars)     |
-| `ENCRYPTION_KEY` | AES-256 encryption key for local data |
-
-#### AI Configuration
-
-Choose your AI provider (Anthropic, OpenAI, or OpenRouter):
-
-```bash
-# Anthropic Compatible API
-ANTHROPIC_BASE_URL=https://api.anthropic.com
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-sonnet-4-6
-
-# OpenAI Compatible API
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=sk-...
-LLM_MODEL=gpt-4o
-```
-
-For **embeddings** (RAG / Knowledge Base), an OpenAI-compatible API key is required:
-
-```bash
-OPENAI_EMBEDDINGS_API_KEY=sk-...
-LLM_EMBEDDING_BASE_URL=https://api.openai.com/v1
-LLM_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-#### Optional Integrations
-
-| Variable                        | Description                  |
-| ------------------------------- | ---------------------------- |
-| `BRAVE_SEARCH_API_KEY`          | Brave Search for web content |
-| `TG_BOT_TOKEN`                  | Telegram bot token           |
-| `SLACK_BOT_TOKEN`               | Slack bot token              |
-| `DISCORD_BOT_TOKEN`             | Discord bot token            |
-| `TWITTER_CLIENT_ID` / `_SECRET` | Twitter OAuth                |
-| `GOOGLE_CLIENT_ID` / `_SECRET`  | Google OAuth                 |
-| `GMAIL_CLIENT_ID` / `_SECRET`   | Gmail OAuth                  |
-| `AUTH_SMTP_*`                   | Email SMTP server            |
-
-Requirements: Node.js 22+, pnpm 9+, Rust Cargo 1.88+
-
-## Install
-
-```bash
-# Install dependencies
-pnpm install
-
-# Start desktop app (requires Rust)
-pnpm tauri:dev
-```
-
-## Build & Test
-
-```bash
-pnpm tsc          # Type check
-pnpm format       # Format code
-pnpm lint         # Lint
-pnpm lint:fix     # Fix lint issues
-pnpm test         # Run tests
-```
+</details>
