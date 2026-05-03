@@ -228,6 +228,9 @@ export async function POST(request: NextRequest) {
 
     let synced = 0;
 
+    // Collect all records that need to be inserted
+    const recordsToInsert = [];
+
     for (const insightRecord of insights) {
       if (!insightRecord) continue;
       const id = insightRecord.id;
@@ -247,19 +250,30 @@ export async function POST(request: NextRequest) {
         // Prefer frontend categories
         const category = categories?.[id] || "monitor";
 
-        await db.insert(insightBriefCategories).values({
-          userId,
-          insightId: id,
+        recordsToInsert.push({
+          insightRecord,
+          id,
           category,
-          dedupeKey: insightRecord.dedupeKey,
-          title: insightRecord.title,
-          source: "auto",
         });
-
-        existingIdsWithCategory.add(id);
       }
 
       synced += 1;
+    }
+
+    // Parallelize inserts using Promise.all
+    if (recordsToInsert.length > 0) {
+      await Promise.all(
+        recordsToInsert.map((r) =>
+          db.insert(insightBriefCategories).values({
+            userId,
+            insightId: r.id,
+            category: r.category,
+            dedupeKey: r.insightRecord.dedupeKey,
+            title: r.insightRecord.title,
+            source: "auto",
+          }),
+        ),
+      );
     }
 
     return NextResponse.json({

@@ -64,6 +64,9 @@ describe("utils", () => {
 
     expect(global.fetch).toHaveBeenCalledWith("/api/test", {
       credentials: "include",
+      headers: {
+        "x-user-timezone": expect.any(String),
+      },
     });
     expect(result).toEqual({ ok: true });
   });

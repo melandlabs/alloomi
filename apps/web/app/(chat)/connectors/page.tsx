@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PersonalizationLinkedAccounts } from "@/components/personalization/personalization-linked-accounts";
-import { useTranslation } from "react-i18next";
+import { normalizeIntegrationPlatform } from "@/lib/integrations/connector-target";
 import type { IntegrationId } from "@/hooks/use-integrations";
 import "../../../i18n";
 
@@ -13,54 +13,32 @@ import "../../../i18n";
  * URL `?platform=xxx` pre-selects a specific platform for connection.
  */
 export default function ConnectorsPage() {
-  const { t } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [isAddConnectorDialogOpen, setIsAddConnectorDialogOpen] =
     useState(false);
+  const [pendingLinkingPlatform, setPendingLinkingPlatform] =
+    useState<IntegrationId | null>(null);
   const addPanelTab = useMemo<"apps" | "rss">(() => {
     return searchParams.get("addPanelTab") === "rss" ? "rss" : "apps";
-  }, [searchParams]);
-  const VALID_PLATFORMS = new Set<string>([
-    "telegram",
-    "whatsapp",
-    "slack",
-    "discord",
-    "gmail",
-    "outlook",
-    "linkedin",
-    "instagram",
-    "twitter",
-    "google_calendar",
-    "outlook_calendar",
-    "teams",
-    "facebook_messenger",
-    "google_drive",
-    "google_docs",
-    "hubspot",
-    "notion",
-    "github",
-    "asana",
-    "jira",
-    "linear",
-    "imessage",
-    "feishu",
-    "dingtalk",
-    "qqbot",
-    "weixin",
-  ]);
-  const linkingPlatform = useMemo(() => {
-    const p = searchParams.get("platform");
-    return p && VALID_PLATFORMS.has(p) ? (p as IntegrationId) : null;
   }, [searchParams]);
 
   /**
    * Auto-open add-connector dialog for deep links.
    */
   useEffect(() => {
-    if (searchParams.get("addPlatform") === "true") {
-      setIsAddConnectorDialogOpen(true);
-    }
-  }, [searchParams]);
+    if (searchParams.get("addPlatform") !== "true") return;
+    setPendingLinkingPlatform(
+      normalizeIntegrationPlatform(searchParams.get("platform")),
+    );
+    setIsAddConnectorDialogOpen(true);
+    router.replace("/connectors", { scroll: false });
+  }, [router, searchParams]);
+
+  const handleAddConnectorDialogOpenChange = (open: boolean) => {
+    setIsAddConnectorDialogOpen(open);
+    if (!open) setPendingLinkingPlatform(null);
+  };
 
   return (
     <div className="flex h-full min-h-0 min-h-[60vh] flex-1 flex-col">
@@ -68,9 +46,9 @@ export default function ConnectorsPage() {
         <PersonalizationLinkedAccounts
           open={true}
           isAddConnectorDialogOpen={isAddConnectorDialogOpen}
-          onAddConnectorDialogOpenChange={setIsAddConnectorDialogOpen}
+          onAddConnectorDialogOpenChange={handleAddConnectorDialogOpenChange}
           initialAddPanelTab={addPanelTab}
-          linkingPlatform={linkingPlatform}
+          linkingPlatform={pendingLinkingPlatform}
         />
       </div>
     </div>

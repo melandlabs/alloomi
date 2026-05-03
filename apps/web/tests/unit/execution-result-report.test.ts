@@ -145,7 +145,7 @@ describe("structured execution report", () => {
     );
     expect(report.suggestedActions?.[0]).toMatchObject({
       type: "open_file",
-      label: "打开 Presentation.pptx",
+      label: "Open Presentation.pptx",
     });
   });
 });

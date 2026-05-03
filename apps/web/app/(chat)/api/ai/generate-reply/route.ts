@@ -250,7 +250,13 @@ CRITICAL RULES:
         headers: internalHeaders,
         body: JSON.stringify({
           model: "default",
-          messages: [{ role: "user", content: finalPrompt }],
+          messages: [
+            {
+              role: "system",
+              content: "You are a professional reply drafting assistant.",
+            },
+            { role: "user", content: finalPrompt },
+          ],
           temperature: 0.7,
         }),
       },
@@ -278,6 +284,7 @@ CRITICAL RULES:
     }
 
     const text = responseData.choices?.[0]?.message?.content ?? "";
+    console.log("[GenerateReply API] Raw AI response:", responseData);
 
     // Parse JSON response with multiple repair strategies
     const parseResult = tryParseJson(text);
