@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Feishu listener(s) started",
+      message: "Lark/Feishu listener(s) started",
     });
   } catch (error) {
     logger.error("Feishu listener init failed", error);

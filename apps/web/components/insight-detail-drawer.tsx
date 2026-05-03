@@ -240,6 +240,8 @@ export default function InsightDetailDrawer({
   onUnpinnedFromBrief,
   /** When true, auto-open chat side panel */
   autoOpenChat = false,
+  initialTab,
+  targetSourceDetailIds,
 }: {
   insight: Insight | null;
   isOpen: boolean;
@@ -255,6 +257,8 @@ export default function InsightDetailDrawer({
   isInBriefContext?: boolean;
   briefListInsightIds?: Set<string>;
   onUnpinnedFromBrief?: (insightId: string) => void;
+  initialTab?: "digest" | "sources" | "attached" | "files";
+  targetSourceDetailIds?: string[];
 }) {
   if (!insight) {
     return null;
@@ -274,6 +278,8 @@ export default function InsightDetailDrawer({
       briefListInsightIds={briefListInsightIds}
       onUnpinnedFromBrief={onUnpinnedFromBrief}
       autoOpenChat={autoOpenChat}
+      initialTab={initialTab}
+      targetSourceDetailIds={targetSourceDetailIds}
     />
   );
 }
@@ -291,6 +297,8 @@ function InsightDetailDrawerContent({
   briefListInsightIds,
   onUnpinnedFromBrief,
   autoOpenChat = false,
+  initialTab,
+  targetSourceDetailIds,
 }: {
   insight: Insight;
   isOpen: boolean;
@@ -305,6 +313,8 @@ function InsightDetailDrawerContent({
   briefListInsightIds?: Set<string>;
   onUnpinnedFromBrief?: (insightId: string) => void;
   autoOpenChat?: boolean;
+  initialTab?: "digest" | "sources" | "attached" | "files";
+  targetSourceDetailIds?: string[];
 }) {
   const { t, i18n } = useTranslation();
 
@@ -877,6 +887,17 @@ function InsightDetailDrawerContent({
     }
   }, [normalizedInsight.platform, detailTab]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialTab) {
+      setDetailTab(initialTab);
+      return;
+    }
+    if ((targetSourceDetailIds?.length ?? 0) > 0) {
+      setDetailTab("sources");
+    }
+  }, [initialTab, isOpen, setDetailTab, targetSourceDetailIds]);
+
   const normalizedDetailPlatform =
     normalizedInsight.details?.[0]?.platform?.toLowerCase() ??
     normalizedInsight.platform?.toLowerCase() ??
@@ -1266,6 +1287,7 @@ function InsightDetailDrawerContent({
                     <InsightDetailSourceInfo
                       key={`sources-${normalizedInsight.id}-${drawerOpenCount}`}
                       insight={normalizedInsight}
+                      targetSourceDetailIds={targetSourceDetailIds}
                       generateState={generateState}
                       onGenerateStateChange={setGenerateState}
                       onPrependToReplyInput={(name) =>

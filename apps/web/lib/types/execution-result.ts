@@ -7,6 +7,10 @@
  */
 
 import { z } from "zod";
+import {
+  buildMissingIntegrationActionFromText,
+  resolveSuggestedActionIntegrationPlatform,
+} from "@/lib/integrations/connector-target";
 
 // ---------------------------------------------------------------------------
 // Reasoning Chain
@@ -92,6 +96,7 @@ export const SUGGESTED_ACTION_TYPES = [
   "download_file",
   "open_link",
   "open_file",
+  "add_integration",
   "custom",
 ] as const;
 
@@ -119,7 +124,7 @@ export const SuggestedActionSchema = z.object({
 
 export interface StructuredExecutionOutput {
   summary?: string;
-  /** Supplementary context line, e.g. "已处理 47 封邮件". */
+  /** Supplementary context line, e.g. "Processed 47 emails". */
   subtitle?: string;
   outcome?: string;
   reasoningChain?: ReasoningStep[];
@@ -236,36 +241,38 @@ function getExecutionReportCopy(language?: string | null) {
   }
 
   return {
-    taskCompleted: "任务已完成",
-    generatedFiles: (count: number) => `生成 ${count} 个文件`,
-    openFile: (name: string) => `打开 ${name}`,
+    taskCompleted: "Task completed",
+    generatedFiles: (count: number) =>
+      `Generated ${count} ${count === 1 ? "file" : "files"}`,
+    openFile: (name: string) => `Open ${name}`,
     toolSummary: (
       toolTypeCount: number,
       toolCallCount: number,
       failedCount: number,
     ) =>
-      `调用 ${toolTypeCount} 类工具共 ${toolCallCount} 次${
-        failedCount > 0 ? `，其中 ${failedCount} 次失败` : ""
+      `Called ${toolTypeCount} ${toolTypeCount === 1 ? "tool type" : "tool types"} ${toolCallCount} ${toolCallCount === 1 ? "time" : "times"}${
+        failedCount > 0
+          ? `, with ${failedCount} ${failedCount === 1 ? "failure" : "failures"}`
+          : ""
       }`,
-    taskReceived: "接收任务",
-    taskConfig: "任务配置",
-    taskDescription: "读取本次伙伴运行的任务目标。",
-    collectWithTools: "调用工具收集信息",
-    toolExecution: "工具执行",
-    organizeResult: "整理执行结果",
-    organizeResultDescription: "根据工具返回和最终回复整理本次运行的关键结果。",
-    systemSummary: "系统整理",
-    generateFiles: "生成文件",
+    taskReceived: "Task received",
+    taskConfig: "Task configuration",
+    taskDescription: "Read this run's task goal.",
+    collectWithTools: "Collected information with tools",
+    toolExecution: "Tool execution",
+    organizeResult: "Organized execution result",
+    organizeResultDescription:
+      "Organized the key result from tool returns and the final response.",
+    systemSummary: "System summary",
+    generateFiles: "Generated files",
     generatedFileDescription: (count: number, names: string[]) =>
-      `本次运行生成 ${count} 个文件：${names.join("、")}${
-        count > 3 ? " 等" : ""
-      }。`,
-    outputFiles: "输出文件",
-    recordError: "记录异常",
-    errorDescription: "本次运行过程中出现异常。",
-    executionStatus: "执行状态",
-    runCompleted: "完成运行",
-    executionResult: "执行结果",
+      `Generated ${count} ${count === 1 ? "file" : "files"}: ${names.join(", ")}${count > 3 ? ", etc." : ""}.`,
+    outputFiles: "Output files",
+    recordError: "Recorded error",
+    errorDescription: "An error occurred during this run.",
+    executionStatus: "Execution status",
+    runCompleted: "Run completed",
+    executionResult: "Execution result",
   };
 }
 
@@ -378,6 +385,28 @@ function buildFileActions(
     }));
 }
 
+function buildMissingIntegrationActions(
+  texts: Array<string | undefined | null>,
+  existingActions: SuggestedAction[],
+  language?: string | null,
+): SuggestedAction[] {
+  if (
+    existingActions.some(
+      (action) =>
+        action.type === "add_integration" ||
+        resolveSuggestedActionIntegrationPlatform(action),
+    )
+  ) {
+    return [];
+  }
+
+  const action = buildMissingIntegrationActionFromText(
+    texts.filter(Boolean).join("\n"),
+    { language },
+  );
+  return action ? [action] : [];
+}
+
 function normalizeReasoningSteps(
   steps: ReasoningStep[] | undefined,
 ): ReasoningStep[] {
@@ -419,9 +448,9 @@ function buildToolSummary(
 export function buildStructuredExecutionReport(
   input: ExecutionReportInput,
 ): StructuredExecutionOutput {
-  const warnings: string[] = [];
   const copy = getExecutionReportCopy(input.language);
   const structured = input.structuredData ?? {};
+  const warnings: string[] = [...(structured.diagnostics?.warnings ?? [])];
   const modelSteps = normalizeReasoningSteps(structured.reasoningChain);
   const modelActions = normalizeSuggestedActions(structured.suggestedActions);
   const files = dedupeFiles([
@@ -522,6 +551,18 @@ export function buildStructuredExecutionReport(
 
   const actions = [
     ...modelActions,
+    ...buildMissingIntegrationActions(
+      [
+        summary,
+        subtitle,
+        structured.outcome,
+        input.cleanText,
+        input.rawText,
+        input.errorMessage,
+      ],
+      modelActions,
+      input.language,
+    ),
     ...buildFileActions(files, modelActions, input.language),
   ];
   const hasModelStructuredOutput =
@@ -553,6 +594,10 @@ export function buildStructuredExecutionReport(
 
 const STRUCTURED_TAG = "<structured-output>";
 const STRUCTURED_TAG_END = "</structured-output>";
+const STRUCTURED_TAG_PATTERN =
+  /<structured-output\b[^>]*>|<structured-out[^>]*>/i;
+const STRUCTURED_TRAILING_TAG_PATTERN =
+  /^\s*(?:<\/structured-output>|<\/parameter>|```)/i;
 
 export interface ParsedStructuredOutput {
   /** Parsed & validated structured data (may be empty object if nothing valid was found). */
@@ -568,39 +613,127 @@ export interface ParsedStructuredOutput {
 export function parseStructuredOutput(rawText: string): ParsedStructuredOutput {
   if (!rawText) return { data: {}, cleanText: rawText };
 
-  const tagStart = rawText.lastIndexOf(STRUCTURED_TAG);
-  const tagEnd = rawText.lastIndexOf(STRUCTURED_TAG_END);
+  const tagMatch = findStructuredTag(rawText);
+  const tagStart = tagMatch?.index ?? -1;
 
-  // Tag not found or malformed
-  if (tagStart === -1 || tagEnd === -1 || tagEnd <= tagStart) {
+  // Tag not found
+  if (!tagMatch || tagStart === -1) {
     return { data: {}, cleanText: rawText };
   }
 
   let data: StructuredExecutionOutput = {};
+  const jsonStart = rawText.indexOf("{", tagMatch.end);
+  const jsonEnd =
+    jsonStart === -1 ? -1 : findBalancedJsonObjectEnd(rawText, jsonStart);
+  const tagEnd = rawText.indexOf(STRUCTURED_TAG_END, tagMatch.end);
 
-  try {
-    const jsonStr = rawText
-      .slice(tagStart + STRUCTURED_TAG.length, tagEnd)
-      .trim();
-    const raw = JSON.parse(jsonStr);
-    const result = StructuredExecutionOutputSchema.safeParse(raw);
-    if (result.success) {
-      data = result.data;
-    } else {
-      console.warn(
-        "[parseStructuredOutput] Schema validation failed:",
-        result.error.issues,
-      );
+  if (jsonStart !== -1 && jsonEnd !== -1) {
+    try {
+      const jsonStr = rawText.slice(jsonStart, jsonEnd).trim();
+      const raw = JSON.parse(jsonStr);
+      const result = StructuredExecutionOutputSchema.safeParse(raw);
+      if (result.success) {
+        data = result.data;
+      } else if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[parseStructuredOutput] Schema validation failed:",
+          result.error.issues,
+        );
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[parseStructuredOutput] JSON parse failed:", e);
+      }
     }
-  } catch (e) {
-    console.warn("[parseStructuredOutput] JSON parse failed:", e);
   }
 
-  // Strip the block from display text
+  // Strip the structured block from display text even if the JSON could not be
+  // parsed. The model sometimes emits malformed tags such as </parameter>, and
+  // user-visible raw JSON is worse than falling back to a repaired report.
+  const blockEnd = getStructuredBlockEnd(rawText, {
+    markerEnd: tagMatch.end,
+    jsonEnd,
+    tagEnd,
+  });
   const cleanText = (
-    rawText.slice(0, tagStart) +
-    rawText.slice(tagEnd + STRUCTURED_TAG_END.length)
+    rawText.slice(0, tagStart) + rawText.slice(blockEnd)
   ).trim();
 
   return { data, cleanText };
+}
+
+function findStructuredTag(
+  rawText: string,
+): { index: number; end: number } | null {
+  const exactIndex = rawText.lastIndexOf(STRUCTURED_TAG);
+  if (exactIndex !== -1) {
+    return { index: exactIndex, end: exactIndex + STRUCTURED_TAG.length };
+  }
+
+  const matches = [
+    ...rawText.matchAll(new RegExp(STRUCTURED_TAG_PATTERN.source, "gi")),
+  ];
+  const match = matches[matches.length - 1];
+  return match?.index === undefined
+    ? null
+    : { index: match.index, end: match.index + match[0].length };
+}
+
+function findBalancedJsonObjectEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      depth++;
+    } else if (char === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+
+  return -1;
+}
+
+function getStructuredBlockEnd(
+  rawText: string,
+  input: { markerEnd: number; jsonEnd: number; tagEnd: number },
+): number {
+  if (input.jsonEnd !== -1) {
+    let end = input.jsonEnd;
+    while (end < rawText.length) {
+      const rest = rawText.slice(end);
+      const match = rest.match(STRUCTURED_TRAILING_TAG_PATTERN);
+      if (!match) break;
+      end += match[0].length;
+    }
+    return end;
+  }
+
+  if (input.tagEnd !== -1) {
+    return input.tagEnd + STRUCTURED_TAG_END.length;
+  }
+
+  const malformedEnd = rawText.indexOf("</parameter>", input.markerEnd);
+  if (malformedEnd !== -1) {
+    return malformedEnd + "</parameter>".length;
+  }
+
+  return rawText.length;
 }

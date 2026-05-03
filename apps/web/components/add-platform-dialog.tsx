@@ -247,6 +247,7 @@ export function AddPlatformContent({
 
   // Store polling timer reference
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoTriggeredPlatformRef = useRef<IntegrationId | null>(null);
 
   // Cleanup polling timer (on dialog close or component unmount)
   useEffect(() => {
@@ -822,7 +823,7 @@ export function AddPlatformContent({
 
     const feishuConnect = () => {
       if (onSelectPlatform) {
-        onSelectPlatform("feishu", "Feishu");
+        onSelectPlatform("feishu", "Lark/Feishu");
       } else {
         setIsFeishuAuthFormOpen(true);
       }
@@ -924,10 +925,10 @@ export function AddPlatformContent({
       },
       feishu: {
         id: "feishu",
-        label: "Feishu",
+        label: "Lark/Feishu",
         description: t(
           "auth.feishuDes",
-          "Connect Feishu (Lark) with App ID and App Secret to chat with Alloomi via WebSocket.",
+          "Connect Lark/Feishu with App ID and App Secret to chat with Alloomi via WebSocket.",
         ),
         icon: "chat-smile",
         buttonClass: "bg-[#3370FF] text-white hover:bg-[#2860E6]",
@@ -1187,9 +1188,15 @@ export function AddPlatformContent({
 
   // Auto-trigger platform-specific auth when linkingPlatform is set
   useEffect(() => {
-    if (!linkingPlatform) return;
+    if (!linkingPlatform) {
+      autoTriggeredPlatformRef.current = null;
+      return;
+    }
+    if (autoTriggeredPlatformRef.current === linkingPlatform) return;
+
     const definition = platformDefs[linkingPlatform];
-    if (definition?.onConnect) {
+    if (definition?.onConnect && definition.disable !== true) {
+      autoTriggeredPlatformRef.current = linkingPlatform;
       void definition.onConnect();
     }
   }, [linkingPlatform, platformDefs]);
@@ -1663,7 +1670,7 @@ export function getPlatformDisplayInfo(
     },
     feishu: {
       icon: "chat-smile",
-      label: "Feishu",
+      label: "Lark/Feishu",
       iconBackground: "bg-[#3370FF]/10 text-[#3370FF]",
     },
     dingtalk: {

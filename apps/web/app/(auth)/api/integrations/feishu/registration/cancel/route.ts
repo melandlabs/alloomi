@@ -7,6 +7,15 @@ import {
   verifyRegistrationCookie,
 } from "@/lib/integrations/feishu/registration-cookie";
 
+function shouldUseSecureCookie() {
+  if (process.env.NODE_ENV !== "production") return false;
+  const appUrl =
+    process.env.NEXTAUTH_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_CLOUD_API_URL;
+  return appUrl?.startsWith("https://") ?? false;
+}
+
 /**
  * Cancel QR scan when user closes dialog: clear registration Cookie
  */
@@ -31,7 +40,7 @@ export async function POST() {
         name: FEISHU_REGISTRATION_COOKIE,
         value: "",
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: shouldUseSecureCookie(),
         sameSite: "lax",
         path: "/",
         maxAge: 0,

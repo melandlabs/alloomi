@@ -35,15 +35,7 @@ export interface AuthModuleLike {
   signOut: (options?: Record<string, unknown>) => Promise<void>;
 }
 
-export type UserType =
-  | "guest"
-  | "regular"
-  | "slack"
-  | "discord"
-  | "google"
-  | "basic"
-  | "pro"
-  | "team";
+export type UserType = "guest" | "regular" | "basic" | "pro" | "team";
 
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
@@ -187,11 +179,11 @@ function createProductionAuthModule() {
             await createUser(slackEmail, DUMMY_PASSWORD);
             const [existingUser] = await getUser(slackEmail);
             token.id = existingUser.id;
-            token.type = "slack";
+            token.type = "regular";
           } else {
             const [existingUser] = users;
             token.id = existingUser.id;
-            token.type = "slack";
+            token.type = "regular";
           }
         }
         if (account?.provider === "discord" && account.access_token) {
@@ -217,11 +209,11 @@ function createProductionAuthModule() {
             await createUser(discordEmail, DUMMY_PASSWORD);
             const [newUser] = await getUser(discordEmail);
             token.id = newUser.id;
-            token.type = "discord";
+            token.type = "regular";
           } else {
             const [existingUser] = users;
             token.id = existingUser.id;
-            token.type = "discord";
+            token.type = "regular";
           }
         }
         if (token.id) {

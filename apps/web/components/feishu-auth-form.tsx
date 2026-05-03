@@ -210,7 +210,7 @@ export function FeishuAuthForm({
                   )
                 : t(
                     "auth.feishuScanSessionLost",
-                    "Session expired. Close the dialog and open Feishu again.",
+                    "Session expired. Close the dialog and open Lark/Feishu again.",
                   ),
           );
           return;
@@ -263,7 +263,7 @@ export function FeishuAuthForm({
 
     try {
       const name =
-        displayName.trim() || `Feishu · ${trimmedAppId.slice(0, 12)}`;
+        displayName.trim() || `Lark/Feishu · ${trimmedAppId.slice(0, 12)}`;
       await createIntegrationAccount({
         platform: "feishu",
         externalId: trimmedAppId,
@@ -276,7 +276,7 @@ export function FeishuAuthForm({
           name,
           description: t(
             "auth.feishuBotDescription",
-            "Chat with Alloomi via Feishu",
+            "Chat with Alloomi via Lark/Feishu",
           ),
           adapter: "feishu",
           enable: true,
@@ -327,7 +327,7 @@ export function FeishuAuthForm({
 
   const scanDescription = t(
     "auth.feishuScanDescription",
-    "Use the Feishu or Lark app on your phone to scan the QR code. No App ID or App Secret input is required.",
+    "Use the Lark/Feishu app on your phone to scan the QR code. No App ID or App Secret input is required.",
   );
 
   const manualFields = (
@@ -361,7 +361,7 @@ export function FeishuAuthForm({
         </Label>
         <Input
           id="feishu-display-name"
-          placeholder={t("auth.feishuDisplayNamePlaceholder", "My Feishu")}
+          placeholder={t("auth.feishuDisplayNamePlaceholder", "My Lark/Feishu")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           disabled={status === "connecting"}
@@ -396,7 +396,7 @@ export function FeishuAuthForm({
           <p className="text-center text-sm text-muted-foreground">
             {t(
               "auth.feishuScanWaiting",
-              "Waiting for you to confirm in Feishu…",
+              "Waiting for you to confirm in Lark/Feishu…",
             )}
           </p>
         </>
@@ -446,7 +446,7 @@ export function FeishuAuthForm({
         >
           {status === "connecting"
             ? t("auth.connecting", "Connecting...")
-            : t("auth.feishuConnect", "Connect Feishu")}
+            : t("auth.feishuConnect", "Connect Lark/Feishu")}
         </Button>
       )}
     </div>
@@ -464,7 +464,7 @@ export function FeishuAuthForm({
             <p className="text-sm text-muted-foreground">
               {t(
                 "auth.feishuDescription",
-                "Create an enterprise self-built app on Feishu Open Platform and enable bot capability, select Use long connection to receive events and subscribe to im.message.receive_v1, fill in the credentials below to chat with Alloomi.",
+                "Create an enterprise self-built app on Lark/Feishu Open Platform and enable bot capability, select Use long connection to receive events and subscribe to im.message.receive_v1, fill in the credentials below to chat with Alloomi.",
               )}
             </p>
             {manualFields}
@@ -491,7 +491,7 @@ export function FeishuAuthForm({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RemixIcon name="chat-smile" className="h-5 w-5 text-[#3370FF]" />
-              {t("auth.feishuTitle", "Connect Feishu")}
+              {t("auth.feishuTitle", "Connect Lark/Feishu")}
             </DialogTitle>
             <DialogDescription>{scanDescription}</DialogDescription>
           </DialogHeader>
@@ -502,7 +502,7 @@ export function FeishuAuthForm({
                 <p className="text-sm text-muted-foreground">
                   {t(
                     "auth.feishuDescription",
-                    "Create an enterprise self-built app on Feishu Open Platform and enable bot capability, select Use long connection to receive events and subscribe to im.message.receive_v1, fill in the credentials below to chat with Alloomi.",
+                    "Create an enterprise self-built app on Lark/Feishu Open Platform and enable bot capability, select Use long connection to receive events and subscribe to im.message.receive_v1, fill in the credentials below to chat with Alloomi.",
                   )}
                 </p>
                 {manualFields}

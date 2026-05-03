@@ -36,18 +36,18 @@ export function FeishuConnectSuccessAlert({
           <AlertDialogTitle>
             {t(
               "auth.feishuConnectRestartTitle",
-              "Feishu connection successful",
+              "Lark/Feishu connection successful",
             )}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {isTauri()
               ? t(
                   "auth.feishuConnectRestartDescTauri",
-                  "To ensure stable Feishu message listening, please fully quit and restart the Alloomi desktop client",
+                  "To ensure stable Lark/Feishu message listening, please fully quit and restart the Alloomi desktop client",
                 )
               : t(
                   "auth.feishuConnectRestartDescWeb",
-                  "Please refresh the current page to ensure Feishu listening and integration status are fully active",
+                  "Please refresh the current page to ensure Lark/Feishu listening and integration status are fully active",
                 )}
           </AlertDialogDescription>
         </AlertDialogHeader>

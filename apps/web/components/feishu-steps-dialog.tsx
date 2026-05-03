@@ -34,7 +34,7 @@ export function FeishuStepsDialog({
             <h3 className="font-semibold mb-2">
               {t(
                 "auth.feishuStepsSection1Title",
-                "1. Create Feishu app and get credentials",
+                "1. Create Lark/Feishu app and get credentials",
               )}
             </h3>
             <ol className="list-decimal list-inside space-y-2 pl-1">
@@ -46,7 +46,7 @@ export function FeishuStepsDialog({
                     onClick={() => openUrl(FEISHU_OPEN_PLATFORM_URL)}
                     className="text-primary underline bg-transparent border-none cursor-pointer p-0"
                   >
-                    {t("auth.feishuSteps1Link", "Feishu Open Platform")}
+                    {t("auth.feishuSteps1Link", "Lark/Feishu Open Platform")}
                   </button>
                 ) : (
                   <a
@@ -55,7 +55,7 @@ export function FeishuStepsDialog({
                     rel="noopener noreferrer"
                     className="text-primary underline"
                   >
-                    {t("auth.feishuSteps1Link", "Feishu Open Platform")}
+                    {t("auth.feishuSteps1Link", "Lark/Feishu Open Platform")}
                   </a>
                 )}
                 {t("auth.feishuSteps1After", " and create an enterprise app")}

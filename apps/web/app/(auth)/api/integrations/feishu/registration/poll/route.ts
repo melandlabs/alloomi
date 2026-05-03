@@ -11,12 +11,21 @@ import {
 } from "@/lib/integrations/feishu/registration-cookie";
 import { startFeishuListenersForUser } from "@/lib/integrations/feishu/ws-listener";
 
+function shouldUseSecureCookie() {
+  if (process.env.NODE_ENV !== "production") return false;
+  const appUrl =
+    process.env.NEXTAUTH_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_CLOUD_API_URL;
+  return appUrl?.startsWith("https://") ?? false;
+}
+
 function clearRegCookie(response: NextResponse) {
   response.cookies.set({
     name: FEISHU_REGISTRATION_COOKIE,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0,
@@ -80,8 +89,8 @@ export async function POST() {
   if (step.kind === "success") {
     const displayName =
       step.openId != null && step.openId.length > 0
-        ? `Feishu · ${step.openId.slice(0, 12)}`
-        : `Feishu · ${step.appId.slice(0, 12)}`;
+        ? `Lark/Feishu · ${step.openId.slice(0, 12)}`
+        : `Lark/Feishu · ${step.appId.slice(0, 12)}`;
 
     console.log(
       "[Feishu registration poll] success userId=%s appIdPrefix=%s apiDomain=%s openId=%s",
@@ -96,7 +105,7 @@ export async function POST() {
       appSecret: step.appSecret,
       displayName,
       botName: displayName,
-      botDescription: "Chat with Alloomi via Feishu",
+      botDescription: "Chat with Alloomi via Lark/Feishu",
       apiDomain: step.domain,
       metadata: {
         feishuRegistrationAt: new Date().toISOString(),
@@ -174,7 +183,7 @@ export async function POST() {
     name: FEISHU_REGISTRATION_COOKIE,
     value: signRegistrationCookie(nextPayload, secret),
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: Math.max(

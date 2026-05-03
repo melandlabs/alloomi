@@ -23,6 +23,74 @@ type FeishuCredentials = {
   domain?: "feishu" | "lark";
 };
 
+/**
+ * Get the open_id of the current app's bot (used for group chat @ mention detection).
+ * Note: feishuOpenId in integration metadata comes from registration flow user_info, which is the scanned user rather than the bot, and cannot be used for this purpose.
+ */
+async function fetchFeishuBotOpenId(params: {
+  appId: string;
+  appSecret: string;
+  domain: "feishu" | "lark";
+}): Promise<string | null> {
+  const openApisBase =
+    params.domain === "lark"
+      ? "https://open.larksuite.com/open-apis"
+      : "https://open.feishu.cn/open-apis";
+  const timeoutMs = 12_000;
+  try {
+    const tokenResp = await fetch(
+      `${openApisBase}/auth/v3/tenant_access_token/internal`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({
+          app_id: params.appId,
+          app_secret: params.appSecret,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    );
+    const tokenJson = (await tokenResp.json().catch(() => null)) as {
+      tenant_access_token?: string;
+      code?: number;
+      msg?: string;
+    } | null;
+    if (!tokenResp.ok || !tokenJson?.tenant_access_token) {
+      console.warn(
+        "[Feishu] Failed to get tenant_access_token, cannot pull bot open_id:",
+        tokenJson?.msg ?? `HTTP ${tokenResp.status}`,
+      );
+      return null;
+    }
+
+    const infoResp = await fetch(`${openApisBase}/bot/v3/info`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${tokenJson.tenant_access_token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const infoJson = (await infoResp.json().catch(() => null)) as {
+      code?: number;
+      msg?: string;
+      bot?: { open_id?: string };
+    } | null;
+    if (!infoResp.ok || infoJson?.code !== 0 || !infoJson?.bot?.open_id) {
+      console.warn(
+        "[Feishu] bot/v3/info failed, cannot parse bot open_id:",
+        infoJson?.msg ?? `HTTP ${infoResp.status}`,
+      );
+      return null;
+    }
+    const id = String(infoJson.bot.open_id).trim();
+    return id.length > 0 ? id : null;
+  } catch (e) {
+    console.warn("[Feishu] Failed to pull bot open_id:", e);
+    return null;
+  }
+}
+
 /** Per-connection context (bot backend: each account corresponds to one Feishu app, Tauri uses authToken to call cloud AI) */
 interface FeishuConnection {
   accountId: string;
@@ -34,6 +102,8 @@ interface FeishuConnection {
   /** Used for fast response within 3 seconds (reaction), etc. */
   appId: string;
   appSecret: string;
+  /** Current app bot open_id (from bot/v3/info), used for group chat to only respond to @ mentions of this bot */
+  botOpenId: string | null;
 }
 
 /** Global: maintain connections by accountId for easy reconnect/destroy */
@@ -111,14 +181,143 @@ async function addFeishuReaction(
  * Parse text from Feishu event payload
  * content is JSON, e.g. {"text":"hello"} or {"text":"","elements":[...]}
  */
-function extractTextFromContent(content: string): string {
-  if (!content?.trim()) return "";
-  try {
-    const obj = JSON.parse(content) as { text?: string };
-    return (obj?.text ?? "").trim();
-  } catch {
-    return content.trim();
+function collectReadableStrings(
+  value: unknown,
+  out: string[],
+  keyHint?: string,
+): void {
+  if (value == null) return;
+  if (typeof value === "string") {
+    const k = (keyHint ?? "").toLowerCase();
+    // Filter obvious metadata fields so quoted/rich-text content stays readable.
+    if (
+      /(^|_)(id|open_id|user_id|union_id|chat_id|message_id|image_key|file_key)$/.test(
+        k,
+      )
+    ) {
+      return;
+    }
+    const s = value.trim();
+    if (s) out.push(s);
+    return;
   }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectReadableStrings(item, out, keyHint);
+    }
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      collectReadableStrings(v, out, k);
+    }
+  }
+}
+
+function collectQuoteIds(
+  value: unknown,
+  out: Set<string>,
+  keyHint?: string,
+): void {
+  if (value == null) return;
+  if (typeof value === "string") {
+    const k = (keyHint ?? "").toLowerCase();
+    if (
+      /(quote|reply|root|parent)/.test(k) &&
+      /(id|message_id)$/.test(k) &&
+      value.trim()
+    ) {
+      out.add(value.trim());
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectQuoteIds(item, out, keyHint);
+    }
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      collectQuoteIds(v, out, k);
+    }
+  }
+}
+
+function collectImageKeys(
+  value: unknown,
+  out: Set<string>,
+  keyHint?: string,
+  inQuotedContext = false,
+): void {
+  if (value == null) return;
+  if (typeof value === "string") {
+    const k = (keyHint ?? "").toLowerCase();
+    if (!inQuotedContext && /(^|_)image_key$/.test(k) && value.trim()) {
+      out.add(value.trim());
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectImageKeys(item, out, keyHint, inQuotedContext);
+    }
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      const isQuotedField = /(quote|quoted|reply|root|parent|reference)/i.test(
+        k,
+      );
+      collectImageKeys(v, out, k, inQuotedContext || isQuotedField);
+    }
+  }
+}
+
+function extractContentInfo(content: string): {
+  text: string;
+  quoteIds: string[];
+  imageKeys: string[];
+} {
+  if (!content?.trim()) return { text: "", quoteIds: [], imageKeys: [] };
+  try {
+    const obj = JSON.parse(content) as unknown;
+    const chunks: string[] = [];
+    const quoteIdSet = new Set<string>();
+    const imageKeySet = new Set<string>();
+    collectReadableStrings(obj, chunks);
+    collectQuoteIds(obj, quoteIdSet);
+    collectImageKeys(obj, imageKeySet);
+    // Preserve order but remove duplicates and keep output bounded.
+    const normalized = Array.from(new Set(chunks)).join("\n").trim();
+    const quoteIds = [...quoteIdSet];
+    const imageKeys = [...imageKeySet];
+    const quotePrefix =
+      quoteIds.length > 0 ? `[Quote IDs]: ${quoteIds.join(", ")}\n` : "";
+    return {
+      text: `${quotePrefix}${normalized}`.trim().slice(0, 10_000),
+      quoteIds,
+      imageKeys,
+    };
+  } catch {
+    return { text: content.trim(), quoteIds: [], imageKeys: [] };
+  }
+}
+
+function extractImageKeysFromRawContent(raw: string): string[] {
+  if (!raw?.trim()) return [];
+  const out = new Set<string>();
+  const imageKeyRegex = /"image_key"\s*:\s*"([^"]+)"/g;
+  const fileKeyRegex = /"file_key"\s*:\s*"([^"]+)"/g;
+  for (const regex of [imageKeyRegex, fileKeyRegex]) {
+    let m = regex.exec(raw);
+    while (m != null) {
+      const k = m[1]?.trim();
+      if (k) out.add(k);
+      m = regex.exec(raw);
+    }
+  }
+  return [...out];
 }
 
 /**
@@ -159,7 +358,36 @@ export async function startFeishuConnection(
         `[Feishu] Account ${accountId} already connected, init did not carry token, use conn and global getCloudAuthToken`,
       );
     }
+    if (existing.botOpenId == null || existing.botOpenId === "") {
+      existing.botOpenId = await fetchFeishuBotOpenId({
+        appId,
+        appSecret,
+        domain: apiDomain,
+      });
+      if (existing.botOpenId && DEBUG) {
+        console.log(
+          `[Feishu] Account ${accountId} completed bot open_id prefix=%s`,
+          existing.botOpenId.slice(0, 12),
+        );
+      }
+    }
     return;
+  }
+
+  const resolvedBotOpenId = await fetchFeishuBotOpenId({
+    appId,
+    appSecret,
+    domain: apiDomain,
+  });
+  if (resolvedBotOpenId) {
+    console.log(
+      "[Feishu] Resolved app bot open_id prefix=%s (used for group @ mention matching)",
+      resolvedBotOpenId.slice(0, 12),
+    );
+  } else {
+    console.warn(
+      "[Feishu] Failed to get bot open_id, group messages with @ mentions will not be processed (to avoid incorrectly responding to other @ mentions)",
+    );
   }
 
   // SDK requires passing an object of "eventType -> handler function" to register, cannot pass two params (eventType, handler)
@@ -197,26 +425,6 @@ export async function startFeishuConnection(
       const message = data?.message ?? (data as any).message;
       const messageId = message?.message_id ?? "";
 
-      // Send "received" acknowledgment to Feishu as quickly as possible (within 3 seconds), then do filtering and business logic
-      if (messageId) {
-        await Promise.race([
-          addFeishuReaction(conn.appId, conn.appSecret, messageId),
-          new Promise<void>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("reaction_timeout")),
-              REACTION_TIMEOUT_MS,
-            ),
-          ),
-        ]).catch((e) => {
-          if ((e as Error)?.message === "reaction_timeout") {
-            console.warn(
-              "[Feishu] reaction did not complete within %dms, continuing processing",
-              REACTION_TIMEOUT_MS,
-            );
-          }
-        });
-      }
-
       // Logging: raw structure of received event (to confirm field positions like sender)
       logEvent("Event received - raw data keys and key fields", {
         keys: Object.keys(data as object),
@@ -229,12 +437,45 @@ export async function startFeishuConnection(
       const content = message?.content ?? "";
       const rawChatType =
         message?.chat_type ?? (data as any).message?.chat_type ?? "";
+      const rawMsgType =
+        (message as any)?.message_type ??
+        (message as any)?.msg_type ??
+        (data as any)?.message?.message_type ??
+        (data as any)?.message?.msg_type ??
+        "";
       const chatType: "p2p" | "group" =
         rawChatType === "group" || rawChatType === "topic_group"
           ? "group"
           : "p2p";
       const mentions: unknown =
         (message as any)?.mentions ?? (data as any)?.message?.mentions;
+      const messageAny = (message as any) ?? {};
+      const rawMessageAny = (data as any)?.message ?? {};
+      let parentId: unknown =
+        messageAny.parent_id ??
+        messageAny.parentId ??
+        rawMessageAny.parent_id ??
+        rawMessageAny.parentId;
+      let rootId: unknown =
+        messageAny.root_id ??
+        messageAny.rootId ??
+        rawMessageAny.root_id ??
+        rawMessageAny.rootId;
+      // Some SDK payloads may strip typed fields; add a defensive extraction from serialized object.
+      if (
+        (typeof parentId !== "string" || !parentId.trim()) &&
+        (typeof rootId !== "string" || !rootId.trim())
+      ) {
+        try {
+          const serialized = JSON.stringify(rawMessageAny);
+          const parentHit = serialized.match(/"parent_id":"([^"]+)"/);
+          const rootHit = serialized.match(/"root_id":"([^"]+)"/);
+          if (parentHit?.[1]) parentId = parentHit[1];
+          if (rootHit?.[1]) rootId = rootHit[1];
+        } catch {
+          // ignore
+        }
+      }
       const senderType =
         sender?.sender_type ?? (sender as any)?.sender_type ?? "";
       const openId =
@@ -242,7 +483,44 @@ export async function startFeishuConnection(
         sender?.sender_id?.user_id ??
         (sender as any)?.sender_id?.open_id ??
         "";
-      const text = extractTextFromContent(content);
+      const senderName: string =
+        (sender as any)?.sender_name ??
+        (sender as any)?.name ??
+        (sender as any)?.display_name ??
+        "";
+      const parsedContent = extractContentInfo(content);
+      const quoteIds: string[] = [];
+      const quoteIdSeen = new Set<string>();
+      const pushQuoteId = (idLike: unknown) => {
+        if (typeof idLike !== "string") return;
+        const id = idLike.trim();
+        if (!id || quoteIdSeen.has(id)) return;
+        quoteIdSeen.add(id);
+        quoteIds.push(id);
+      };
+      // Keep deterministic precedence: direct reply first, thread root second.
+      pushQuoteId(parentId);
+      pushQuoteId(rootId);
+      for (const qid of parsedContent.quoteIds) {
+        pushQuoteId(qid);
+      }
+      let imageKeys = parsedContent.imageKeys;
+      if (imageKeys.length === 0 && rawMsgType === "image") {
+        imageKeys = extractImageKeysFromRawContent(content);
+      }
+      const text = parsedContent.text;
+      if (DEBUG) {
+        console.log(
+          "[Feishu][DEBUG_PARSE] inbound message_id=%s chat_id=%s parent_id=%s root_id=%s quote_ids=%s image_keys=%s parsed_preview=%s",
+          messageId || "(empty)",
+          chatId || "(empty)",
+          (typeof parentId === "string" && parentId.trim()) || "(none)",
+          (typeof rootId === "string" && rootId.trim()) || "(none)",
+          quoteIds.join(",") || "(none)",
+          imageKeys.join(",") || "(none)",
+          text.replace(/\s+/g, " ").slice(0, 180),
+        );
+      }
 
       if (!chatId) {
         if (DEBUG) console.warn("[Feishu] Event missing chat_id", data);
@@ -281,6 +559,33 @@ export async function startFeishuConnection(
       // Group chat: only trigger subsequent processing when message contains @ info (e.g. user @mentions bot in group)
       if (chatType === "group") {
         const mentionList = Array.isArray(mentions) ? mentions : [];
+        const botOpenId = (conn.botOpenId ?? "").trim();
+        const mentionedOpenIds = mentionList
+          .map((item) => {
+            const m = item as
+              | {
+                  id?: {
+                    open_id?: string;
+                    union_id?: string;
+                    user_id?: string;
+                  };
+                  open_id?: string;
+                }
+              | undefined;
+            if (!m) return "";
+            if (typeof m.open_id === "string" && m.open_id.trim())
+              return m.open_id.trim();
+            const idObj = m.id;
+            if (idObj && typeof idObj === "object") {
+              if (typeof idObj.open_id === "string" && idObj.open_id.trim())
+                return idObj.open_id.trim();
+            }
+            return "";
+          })
+          .filter((id): id is string => id.length > 0);
+        const isMentioningCurrentBot =
+          botOpenId.length > 0 && mentionedOpenIds.includes(botOpenId);
+
         if (mentionList.length === 0) {
           console.log(
             "[Feishu] Filtered: group message without @ mention, ignoring message_id=%s",
@@ -288,13 +593,43 @@ export async function startFeishuConnection(
           );
           return;
         }
+        if (botOpenId.length === 0) {
+          console.warn(
+            "[Feishu] Filtered: group message contains @ but bot open_id not yet obtained, ignoring message_id=%s (please ensure bot/v3/info is available)",
+            messageId,
+          );
+          return;
+        }
+        if (!isMentioningCurrentBot) {
+          console.log(
+            "[Feishu] Filtered: group message does not @ current bot message_id=%s bot_open_id=%s mention_open_ids=%s",
+            messageId,
+            botOpenId,
+            mentionedOpenIds.join(",") || "(none)",
+          );
+          return;
+        }
       }
 
-      console.log(
-        "[Feishu] Bot received user message message_id=%s content=%s",
-        messageId,
-        text.slice(0, 120),
-      );
+      // Send "received" acknowledgment to Feishu as quickly as possible (within 3 seconds), then do filtering and business logic
+      if (messageId) {
+        await Promise.race([
+          addFeishuReaction(conn.appId, conn.appSecret, messageId),
+          new Promise<void>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("reaction_timeout")),
+              REACTION_TIMEOUT_MS,
+            ),
+          ),
+        ]).catch((e) => {
+          if ((e as Error)?.message === "reaction_timeout") {
+            console.warn(
+              "[Feishu] reaction did not complete within %dms, continuing processing",
+              REACTION_TIMEOUT_MS,
+            );
+          }
+        });
+      }
 
       // Deduplicate before dispatch (based on OpenClaw): mark as processed only here to avoid duplicate replies from Feishu redelivery or dual events
       const dedupKey = `${accountId}:${messageId}`;
@@ -313,7 +648,10 @@ export async function startFeishuConnection(
         chatId,
         messageId,
         senderId: openId,
+        senderName: senderName.trim() || undefined,
         text,
+        quoteIds,
+        imageKeys,
         chatType,
       } as const;
       // Connection may have been established during server cold start (no token); init writes token to memory, merge here to avoid calling model with empty token briefly after restart
@@ -371,6 +709,7 @@ export async function startFeishuConnection(
     authToken: authToken?.trim() || undefined,
     appId,
     appSecret,
+    botOpenId: resolvedBotOpenId,
   };
   connections.set(accountId, conn);
 

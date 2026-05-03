@@ -11,6 +11,15 @@ import {
   type FeishuRegistrationCookiePayload,
 } from "@/lib/integrations/feishu/registration-cookie";
 
+function shouldUseSecureCookie() {
+  if (process.env.NODE_ENV !== "production") return false;
+  const appUrl =
+    process.env.NEXTAUTH_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_CLOUD_API_URL;
+  return appUrl?.startsWith("https://") ?? false;
+}
+
 /**
  * Start Feishu app registration device code flow: write HttpOnly Cookie, return QR code URL
  */
@@ -52,7 +61,7 @@ export async function POST() {
       name: FEISHU_REGISTRATION_COOKIE,
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: shouldUseSecureCookie(),
       sameSite: "lax",
       path: "/",
       maxAge: begin.expireInSec + 60,
