@@ -170,7 +170,7 @@ export async function GET(
       // Get MIME type
       const mimeType = MIME_TYPES[ext] || "application/octet-stream";
 
-      // Return binary content - convert Buffer to Uint8Array for NextResponse compatibility
+      // Return binary content
       return new NextResponse(new Uint8Array(binaryContent), {
         status: 200,
         headers: {

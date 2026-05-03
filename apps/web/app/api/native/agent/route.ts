@@ -153,6 +153,8 @@ function createSSEStream(
         } catch {}
         // Call callback when connection closes
         onClose?.();
+        // Log chat completion
+        console.log("[AgentAPI] ===== CHAT COMPLETE =====");
       }
     },
   });
@@ -743,10 +745,6 @@ ${insightsContent}
           originalPrompt: finalPrompt,
           ...agentOptions,
           onInsightChange: (data) => {
-            console.log(
-              "[AgentAPI] Insight change detected (execute mode):",
-              data,
-            );
             // Add to event queue
             insightChangeEventQueue.push(data);
           },
@@ -835,7 +833,6 @@ ${insightsContent}
           const innerGenerator = agent.run(finalPrompt, {
             ...agentOptions,
             onInsightChange: (data) => {
-              console.log("[AgentAPI] Insight change detected:", data);
               // Add to event queue
               insightChangeEventQueue.push(data);
             },
@@ -955,7 +952,6 @@ ${insightsContent}
     }
 
     // Create SSE stream
-    // Track if the generator completed normally
     const readable = createSSEStream(generator, () => {
       // Only abort if generator did not complete normally
       if (!generatorCompletedNormally) {
