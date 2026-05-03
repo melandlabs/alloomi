@@ -257,22 +257,6 @@ export default defineConfig({
         replacement: alias("../../packages/storage/src/local.ts"),
       },
       {
-        find: "@alloomi/billing/coupons",
-        replacement: alias("../../packages/billing/src/coupons.ts"),
-      },
-      {
-        find: "@alloomi/billing/prices",
-        replacement: alias("../../packages/billing/src/prices.ts"),
-      },
-      {
-        find: "@alloomi/billing/entitlements",
-        replacement: alias("../../packages/billing/src/entitlements.ts"),
-      },
-      {
-        find: "@alloomi/billing",
-        replacement: alias("../../packages/billing/src/index.ts"),
-      },
-      {
         find: "@alloomi/integrations/channels",
         replacement: alias("../../packages/integrations/channels/src/index.ts"),
       },

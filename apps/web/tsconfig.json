@@ -51,8 +51,6 @@
       "@alloomi/ai/store/*": ["../../packages/ai/src/store/*"],
       "@alloomi/ai/audio": ["../../packages/ai/src/audio/index.ts"],
       "@alloomi/ai/audio/*": ["../../packages/ai/src/audio/*"],
-      "@alloomi/billing": ["../../packages/billing/src/index.ts"],
-      "@alloomi/billing/*": ["../../packages/billing/src/*"],
       "@alloomi/integrations/channels": ["../../packages/integrations/channels/src/index.ts"],
       "@alloomi/integrations/channels/*": ["../../packages/integrations/channels/src/*"],
       "@alloomi/rag": ["../../packages/ai/rag/src/index.ts"],
