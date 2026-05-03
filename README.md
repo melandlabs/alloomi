@@ -84,7 +84,7 @@ pnpm tauri:dev
 </tr>
 </table>
 
-> More demos can be found [here](https://alloomi.ai/docs/alloomi/use-cases/industry-intelligence)
+> More demos and show cases can be found [here](https://github.com/melandlabs/alloomi/wiki/Use-Case:-Engineering-Daily-Sync)
 
 ## Features
 
@@ -120,11 +120,11 @@ pnpm tauri:dev
 
 <img src="screenshots/components.png" alt="Components" style="width:100%; border:1px solid #ddd; border-radius:8px;">
 
-> 📖 [Learn more about architecture here](https://alloomi.ai/docs/alloomi)
+> 📖 [Learn more about architecture here](https://github.com/melandlabs/alloomi/wiki/1.What-is-Alloomi)
 
 ## Documentation
 
-Detailed documentation is available at [here](https://alloomi.ai/docs).
+Detailed documentation is available at [here](https://github.com/melandlabs/alloomi/wiki).
 
 ## Community
 
