@@ -361,9 +361,8 @@ export async function pullNotionPages({
     }
   };
 
-  for (const pageId of pageIds ?? []) {
-    await resolvePage(pageId);
-  }
+  // Parallelize page ID resolution
+  await Promise.all((pageIds ?? []).map((pageId) => resolvePage(pageId)));
 
   for (const dbId of databaseIds ?? []) {
     let cursor: string | undefined;
@@ -379,11 +378,13 @@ export async function pullNotionPages({
         .filter((item: any) => item.object === "page")
         .map((item: any) => item.id);
 
-      for (const pid of pages) {
-        await resolvePage(pid);
-        fetched += 1;
-        if (fetched >= limitPerDatabase) break;
-      }
+      // Parallelize page resolution within this query batch
+      await Promise.all(
+        pages
+          .slice(0, limitPerDatabase - fetched)
+          .map((pid: string) => resolvePage(pid)),
+      );
+      fetched += pages.length;
 
       cursor =
         query.has_more && fetched < limitPerDatabase

@@ -107,11 +107,28 @@ export function getAuthToken(): string | null {
     if (cookieToken) return cookieToken;
 
     // Fallback to localStorage (old session compatibility)
-    return localStorage.getItem(TOKEN_KEY);
+    const localStorageToken = localStorage.getItem(TOKEN_KEY);
+    if (localStorageToken) return localStorageToken;
+
+    // Tauri fallback: try to read directly from Tauri storage
+    // This handles cases where cookie/localStorage sync failed
+    return getAuthTokenFromTauri();
   } catch (error) {
     console.error("[TokenManager] Failed to get token:", error);
     return null;
   }
+}
+
+/**
+ * Read auth token directly from Tauri storage
+ * Used as fallback when cookie/localStorage are not available
+ */
+function getAuthTokenFromTauri(): string | null {
+  // Synchronous access to schedulerCloudAuthToken (set by login page)
+  const schedulerToken = getCloudAuthToken();
+  if (schedulerToken) return schedulerToken;
+
+  return null;
 }
 
 /**

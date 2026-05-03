@@ -244,8 +244,10 @@ class WhatsAppSelfMessageListener {
           `[WhatsAppSelfListener] [${accountId}] MSG [${source}]: jid=${jid} participant=${participant} fromMe=${fromMe} id=${msgId}`,
         );
 
-        // Skip messages from others — only process our own messages (Note to Self)
+        // Skip messages sent to others — only process Note to Self (fromMe + own JID)
         if (!fromMe) continue;
+        const myJid = currentSock?.user?.id;
+        if (myJid && jid !== myJid) continue;
 
         // Immediate deduplication: check Set BEFORE processing to handle rapid
         // duplicate deliveries (e.g. messages.upsert + messaging-history.set).
@@ -512,6 +514,9 @@ class WhatsAppSelfMessageListener {
         // Only process messages sent by us (self-chat)
         const isFromMe = msg.key.fromMe ?? false;
         if (!isFromMe) continue;
+        // Only process Note to Self (messages sent to our own JID)
+        const msgRemoteJid = msg.key.remoteJid || "";
+        if (msgRemoteJid !== myJid) continue;
 
         this.handleIncomingMessage(msg, accountId, currentSock);
 

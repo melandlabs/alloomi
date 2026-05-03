@@ -1,23 +1,25 @@
+import {
+  getContact,
+  getContactsByName,
+  getContactsBySearchTerm,
+  getContactByIMessageIdentifier,
+  getBotWithAccountById,
+  updateIntegrationAccount,
+} from "../db/queries";
+import type { UserContact } from "../db/schema";
+import { AppError } from "@alloomi/shared/errors";
+import type { Attachment } from "@alloomi/shared";
 import type {
   File as FileMsg,
   Image,
   Messages,
   Voice,
 } from "@alloomi/integrations/channels";
+import { handleTelegramAuthFailure } from "@/lib/integrations/telegram/session";
 import { isTelegramContactMeta } from "@alloomi/integrations/contacts";
-import type { Attachment } from "@alloomi/shared";
-import { AppError } from "@alloomi/shared/errors";
-import {
-  getBotWithAccountById,
-  getContact,
-  getContactByIMessageIdentifier,
-  getContactsByName,
-  getContactsBySearchTerm,
-  updateIntegrationAccount,
-} from "../db/queries";
-import type { UserContact } from "../db/schema";
 import { getBotCredentials } from "./token";
 import { fileIngester } from "../integrations/providers/file-ingester";
+import { telegramClientRegistry } from "../integrations/telegram/client-registry";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -247,17 +249,8 @@ export async function sendReplyByBotId({
         typeof configuredBotToken === "string"
           ? (configuredBotToken as string)
           : undefined;
-      const [
-        telegramAdapterModule,
-        { handleTelegramAuthFailure },
-        { telegramClientRegistry },
-      ] = await Promise.all([
-        import("@alloomi/integrations/telegram/adapter"),
-        import("@/lib/integrations/telegram/session"),
-        import("../integrations/telegram/client-registry"),
-      ]);
 
-      const adapter = new telegramAdapterModule.TelegramAdapter({
+      const adapter = new TelegramAdapter({
         botId: bot.id,
         botToken,
         session: sessionKey,
