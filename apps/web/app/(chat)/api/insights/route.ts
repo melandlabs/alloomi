@@ -55,10 +55,7 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id;
     let settings = await ensureUserInsightSettings(userId);
     // If days parameter is specified, use custom value; otherwise use default value for user type
-    const historyDays =
-      customDays !== null
-        ? customDays
-        : 1;
+    const historyDays = customDays !== null ? customDays : 1;
     const nowRef = new Date();
     const now = nowRef;
     const derivedTier = deriveActivityTier(now, settings.lastActiveAt);

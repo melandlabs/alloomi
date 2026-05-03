@@ -27,7 +27,6 @@ Alloomi is a **proactive AI workspace** that monitors business signals, orchestr
 | Repetitive tasks done manually every day              | **Set scheduled tasks, AI executes automatically** |
 | Forget context after months                           | **Long-term memory that remembers everything**     |
 
-
 ## Quick Start
 
 ### Run from Source

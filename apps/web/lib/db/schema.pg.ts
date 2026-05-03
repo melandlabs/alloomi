@@ -1584,9 +1584,7 @@ export const userFreeQuota = pgTable(
     userId: uuid("userId")
       .notNull()
       .references(() => user.id),
-    totalQuota: integer("total_quota")
-      .notNull()
-      .default(2048),
+    totalQuota: integer("total_quota").notNull().default(2048),
     usedQuota: integer("used_quota").notNull().default(0),
     lastAdjustedAt: timestamp("last_adjusted_at").defaultNow(),
   },

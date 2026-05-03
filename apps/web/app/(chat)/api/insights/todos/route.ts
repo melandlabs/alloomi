@@ -42,10 +42,7 @@ export async function GET(request: NextRequest) {
     await ensureUserInsightSettings(userId);
 
     // Use default history days for user type, or custom value
-    const historyDays =
-      customDays !== null
-        ? customDays
-        : 1;
+    const historyDays = customDays !== null ? customDays : 1;
 
     const data = await computeInsightPayload(userId, {
       historyDays,

@@ -40,10 +40,7 @@ export async function GET(request: NextRequest) {
     const userId = session.user.id;
 
     // If days parameter is specified, use custom value; otherwise use default value for user type
-    const historyDays =
-      customDays !== null
-        ? customDays
-        : 1;
+    const historyDays = customDays !== null ? customDays : 1;
 
     const data = await computeInsightPayload(userId, {
       historyDays,
