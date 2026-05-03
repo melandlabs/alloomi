@@ -80,7 +80,8 @@ pnpm tauri:dev
 <td><img src="screenshots/app/library.gif" alt="Library" style="border:1px solid #ddd; border-radius:8px;"></td>
 </tr>
 <tr>
-<td colspan="2" align="center">Automation & Cron Jobs | Library Gallery</td>
+<td align="center">Automation & Cron Jobs</td>
+<td align="center">Library Gallery</td>
 </tr>
 </table>
 
