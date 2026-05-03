@@ -2,6 +2,52 @@ import type { ExtractEmailInfo } from "../integrations/email";
 import type { DetailData, TimelineData } from "@/lib/ai/subagents/insights";
 import type { GeneratedInsightPayload } from "@/lib/insights/transform";
 import { EMAIL_TASK_LABEL } from "./constants";
+import type { InsightTaskItem } from "@alloomi/insights";
+import {
+  classifyEmail,
+  extractTopKeywords,
+} from "../integrations/email/classifier";
+
+const NO_REPLY_ADDRESS_RE =
+  /^(noreply|no-reply|donotreply|do-not-reply|mailer-daemon|notifications?)@/i;
+
+const NO_REPLY_CONTENT_PATTERNS = [
+  /\bdo not reply\b/i,
+  /\bno reply needed\b/i,
+  /\bno action needed\b/i,
+  /\bfor your information\b/i,
+  /\bfyi\b/i,
+  /please do not reply/iu,
+  /no reply needed/iu,
+  /for your reference/iu,
+  /auto reply/iu,
+  /auto notification/iu,
+] as const;
+
+const REPLY_SIGNAL_PATTERNS = [
+  /\?/u,
+  /？/u,
+  /\bplease reply\b/i,
+  /\bcan you\b/i,
+  /\bcould you\b/i,
+  /\bwould you\b/i,
+  /\blet me know\b/i,
+  /\bplease confirm\b/i,
+  /\bneed your response\b/i,
+  /\bawaiting your response\b/i,
+  /\baction required\b/i,
+  /please reply/iu,
+  /please confirm/iu,
+  /may I ask/iu,
+  /kindly/iu,
+  /could you please/iu,
+  /trouble/iu,
+] as const;
+
+type EmailActionSignals = Pick<
+  GeneratedInsightPayload,
+  "waitingForMe" | "actionRequired" | "actionRequiredDetails" | "isUnreplied"
+>;
 
 /**
  * Build email detail content (for LLM + frontend Markdown rendering)
@@ -86,6 +132,134 @@ export function collectEmailParticipants(email: ExtractEmailInfo): string[] {
   return Array.from(participants);
 }
 
+function normalizeEmailText(value: string | null | undefined): string {
+  return value?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function buildEmailReplyTaskTitle(email: ExtractEmailInfo): string {
+  const sender =
+    normalizeEmailText(email.from.name) ||
+    normalizeEmailText(email.from.email) ||
+    "Unknown sender";
+  return `Reply to ${sender}'s email`;
+}
+
+function buildEmailReplyContext(email: ExtractEmailInfo): string {
+  const subject = normalizeEmailText(email.subject);
+  const snippet = normalizeEmailText(email.snippet || email.text);
+  if (subject && snippet) {
+    return `Email subject: ${subject}. The latest email mentioned: ${snippet}`;
+  }
+  if (subject) {
+    return `Email subject: ${subject}.`;
+  }
+  if (snippet) {
+    return `The latest email mentioned: ${snippet}`;
+  }
+  return "This email needs a reply.";
+}
+
+function buildEmailReplyDraftHint(email: ExtractEmailInfo): string {
+  const subject = normalizeEmailText(email.subject);
+  const snippet = normalizeEmailText(email.snippet || email.text);
+  if (subject && snippet) {
+    return `Please reply regarding "${subject}", focusing on: ${snippet}`;
+  }
+  if (subject) {
+    return `Please reply regarding "${subject}".`;
+  }
+  if (snippet) {
+    return `Please reply based on this email: ${snippet}`;
+  }
+  return "Please reply to this email.";
+}
+
+function inferEmailActionSignals(
+  email: ExtractEmailInfo,
+  accountEmail: string | null,
+): EmailActionSignals {
+  const senderEmail = normalizeEmailText(email.from.email).toLowerCase();
+  const account = normalizeEmailText(accountEmail).toLowerCase();
+  const combined = `${normalizeEmailText(email.subject)} ${normalizeEmailText(email.text)}`;
+  const lowerCombined = combined.toLowerCase();
+
+  if (!senderEmail) {
+    return {
+      waitingForMe: null,
+      actionRequired: false,
+      actionRequiredDetails: null,
+      isUnreplied: false,
+    };
+  }
+
+  if (
+    (account && senderEmail === account) ||
+    NO_REPLY_ADDRESS_RE.test(senderEmail) ||
+    NO_REPLY_CONTENT_PATTERNS.some((pattern) => pattern.test(combined))
+  ) {
+    return {
+      waitingForMe: null,
+      actionRequired: false,
+      actionRequiredDetails: null,
+      isUnreplied: false,
+    };
+  }
+
+  const hasReplySignal = REPLY_SIGNAL_PATTERNS.some((pattern) =>
+    pattern.test(combined),
+  );
+  const hasQuestionSignal =
+    lowerCombined.includes("question") ||
+    lowerCombined.includes("inquiry") ||
+    combined.includes("？") ||
+    combined.includes("?");
+
+  if (!hasReplySignal && !hasQuestionSignal) {
+    return {
+      waitingForMe: null,
+      actionRequired: false,
+      actionRequiredDetails: null,
+      isUnreplied: false,
+    };
+  }
+
+  const sender =
+    normalizeEmailText(email.from.name) || normalizeEmailText(email.from.email);
+  const title = buildEmailReplyTaskTitle(email);
+  const task: InsightTaskItem = {
+    id: `reply:${email.uid}`,
+    title,
+    context: buildEmailReplyContext(email),
+    requester: sender || null,
+    requesterId: senderEmail,
+    responder: accountEmail ?? null,
+    responderId: accountEmail ?? null,
+    priority:
+      lowerCombined.includes("urgent") ||
+      lowerCombined.includes("asap") ||
+      lowerCombined.includes("as soon as possible") ||
+      lowerCombined.includes("today")
+        ? "high"
+        : null,
+    status: "pending",
+    sourceDetailIds: null,
+    from: senderEmail,
+    subject: normalizeEmailText(email.subject) || null,
+    replyDraft: buildEmailReplyDraftHint(email),
+  };
+
+  return {
+    waitingForMe: [task],
+    actionRequired: true,
+    actionRequiredDetails: {
+      who: sender || null,
+      what: title,
+      when: null,
+    },
+    isUnreplied: true,
+  };
+}
+
 /**
  * Truncate email subject, keep it concise
  */
@@ -166,12 +340,9 @@ export function buildEmailInsightPayload({
   };
 
   // Apply zero-cost classification (Gmail labels + content rules)
-  const {
-    classifyEmail,
-    extractTopKeywords,
-  } = require("../integrations/email/classifier");
   const classification = classifyEmail(email);
   const keywords = extractTopKeywords(email, 5);
+  const actionSignals = inferEmailActionSignals(email, accountEmail);
 
   // Fallback to title if keywords are empty (ensures title content is searchable via keywords)
   const finalKeywords =
@@ -206,8 +377,8 @@ export function buildEmailInsightPayload({
         ? email.subject.trim()
         : `Email from ${senderName}`,
     description,
-    importance: "low",
-    urgency: "low",
+    importance: classification.importance,
+    urgency: classification.urgency,
     platform: "gmail",
     account: accountEmail,
     people: collectEmailParticipants(email),
@@ -217,6 +388,10 @@ export function buildEmailInsightPayload({
     historySummary: null,
     categories: filteredCategories.length > 0 ? filteredCategories : undefined,
     topKeywords: finalKeywords.length > 0 ? finalKeywords : undefined,
+    waitingForMe: actionSignals.waitingForMe,
+    actionRequired: actionSignals.actionRequired,
+    actionRequiredDetails: actionSignals.actionRequiredDetails,
+    isUnreplied: actionSignals.isUnreplied,
   };
 }
 
@@ -368,11 +543,6 @@ export function buildMergedEmailInsightPayload({
   );
 
   // Apply zero-cost classification (Gmail labels + content rules)
-  const {
-    classifyEmail,
-    extractTopKeywords,
-  } = require("../integrations/email/classifier");
-
   // Filter categories: remove empty strings and strings with only whitespace
   const filterCategories = (cats: string[]): string[] => {
     return cats
@@ -392,6 +562,8 @@ export function buildMergedEmailInsightPayload({
     const keywords = extractTopKeywords(email, 5);
     keywords.forEach((kw: string) => allKeywords.add(kw));
   }
+  const latestClassification = classifyEmail(latestEmail);
+  const actionSignals = inferEmailActionSignals(latestEmail, accountEmail);
 
   // Fallback to primary subject if keywords are empty (ensures title content is searchable via keywords)
   if (allKeywords.size === 0 && primarySubject) {
@@ -407,8 +579,8 @@ export function buildMergedEmailInsightPayload({
     taskLabel: EMAIL_TASK_LABEL,
     title,
     description,
-    importance: "low",
-    urgency: "low",
+    importance: latestClassification.importance,
+    urgency: latestClassification.urgency,
     platform: "gmail",
     account: accountEmail,
     people: Array.from(allPeople),
@@ -427,5 +599,9 @@ export function buildMergedEmailInsightPayload({
     categories: allCategories.size > 0 ? Array.from(allCategories) : undefined,
     topKeywords:
       allKeywords.size > 0 ? Array.from(allKeywords).slice(0, 10) : undefined,
+    waitingForMe: actionSignals.waitingForMe,
+    actionRequired: actionSignals.actionRequired,
+    actionRequiredDetails: actionSignals.actionRequiredDetails,
+    isUnreplied: actionSignals.isUnreplied,
   };
 }
