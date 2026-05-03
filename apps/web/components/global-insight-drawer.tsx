@@ -10,8 +10,13 @@ import {
 import type { Insight } from "@/lib/db/schema";
 import InsightDetailDrawer from "@/components/insight-detail-drawer";
 
+export interface InsightDrawerOpenOptions {
+  initialTab?: "digest" | "sources" | "attached" | "files";
+  targetSourceDetailIds?: string[];
+}
+
 interface GlobalInsightDrawerContextValue {
-  openDrawer: (insight: Insight) => void;
+  openDrawer: (insight: Insight, options?: InsightDrawerOpenOptions) => void;
   closeDrawer: () => void;
   isOpen: boolean;
 }
@@ -40,14 +45,17 @@ export function GlobalInsightDrawerProvider({
 }) {
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [openOptions, setOpenOptions] = useState<InsightDrawerOpenOptions>({});
 
-  const openDrawer = (insight: Insight) => {
+  const openDrawer = (insight: Insight, options?: InsightDrawerOpenOptions) => {
     setSelectedInsight(insight);
+    setOpenOptions(options ?? {});
     setIsOpen(true);
   };
 
   const closeDrawer = () => {
     setSelectedInsight(null);
+    setOpenOptions({});
     setIsOpen(false);
   };
 
@@ -82,6 +90,8 @@ export function GlobalInsightDrawerProvider({
         insight={selectedInsight}
         isOpen={isOpen}
         onClose={closeDrawer}
+        initialTab={openOptions.initialTab}
+        targetSourceDetailIds={openOptions.targetSourceDetailIds}
       />
     </GlobalInsightDrawerContext.Provider>
   );

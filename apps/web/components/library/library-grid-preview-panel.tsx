@@ -26,6 +26,12 @@ const MindMapPreview = dynamic(
   { ssr: false },
 );
 
+const INLINE_PAGE_PREVIEW_CLASS =
+  "h-[min(78vh,900px)] min-h-[520px] md:min-h-[640px]";
+const TEXT_PAGE_FLOW_MAX_BYTES = 300 * 1024;
+
+type InlinePreviewLayout = "contained" | "page-flow";
+
 export interface LibraryGridPreviewPanelProps {
   /** Preview type: website snapshot, Markdown, or generic icon */
   previewKind: LibraryPreviewKind;
@@ -72,6 +78,11 @@ export interface LibraryGridPreviewPanelProps {
   fullContentLoading?: boolean;
   /** Error loading full content */
   fullContentError?: string;
+  /**
+   * `contained` keeps inline previews inside a one-page-height region.
+   * `page-flow` lets lightweight text-like previews expand into page scroll.
+   */
+  inlinePreviewLayout?: InlinePreviewLayout;
 }
 
 /**
@@ -180,16 +191,25 @@ export function LibraryGridPreviewPanel({
   fullSpreadsheetData,
   fullContentLoading,
   fullContentError,
+  inlinePreviewLayout = "contained",
 }: LibraryGridPreviewPanelProps) {
   if (variant === "inline") {
+    const canUsePageFlow =
+      inlinePreviewLayout === "page-flow" &&
+      ["markdown", "text"].includes(previewKind) &&
+      snapshotText.length <= TEXT_PAGE_FLOW_MAX_BYTES;
+
     return (
       <div
         className={cn(
-          "min-h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full min-w-0 shrink-0 overflow-hidden rounded-none bg-muted/25",
+          "w-full min-w-0 shrink-0 rounded-none bg-muted/25",
+          canUsePageFlow
+            ? "overflow-visible"
+            : cn(INLINE_PAGE_PREVIEW_CLASS, "overflow-hidden"),
         )}
       >
         {previewKind === "website" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full flex-col overflow-auto bg-background">
+          <div className="flex h-full w-full flex-col overflow-auto bg-background">
             {snapshotHtml ? (
               <iframe
                 title={`${previewTitle}-inline-preview`}
@@ -208,7 +228,12 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "markdown" ? (
-          <div className="h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full overflow-auto bg-card px-4 py-3">
+          <div
+            className={cn(
+              "w-full bg-card px-4 py-3",
+              canUsePageFlow ? "overflow-visible" : "h-full overflow-auto",
+            )}
+          >
             {loading ? (
               <p className="text-sm text-muted-foreground">
                 {t("common.loading", "Loading")}
@@ -221,8 +246,21 @@ export function LibraryGridPreviewPanel({
               </div>
             )}
           </div>
+        ) : previewKind === "text" ? (
+          <div
+            className={cn(
+              "w-full bg-card px-4 py-3",
+              canUsePageFlow ? "overflow-visible" : "h-full overflow-auto",
+            )}
+          >
+            <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+              {loading
+                ? t("common.loading", "Loading")
+                : snapshotText || titleLine}
+            </p>
+          </div>
         ) : previewKind === "pdf" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             {fullContentLoading ? (
               <p className="text-sm text-muted-foreground">
                 {t("common.loading", "Loading")}
@@ -253,7 +291,7 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "spreadsheet" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full flex-col overflow-hidden bg-card px-3 py-2">
+          <div className="flex h-full w-full flex-col overflow-hidden bg-card px-3 py-2">
             {fullContentLoading ? (
               <div className="flex items-center justify-center flex-1">
                 <p className="text-sm text-muted-foreground">
@@ -276,7 +314,7 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "pptx" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             {loading ? (
               <p className="text-sm text-muted-foreground">
                 {t("common.loading", "Loading")}
@@ -302,7 +340,7 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "docx" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             {fullContentLoading ? (
               <p className="text-sm text-muted-foreground">
                 {t("common.loading", "Loading")}
@@ -333,7 +371,7 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "image" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden bg-neutral-100 dark:bg-neutral-900">
             {loading ? (
               <p className="text-sm text-muted-foreground">
                 {t("common.loading", "Loading")}
@@ -359,7 +397,7 @@ export function LibraryGridPreviewPanel({
             )}
           </div>
         ) : previewKind === "mindmap" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] w-full overflow-hidden bg-card">
+          <div className="flex h-full w-full overflow-hidden bg-card">
             {loading ? (
               <div className="flex items-center justify-center flex-1">
                 <p className="text-sm text-muted-foreground">
@@ -377,7 +415,7 @@ export function LibraryGridPreviewPanel({
         ) : previewKind === "video" ||
           previewKind === "audio" ||
           previewKind === "archive" ? (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
+          <div className="flex h-full min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-border/60 bg-card/80 p-2 shadow-sm">
               <img
                 src={fileIconSrc}
@@ -389,7 +427,7 @@ export function LibraryGridPreviewPanel({
             </div>
           </div>
         ) : (
-          <div className="flex h-[min(52vh,480px)] max-h-[min(65vh,560px)] min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
+          <div className="flex h-full min-h-[200px] w-full items-center justify-center bg-gradient-to-br from-muted/50 to-muted/20 p-6">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-border/60 bg-card/80 p-2 shadow-sm">
               <img
                 src={fileIconSrc}

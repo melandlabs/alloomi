@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { RemixIcon } from "@/components/remix-icon";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@alloomi/ui";
-import { Input } from "@alloomi/ui";
 import type { Insight } from "@/lib/db/schema";
 import type { SearchResultItem } from "@/components/global-search-dialog";
 import { useGlobalInsightDrawer } from "@/components/global-insight-drawer";
 import { fetcher } from "@/lib/utils";
 import useSWR from "swr";
+import { EventChannelDropdownContent } from "@/components/shared/event-channel-dropdown-content";
 
 /**
  * Event search dialog component
@@ -27,7 +26,6 @@ export function EventSearchDialog({
   const { openDrawer } = useGlobalInsightDrawer();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debounce search query
@@ -109,14 +107,10 @@ export function EventSearchDialog({
   };
 
   /**
-   * When dialog opens, focus the input field
+   * Reset query state when dialog is closed.
    */
   useEffect(() => {
-    if (open && inputRef.current) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-    } else {
+    if (!open) {
       setSearchQuery("");
       setDebouncedQuery("");
     }
@@ -132,97 +126,44 @@ export function EventSearchDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0">
-          {/* Search input */}
-          <div className="relative">
-            <RemixIcon
-              name="search"
-              size="size-4"
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder={t(
-                "chat.searchEventPlaceholder",
-                "Search event name...",
-              )}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  onOpenChange(false);
-                }
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-              >
-                <RemixIcon name="close" size="size-4" />
-              </button>
-            )}
-          </div>
-
           {/* Events list */}
           <div className="flex-1 overflow-y-auto min-h-0 border rounded-lg">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <RemixIcon
-                  name="loader_2"
-                  size="size-6"
-                  className="animate-spin text-muted-foreground"
-                />
-                <span className="ml-2 text-sm text-muted-foreground">
-                  {t("common.loading", "Loading")}
-                </span>
-              </div>
-            ) : error ? (
+            {error ? (
               <div className="flex items-center justify-center py-12 text-sm text-destructive">
                 {t(
                   "chat.searchEventError",
                   "Failed to load events, please try again later",
                 )}
               </div>
-            ) : insights.length === 0 ? (
-              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                {searchQuery.trim()
-                  ? t("chat.noEventsFound", "No matching events found")
-                  : t("chat.noEvents", "No events")}
-              </div>
             ) : (
-              <div className="divide-y">
-                {insights.map((insight) => (
-                  <button
-                    key={insight.id}
-                    type="button"
-                    onClick={() => handleSelectEvent(insight)}
-                    className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">
-                        {insight.title ||
-                          t("chat.untitledEvent", "Untitled event")}
-                      </div>
-                      {insight.description && (
-                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-line">
-                          {insight.description}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        {insight.platform && <span>{insight.platform}</span>}
-                        {insight.time && (
-                          <span>
-                            • {new Date(insight.time).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <EventChannelDropdownContent
+                query={searchQuery}
+                onQueryChange={setSearchQuery}
+                searchPlaceholder={t(
+                  "chat.searchEventPlaceholder",
+                  "Search event name...",
+                )}
+                loading={isLoading}
+                loadingText={t("common.loading", "Loading")}
+                emptyText={
+                  searchQuery.trim()
+                    ? t("chat.noEventsFound", "No matching events found")
+                    : t("chat.noEvents", "No events")
+                }
+                items={insights.map((insight) => ({
+                  id: insight.id,
+                  title:
+                    insight.title || t("chat.untitledEvent", "Untitled event"),
+                  description: insight.description,
+                }))}
+                onSelect={(item) => {
+                  const insight = insights.find(
+                    (current) => current.id === item.id,
+                  );
+                  if (!insight) return;
+                  handleSelectEvent(insight);
+                }}
+              />
             )}
           </div>
 

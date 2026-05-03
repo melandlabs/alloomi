@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import * as JSZipModule from "jszip";
+import { toast } from "@/components/toast";
 
 /** JSZip module type (export = JSZip, with both constructor and static methods like loadAsync) */
 type JSZipType = import("jszip");
@@ -69,14 +70,7 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
   const [renderEngineStatusMessage, setRenderEngineStatusMessage] = useState<
     string | null
   >(null);
-
-  // Add debug log
-  console.log("[PptxPreview] Received artifact:", {
-    path: artifact.path,
-    name: artifact.name,
-    pathType: typeof artifact.path,
-    pathStartsWithSlash: artifact.path?.startsWith("/"),
-  });
+  const [renderAttemptKey, setRenderAttemptKey] = useState(0);
 
   const handleOpenExternal = async () => {
     if (!artifact.path) return;
@@ -122,15 +116,24 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
     const blobUrls: string[] = [];
     let timeoutId: NodeJS.Timeout | null = null;
     let isCancelled = false;
+    let statusPollInterval: NodeJS.Timeout | null = null;
+
+    const clearPoll = () => {
+      if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+        statusPollInterval = null;
+      }
+    };
 
     async function loadPptx() {
+      setServerRenderWarning(null);
+      setRenderEngineStatusMessage(null);
+
       if (!artifact.path) {
         setError(t("common.pptxPreview.noPathAvailable"));
         setLoading(false);
         return;
       }
-
-      console.log("[PptxPreview] Loading PPTX from path:", artifact.path);
 
       // Set timeout - prevent long loading causing frontend crash
       timeoutId = setTimeout(() => {
@@ -144,110 +147,104 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
       // Check if in Tauri environment and taskId is provided for server-side rendering
       const isTauri = !!(window as any).__TAURI__;
 
-      // Always try server-side rendering when taskId is available, regardless of render engine status
-      // The server will determine if binaries are available (bundled, PATH, or unavailable)
       if (isTauri && taskId) {
         try {
-          // Fetch server-side rendered slides (server handles binary availability check internally)
-          const pptxPath = encodeURIComponent(artifact.path);
-          const response = await fetch(
-            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
-          );
+          const { getRenderEngineStatus, ensureRenderEngineDownloadStarted } =
+            await import("@/lib/tauri");
+          const engineStatus = await getRenderEngineStatus();
 
-          if (response.ok) {
-            const manifest = await response.json();
-            console.log(
-              "[PptxPreview] Server-side rendering successful:",
-              manifest,
+          if (engineStatus?.available) {
+            // Fetch server-side rendered slides
+            const pptxPath = encodeURIComponent(artifact.path);
+            const response = await fetch(
+              `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
             );
 
-            // Build slide data with rendered image URLs
-            // Image URLs are served via /api/workspace/file/{taskId}/{path}?binary=true
-            const serverSlides: PptxSlide[] = manifest.slides.map(
-              (slide: {
-                index: number;
-                path: string;
-                width: number;
-                height: number;
-              }) => ({
-                index: slide.index,
-                title: `Slide ${slide.index}`,
-                content: [],
-                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
-                shapes: [],
-                background: "#ffffff",
-              }),
-            );
+            if (response.ok) {
+              const manifest = await response.json();
 
-            setSlides(serverSlides);
-            setRenderEngineStatusMessage(
-              "Using high-fidelity server-side rendering",
-            );
-            setLoading(false);
-            return;
-          }
+              // Build slide data with rendered image URLs
+              // Image URLs are served via /api/workspace/file/{taskId}/{path}?binary=true
+              const serverSlides: PptxSlide[] = manifest.slides.map(
+                (slide: {
+                  index: number;
+                  path: string;
+                  width: number;
+                  height: number;
+                }) => ({
+                  index: slide.index,
+                  title: `Slide ${slide.index}`,
+                  content: [],
+                  renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
+                  shapes: [],
+                  background: "#ffffff",
+                }),
+              );
 
-          // 503 means render engine unavailable on server - try client-side
-          if (response.status === 503) {
-            const errorData = await response.json().catch(() => ({}));
+              setSlides(serverSlides);
+              setRenderEngineStatusMessage(
+                engineStatus.reason ||
+                  "Using high-fidelity server-side rendering",
+              );
+              clearPoll();
+              setLoading(false);
+              return;
+            }
             console.warn(
-              "[PptxPreview] Server-side rendering unavailable:",
-              errorData.message || response.statusText,
-            );
-            setServerRenderWarning(
-              errorData.message ||
-                "High-fidelity rendering not available. Using simplified preview.",
-            );
-          } else {
-            console.warn(
-              "[PptxPreview] Server-side rendering request failed:",
+              "[PptxPreview] Server-side rendering failed, falling back to client-side:",
               response.status,
             );
-            setServerRenderWarning("Server-side rendering request failed");
-          }
-        } catch (err) {
-          console.error(
-            "[PptxPreview] Error during server-side rendering:",
-            err,
-          );
-          setServerRenderWarning("Could not connect to render server");
-        }
-      } else if (taskId) {
-        // Non-Tauri environment: try API without render engine check
-        try {
-          const pptxPath = encodeURIComponent(artifact.path);
-          const response = await fetch(
-            `/api/workspace/pptx-preview/${encodeURIComponent(taskId)}/${pptxPath}`,
-          );
-
-          if (response.ok) {
-            const manifest = await response.json();
-            const serverSlides: PptxSlide[] = manifest.slides.map(
-              (slide: {
-                index: number;
-                path: string;
-                width: number;
-                height: number;
-              }) => ({
-                index: slide.index,
-                title: `Slide ${slide.index}`,
-                content: [],
-                renderedImageUrl: `/api/workspace/file/${encodeURIComponent(taskId)}/${encodeURIComponent(slide.path)}?binary=true`,
-                shapes: [],
-                background: "#ffffff",
-              }),
+            setServerRenderWarning(
+              "High-fidelity rendering unavailable, using simplified preview",
             );
-            setSlides(serverSlides);
+          } else {
             setRenderEngineStatusMessage(
-              "Using high-fidelity server-side rendering",
+              engineStatus?.reason || "Render engine not installed",
             );
-            setLoading(false);
-            return;
+            const startedStatus = await ensureRenderEngineDownloadStarted();
+            const isDownloading = startedStatus?.downloading || false;
+
+            setServerRenderWarning(
+              isDownloading
+                ? t("common.pptxPreview.highFidelityLoading")
+                : t("common.pptxPreview.highFidelityUnavailable"),
+            );
+
+            if (isDownloading) {
+              toast({
+                type: "info",
+                description: t("common.pptxPreview.highFidelityLoadingToast"),
+                duration: 3500,
+              });
+              statusPollInterval = setInterval(async () => {
+                try {
+                  const status = await getRenderEngineStatus();
+                  if (status?.available && !isCancelled) {
+                    clearPoll();
+                    setRenderEngineStatusMessage(
+                      status.reason ||
+                        t("common.pptxPreview.highFidelityReady"),
+                    );
+                    setServerRenderWarning(null);
+                    toast({
+                      type: "success",
+                      description: t("common.pptxPreview.highFidelityReady"),
+                      duration: 2500,
+                    });
+                    setRenderAttemptKey((prev) => prev + 1);
+                  } else if (status?.error_message && !status.downloading) {
+                    clearPoll();
+                  }
+                } catch {
+                  clearPoll();
+                }
+              }, 5000);
+            }
           }
         } catch (err) {
-          console.warn(
-            "[PptxPreview] Non-Tauri server-side rendering failed:",
-            err,
+          console.error("[PptxPreview] Error checking render engine:", err);
+          setServerRenderWarning(
+            t("common.pptxPreview.renderEngineCheckFailed"),
           );
         }
       }
@@ -264,7 +261,6 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           return;
         }
         if (fileInfo.size > MAX_PREVIEW_SIZE) {
-          console.log("[PptxPreview] File too large:", fileInfo.size);
           setFileTooLarge(fileInfo.size);
           setLoading(false);
           return;
@@ -288,10 +284,7 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           sourceArray.byteOffset + sourceArray.byteLength,
         ) as ArrayBuffer;
 
-        console.log("[PptxPreview] Loaded", arrayBuffer.byteLength, "bytes");
-
         if (isCancelled) {
-          console.log("[PptxPreview] Loading was cancelled");
           return;
         }
 
@@ -638,7 +631,6 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           throw new Error(t("common.pptxPreview.noSlidesFound"));
         }
 
-        console.log("[PptxPreview] Parsed", parsedSlides.length, "slides");
         setSlides(parsedSlides);
         setError(null);
       } catch (err) {
@@ -663,9 +655,10 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+      clearPoll();
       blobUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [artifact.path, taskId]);
+  }, [artifact.path, renderAttemptKey, t, taskId]);
 
   // Navigate slides
   const goToPrev = () => {
@@ -763,6 +756,14 @@ export function PptxPreview({ artifact, taskId }: PptxPreviewProps) {
           <div className="flex items-center gap-2 text-amber-800 text-sm">
             <RemixIcon name="alert" size="size-4" />
             <span>{serverRenderWarning}</span>
+          </div>
+        </div>
+      )}
+      {renderEngineStatusMessage && !serverRenderWarning && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2">
+          <div className="flex items-center gap-2 text-emerald-800 text-sm">
+            <RemixIcon name="checkbox_circle" size="size-4" />
+            <span>{renderEngineStatusMessage}</span>
           </div>
         </div>
       )}

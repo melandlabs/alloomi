@@ -40,6 +40,29 @@ function uint8ToBase64(uint8Array: Uint8Array): string {
   return btoa(binary);
 }
 
+/**
+ * Check if a path is a blob storage pathname (Vercel Blob).
+ * Blob storage pathnames look like: cloud_{uuid}/{timestamp}-{uuid}-{filename}
+ * or userId/{timestamp}-{uuid}-{filename}
+ */
+function isBlobStoragePath(path: string): boolean {
+  if (!path) return false;
+  // Match patterns like:
+  // - cloud_d52f89fc-2436-405f-a8c8-ee278447297f/1777556638369-b8c27b6c-...
+  // - {userId}/{timestamp}-{uuid}-{filename}
+  // Check if path contains patterns typical of blob storage (starts with cloud_ or contains timestamp-uuid pattern)
+  const trimmed = path.trim();
+  if (trimmed.startsWith("cloud_")) return true;
+  // Check for timestamp-uuid pattern: digits-digits-hyphenated-uuid
+  if (
+    /^\d+-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.test(
+      trimmed,
+    )
+  )
+    return true;
+  return false;
+}
+
 interface FilePreviewPanelProps {
   file: {
     path: string;
@@ -222,6 +245,56 @@ export function FilePreviewPanel({
       try {
         // If taskId exists, fetch workspace file content via API (applicable to library page, etc.)
         if (taskId && file.path) {
+          // Check if this is a blob storage path (not a workspace session file)
+          // Blob storage paths look like: cloud_{uuid}/{timestamp}-{uuid}-{filename}
+          // These should be routed to /api/files/download instead of workspace file API
+          if (isBlobStoragePath(file.path)) {
+            const mimeType = isImageFile
+              ? `image/${cleanType === "jpg" ? "jpeg" : cleanType}`
+              : isPdfFile
+                ? "application/pdf"
+                : "application/octet-stream";
+            const res = await fetch(
+              `/api/files/download?path=${encodeURIComponent(file.path)}`,
+              {
+                headers: {
+                  Accept: mimeType,
+                },
+              },
+            );
+            if (!res.ok) {
+              if (res.status === 404) {
+                setError(
+                  t("common.filePreview.fileNotFound") || "File not found",
+                );
+              } else {
+                setError(
+                  t("common.filePreview.loadFailed") || "Failed to load file",
+                );
+              }
+              return;
+            }
+            const arrayBuffer = await res.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+
+            if (isPdfFile) {
+              setPdfContent(uint8Array);
+            } else if (isImageFile) {
+              const dataUrl = `data:${mimeType};base64,${uint8ToBase64(uint8Array)}`;
+              setImageDataUrl(dataUrl);
+            } else if (isAppleFile) {
+              const pdfData = await extractApplePreviewPdf(arrayBuffer);
+              if (pdfData) {
+                setPdfContent(pdfData);
+              } else {
+                setError(
+                  t("common.filePreview.previewNotAvailable") ||
+                    "No preview available for this Apple document",
+                );
+              }
+            }
+            return;
+          }
           // For image and PDF files, need to fetch binary data
           if (isPdfFile || isImageFile || isAppleFile) {
             const mimeType = isImageFile
@@ -343,6 +416,80 @@ export function FilePreviewPanel({
             return;
           }
           setCodeContent(content);
+          return;
+        }
+
+        // If path is an API URL (e.g., /api/rag/documents/...), fetch directly via HTTP
+        if (file.path.startsWith("/api/")) {
+          const res = await fetch(file.path, {
+            headers: {
+              Accept: isPdfFile
+                ? "application/pdf"
+                : isImageFile
+                  ? `image/${cleanType === "jpg" ? "jpeg" : cleanType}`
+                  : isVideoFile
+                    ? "video/mp4"
+                    : isAudioFile
+                      ? "audio/mpeg"
+                      : "application/octet-stream",
+            },
+          });
+          if (!res.ok) {
+            if (res.status === 404) {
+              setError(
+                t("common.filePreview.fileNotFound") || "File not found",
+              );
+            } else {
+              setError(
+                t("common.filePreview.loadFailed") || "Failed to load file",
+              );
+            }
+            return;
+          }
+          const arrayBuffer = await res.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          if (isPdfFile) {
+            setPdfContent(uint8Array);
+          } else if (isImageFile) {
+            const mimeType = `image/${cleanType === "jpg" ? "jpeg" : cleanType}`;
+            const dataUrl = `data:${mimeType};base64,${uint8ToBase64(uint8Array)}`;
+            setImageDataUrl(dataUrl);
+          } else if (isAppleFile) {
+            // Apple file: extract iCloud preview PDF
+            const pdfData = await extractApplePreviewPdf(arrayBuffer);
+            if (pdfData) {
+              setPdfContent(pdfData);
+            } else {
+              setError(
+                t("common.filePreview.previewNotAvailable") ||
+                  "No preview available for this Apple document",
+              );
+            }
+          } else if (isMindMapFile) {
+            // Mind map file: decode as text
+            const decoder = new TextDecoder("utf-8");
+            const textContent = decoder.decode(arrayBuffer);
+            setCodeContent(textContent);
+          } else if (isCodeFile || isMarkdownFile || isHtmlFile) {
+            // For text-based files, convert binary to text and set codeContent
+            const decoder = new TextDecoder("utf-8");
+            const textContent = decoder.decode(arrayBuffer);
+            setCodeContent(textContent);
+          } else {
+            // For other types (video, audio, archive, etc.), create blob URL
+            const blob = new Blob([arrayBuffer], {
+              type: isVideoFile
+                ? "video/mp4"
+                : isAudioFile
+                  ? "audio/mpeg"
+                  : isArchiveFile
+                    ? "application/zip"
+                    : "application/octet-stream",
+            });
+            const url = URL.createObjectURL(blob);
+            setMediaUrl(url);
+          }
           return;
         }
 

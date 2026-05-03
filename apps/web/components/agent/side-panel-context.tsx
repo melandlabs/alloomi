@@ -55,6 +55,9 @@ const defaultSidePanelValue: SidePanelContextValue = {
   setSidePanelDisplayMode: () => {},
 };
 
+/** LocalStorage key for persisting side panel width */
+const SIDE_PANEL_WIDTH_KEY = "sidePanelWidth";
+
 /**
  * Generate current "page" identifier: pathname + key search (page), for detecting page navigation
  */
@@ -88,7 +91,22 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
 
   /** Open sidebar, only one panel shown at a time */
   const openSidePanel = useCallback((panel: SidePanel) => {
-    setSidePanel(panel);
+    let nextPanel = panel;
+    // If panel doesn't specify width, try to restore from localStorage
+    if (nextPanel.width === undefined) {
+      try {
+        const savedWidth = localStorage.getItem(SIDE_PANEL_WIDTH_KEY);
+        if (savedWidth) {
+          const parsed = Number.parseInt(savedWidth, 10);
+          if (!Number.isNaN(parsed) && parsed > 0) {
+            nextPanel = { ...nextPanel, width: parsed };
+          }
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+    setSidePanel(nextPanel);
   }, []);
 
   /** Close sidebar */
@@ -99,6 +117,12 @@ export function SidePanelProvider({ children }: { children: ReactNode }) {
   /** Update panel width (for drag resize, doesn't rebuild content) */
   const setSidePanelWidth = useCallback((width: number) => {
     setSidePanel((prev) => (prev ? { ...prev, width } : prev));
+    // Persist width to localStorage
+    try {
+      localStorage.setItem(SIDE_PANEL_WIDTH_KEY, String(width));
+    } catch {
+      // Ignore localStorage errors (quota exceeded, private browsing, etc.)
+    }
   }, []);
 
   /** Update panel content */

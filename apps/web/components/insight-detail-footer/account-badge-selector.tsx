@@ -61,7 +61,7 @@ export function AccountBadgeSelector({
       jira: t("platform.jira", "Jira"),
       linear: t("platform.linear", "Linear"),
       imessage: t("platform.imessage", "iMessage"),
-      feishu: t("platform.feishu", "Feishu"),
+      feishu: t("platform.feishu", "Lark/Feishu"),
       dingtalk: t("platform.dingtalk", "DingTalk"),
       qqbot: t("platform.qqbot", "QQ Bot"),
       weixin: t("platform.weixin"),

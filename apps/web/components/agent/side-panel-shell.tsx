@@ -141,7 +141,7 @@ export function SidePanelShell({ children }: { children: ReactNode }) {
             "content-area-card",
             "flex flex-col flex-shrink-0 overflow-hidden h-full",
             "transition-all duration-200",
-            isFullscreen ? "flex-1" : "relative ml-2 sm:ml-3",
+            isFullscreen ? "flex-1" : "relative ml-2 sm:ml-2",
           )}
           style={
             isFullscreen

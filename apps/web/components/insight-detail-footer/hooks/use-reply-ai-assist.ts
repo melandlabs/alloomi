@@ -302,14 +302,17 @@ export function useReplyAiAssist({
       // Silent fail for JSON parse errors - no toast
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      if (!errorMessage.includes("Failed to parse AI response")) {
-        console.error(
-          t(
-            "insight.aiDraftFailed",
-            `Failed to generate reply. ${errorMessage}`,
-          ),
-        );
-      }
+
+      // Log detailed error for debugging (includes API response text)
+      console.error(
+        `[use-reply-ai-assist] Generation failed: ${errorMessage}`,
+        {
+          insightId: insight.id,
+          errorType:
+            error instanceof Error ? error.constructor.name : typeof error,
+          fullError: error,
+        },
+      );
     }
   }, [
     insight.id,

@@ -78,12 +78,19 @@ export function AvatarDisplay({
   const svgClipId = useId();
   const reduceMotion = usePrefersReducedMotion();
 
+  const isCustomImageMode = Boolean(config.customTextureUrl);
   const gradientId = `${svgClipId}-lg`;
-  const shape = getAvatarShapePreset(config.shapeId);
+  const shape = getAvatarShapePreset(
+    isCustomImageMode ? "circle" : config.shapeId,
+  );
   const [c1, c2, c3] = getPresetGradientHex(config.colorPresetId);
 
-  const blinkingEnabled = enableBlinking ?? enableInteractions;
-  const gazeTrackingEnabled = enableGazeTracking ?? enableInteractions;
+  const blinkingEnabled = isCustomImageMode
+    ? false
+    : (enableBlinking ?? enableInteractions);
+  const gazeTrackingEnabled = isCustomImageMode
+    ? false
+    : (enableGazeTracking ?? enableInteractions);
 
   /**
    * Get asset by ID
@@ -199,7 +206,9 @@ export function AvatarDisplay({
     ctx.fillStyle = "#F8FAFC";
     ctx.fillRect(0, 0, 1024, 1024);
 
-    const shapePreset = getAvatarShapePreset(config.shapeId);
+    const shapePreset = getAvatarShapePreset(
+      isCustomImageMode ? "circle" : config.shapeId,
+    );
     const [g1, g2, g3] = getPresetGradientHex(config.colorPresetId);
     const pathScale = getAvatarShapePathScale(shapePreset);
 
@@ -282,16 +291,25 @@ export function AvatarDisplay({
       ctx.restore();
     };
 
-    drawFeature(eyebrows.path, EYES_FACTOR);
-    drawFeature(eyes.path, EYES_FACTOR);
-    drawFeature(nose.path, NOSE_FACTOR);
-    drawFeature(mouth.path, MOUTH_FACTOR);
+    if (!isCustomImageMode) {
+      drawFeature(eyebrows.path, EYES_FACTOR);
+      drawFeature(eyes.path, EYES_FACTOR);
+      drawFeature(nose.path, NOSE_FACTOR);
+      drawFeature(mouth.path, MOUTH_FACTOR);
+    }
 
     const link = document.createElement("a");
     link.download = "alloomi-avatar.png";
     link.href = canvas.toDataURL();
     link.click();
-  }, [config, eyebrows.path, eyes.path, nose.path, mouth.path]);
+  }, [
+    config,
+    eyebrows.path,
+    eyes.path,
+    nose.path,
+    mouth.path,
+    isCustomImageMode,
+  ]);
 
   useEffect(() => {
     if (onDownloadRef) {
@@ -384,73 +402,74 @@ export function AvatarDisplay({
         </svg>
       </div>
 
-      {/* Facial features layer */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-        <svg
-          viewBox="0 0 100 100"
-          className={
-            featureScaleClassName ??
-            "h-[60%] w-[60%] [filter:drop-shadow(0_0_4px_rgba(255,255,255,0.55))]"
-          }
-        >
-          <g
-            stroke="rgba(255, 255, 255, 0.65)"
-            fill="none"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {!isCustomImageMode && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <svg
+            viewBox="0 0 100 100"
+            className={
+              featureScaleClassName ??
+              "h-[60%] w-[60%] [filter:drop-shadow(0_0_4px_rgba(255,255,255,0.55))]"
+            }
           >
             <g
-              style={{
-                transform: `translate(${lookAt.x * 0.6}px, ${lookAt.y * 0.6}px)`,
-                transition: "transform 0.15s ease-out",
-              }}
+              stroke="rgba(255, 255, 255, 0.65)"
+              fill="none"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                d={mouth.path}
-                className="transition-all duration-300 ease-out"
-              />
-            </g>
-
-            <g
-              style={{
-                transform: `translate(${lookAt.x * 1.0}px, ${lookAt.y * 1.0}px)`,
-                transition: "transform 0.15s ease-out",
-              }}
-            >
-              <path
-                d={eyebrows.path}
-                className="transition-all duration-300 ease-out"
-              />
-
               <g
                 style={{
-                  transformOrigin: "50px 50px",
-                  transform: isBlinking ? "scaleY(0.1)" : "scaleY(1)",
-                  transition: "transform 0.1s ease-in-out",
+                  transform: `translate(${lookAt.x * 0.6}px, ${lookAt.y * 0.6}px)`,
+                  transition: "transform 0.15s ease-out",
                 }}
               >
                 <path
-                  d={eyes.path}
+                  d={mouth.path}
+                  className="transition-all duration-300 ease-out"
+                />
+              </g>
+
+              <g
+                style={{
+                  transform: `translate(${lookAt.x * 1.0}px, ${lookAt.y * 1.0}px)`,
+                  transition: "transform 0.15s ease-out",
+                }}
+              >
+                <path
+                  d={eyebrows.path}
+                  className="transition-all duration-300 ease-out"
+                />
+
+                <g
+                  style={{
+                    transformOrigin: "50px 50px",
+                    transform: isBlinking ? "scaleY(0.1)" : "scaleY(1)",
+                    transition: "transform 0.1s ease-in-out",
+                  }}
+                >
+                  <path
+                    d={eyes.path}
+                    className="transition-all duration-300 ease-out"
+                  />
+                </g>
+              </g>
+
+              <g
+                style={{
+                  transform: `translate(${lookAt.x * 1.4}px, ${lookAt.y * 1.4}px)`,
+                  transition: "transform 0.15s ease-out",
+                }}
+              >
+                <path
+                  d={nose.path}
                   className="transition-all duration-300 ease-out"
                 />
               </g>
             </g>
-
-            <g
-              style={{
-                transform: `translate(${lookAt.x * 1.4}px, ${lookAt.y * 1.4}px)`,
-                transition: "transform 0.15s ease-out",
-              }}
-            >
-              <path
-                d={nose.path}
-                className="transition-all duration-300 ease-out"
-              />
-            </g>
-          </g>
-        </svg>
-      </div>
+          </svg>
+        </div>
+      )}
     </div>
   );
 }

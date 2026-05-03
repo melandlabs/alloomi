@@ -51,6 +51,7 @@ const PAGE_SIZE = 50;
 
 interface InsightDetailSourceInfoProps {
   insight: Insight;
+  targetSourceDetailIds?: string[];
   generateState?: {
     isLoading: boolean;
     hasOptions: boolean;
@@ -74,6 +75,7 @@ interface InsightDetailSourceInfoProps {
  */
 export function InsightDetailSourceInfo({
   insight,
+  targetSourceDetailIds,
   generateState,
   onGenerateStateChange,
   onDisplayMessageCountChange,
@@ -395,6 +397,28 @@ export function InsightDetailSourceInfo({
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
   /** Top anchor ref, used to maintain scroll position after loading more */
   const topAnchorRef = useRef<HTMLDivElement>(null);
+  const lastScrolledTargetRef = useRef<string>("");
+
+  const detailIdBySignature = useMemo(() => {
+    const map = new Map<string, string>();
+    (insight.details ?? []).forEach((detail, index) => {
+      const normalizedTime = Math.floor(normalizeTimestamp(detail.time) / 1000);
+      const content = detail.originalContent ?? detail.content ?? "";
+      const signature = [
+        normalizedTime,
+        detail.person ?? "",
+        detail.channel ?? "",
+        content,
+      ].join("::");
+      if (!map.has(signature)) {
+        map.set(
+          signature,
+          String((detail as DetailData & { id?: string }).id ?? index),
+        );
+      }
+    });
+    return map;
+  }, [insight.details]);
 
   /**
    * Handle reply button click: pre-fill recipient/account and open reply view
@@ -615,6 +639,14 @@ export function InsightDetailSourceInfo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only execute on first mount
 
+  useEffect(() => {
+    if ((targetSourceDetailIds?.length ?? 0) === 0) return;
+    setShowAllChannelMessages(false);
+    setFilterType("all");
+    setFilterValue(null);
+    setMessageSearch("");
+  }, [targetSourceDetailIds]);
+
   /**
    * After initial load completes, scroll to bottom
    * Executed when isLoadingChannelMessages changes from true to false and message count is greater than 0
@@ -677,6 +709,34 @@ export function InsightDetailSourceInfo({
       return () => cancelAnimationFrame(id);
     }
   }, [isLoadingMore, PAGE_SIZE]);
+
+  useEffect(() => {
+    const targetDetailIds = targetSourceDetailIds ?? [];
+    if (targetDetailIds.length === 0) return;
+
+    const nextTargetKey = targetDetailIds.join(",");
+    if (lastScrolledTargetRef.current === nextTargetKey) return;
+
+    const container = listContainerRef.current;
+    if (!container) return;
+
+    const frame = requestAnimationFrame(() => {
+      const target = targetDetailIds
+        .map((detailId) =>
+          container.querySelector<HTMLElement>(
+            `[data-source-detail-id="${CSS.escape(detailId)}"]`,
+          ),
+        )
+        .find(Boolean);
+
+      if (!target) return;
+
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      lastScrolledTargetRef.current = nextTargetKey;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [filteredAndSortedDetails, targetSourceDetailIds]);
 
   /** Current channel name: prioritize insight.groups[0], otherwise take first detail's channel, otherwise fall back to "Source Info" */
   const channelLabel = useMemo(() => {
@@ -937,6 +997,19 @@ export function InsightDetailSourceInfo({
             // Unique key for React rendering (includes index to ensure uniqueness)
             const detailKey = `${quoteKey}-${index}`;
             const showOriginal = detailShowOriginal[detailKey] ?? false;
+            const normalizedTime = Math.floor(
+              normalizeTimestamp(detail.time) / 1000,
+            );
+            const detailSignature = [
+              normalizedTime,
+              detail.person ?? "",
+              detail.channel ?? "",
+              detail.originalContent ?? detail.content ?? "",
+            ].join("::");
+            const sourceDetailId = detailIdBySignature.get(detailSignature);
+            const isTargeted =
+              sourceDetailId !== undefined &&
+              (targetSourceDetailIds ?? []).includes(sourceDetailId);
             const timeStr = format(
               detail.time ? coerceDate(detail.time) : new Date(),
               "HH:mm",
@@ -1008,6 +1081,7 @@ export function InsightDetailSourceInfo({
                 <div
                   className="group flex w-full justify-start"
                   data-message-index={index}
+                  data-source-detail-id={sourceDetailId}
                 >
                   <div className="flex w-full max-w-full flex-col gap-0.5 items-start relative">
                     {/* Unified left alignment: name, source badge, time on same row as hover actions */}
@@ -1133,10 +1207,12 @@ export function InsightDetailSourceInfo({
                     {/* Bubble */}
                     <div
                       className={cn(
-                        "rounded-lg px-4 py-2 text-sm break-words",
+                        "rounded-lg px-4 py-2 text-sm break-words scroll-mt-24 transition-colors",
                         fromOwnAccount
                           ? "bg-primary-50 text-foreground border border-border"
                           : "text-foreground border border-border",
+                        isTargeted &&
+                          "border-primary bg-primary/5 ring-1 ring-primary/20",
                         isEmailPlatform && "w-full",
                       )}
                     >
