@@ -4,7 +4,10 @@
  * This module combines all business tool factories and creates the MCP server.
  */
 
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import {
+  createSdkMcpServer,
+  type SdkMcpToolDefinition,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { Session } from "next-auth";
 import type { InsightChangeCallback } from "./shared";
 
@@ -20,6 +23,10 @@ import { createRawMessagesTools } from "./raw-messages";
 import { createMemoryPathTool } from "./memory-path";
 import { createSchedulerTools } from "./scheduler";
 
+export type BusinessToolsMcpOptions = {
+  excludeTools?: string[];
+};
+
 /**
  * Create business tools MCP server
  *
@@ -30,6 +37,7 @@ import { createSchedulerTools } from "./scheduler";
  * @param cloudAuthToken - Optional cloud auth token for embeddings API
  * @param onInsightChange - Optional callback to notify frontend of insight changes
  * @param chatId - Optional chat ID for associating insights with conversations
+ * @param options - Optional runtime tool configuration
  * @returns MCP server instance
  */
 export function createBusinessToolsMcpServer(
@@ -37,39 +45,50 @@ export function createBusinessToolsMcpServer(
   cloudAuthToken?: string,
   onInsightChange?: InsightChangeCallback,
   chatId?: string,
+  options?: BusinessToolsMcpOptions,
 ) {
   // Store cloudAuthToken for embeddings API (needed when cloud calls tools)
   const embeddingsAuthToken = cloudAuthToken;
+  const tools: SdkMcpToolDefinition<any>[] = [
+    // time tool - no session needed
+    createTimeTool(),
+
+    // Session-based tools
+    createChatInsightTool(session),
+    createDownloadAttachmentTool(session, chatId),
+    createContactsTool(session),
+    createIntegrationsTool(session),
+    createSendReplyTool(session),
+
+    // Insight CRUD tools
+    ...createInsightCrudTools(session, chatId, onInsightChange),
+
+    // Search knowledge tools
+    ...createSearchKnowledgeTools(session, embeddingsAuthToken),
+
+    // Raw messages tools
+    ...createRawMessagesTools(session),
+
+    // Memory path tool
+    createMemoryPathTool(session),
+
+    // Scheduler tools
+    ...createSchedulerTools(session, embeddingsAuthToken),
+  ];
+
+  const excludeSet = new Set(options?.excludeTools ?? []);
+  const filteredTools =
+    excludeSet.size > 0
+      ? tools.filter((businessTool) => {
+          const toolName = (businessTool as { name: string }).name;
+          return !excludeSet.has(toolName);
+        })
+      : tools;
 
   return createSdkMcpServer({
     name: "business-tools",
     version: "1.0.0",
-    tools: [
-      // time tool - no session needed
-      createTimeTool(),
-
-      // Session-based tools
-      createChatInsightTool(session),
-      createDownloadAttachmentTool(session, chatId),
-      createContactsTool(session),
-      createIntegrationsTool(session),
-      createSendReplyTool(session),
-
-      // Insight CRUD tools
-      ...createInsightCrudTools(session, chatId, onInsightChange),
-
-      // Search knowledge tools
-      ...createSearchKnowledgeTools(session, embeddingsAuthToken),
-
-      // Raw messages tools
-      ...createRawMessagesTools(session),
-
-      // Memory path tool
-      createMemoryPathTool(session),
-
-      // Scheduler tools
-      ...createSchedulerTools(session, embeddingsAuthToken),
-    ],
+    tools: filteredTools,
   });
 }
 

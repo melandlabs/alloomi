@@ -1,5 +1,5 @@
 /**
- * Search Knowledge tools - searchKnowledgeBase, getFullDocumentContent
+ * Search Knowledge tools - searchKnowledgeBase, getFullDocumentContent, listKnowledgeBaseDocuments
  */
 
 import { tool } from "@anthropic-ai/claude-agent-sdk";
@@ -10,6 +10,7 @@ import {
   formatSearchResultsForLLM,
   getDocumentFullContent,
   getDocument,
+  getUserDocuments,
 } from "@/lib/ai/rag/langchain-service";
 
 /**
@@ -254,5 +255,138 @@ export function createSearchKnowledgeTools(
         }
       },
     ),
+
+    // listKnowledgeBaseDocuments tool
+    tool(
+      "listKnowledgeBaseDocuments",
+      [
+        "List all documents in the user's knowledge base.",
+        "",
+        "Use this when:",
+        "- User asks 'what documents do I have', 'list my files', 'show me my knowledge base'",
+        "- User wants to see what files are available in their strategy memory",
+        "- User wants to know what documents they can search or analyze",
+        "",
+        "This returns a list of all uploaded documents with their metadata (name, size, upload date, chunk count).",
+        "After listing, user can ask to search specific documents or get full content of a particular document.",
+      ].join("\n"),
+      {
+        limit: z.coerce
+          .number()
+          .min(1)
+          .max(100)
+          .default(50)
+          .describe(
+            "Maximum number of documents to return (default: 50, max: 100)",
+          ),
+      },
+      async (args) => {
+        try {
+          const { limit = 50 } = args;
+
+          // Validate user session
+          if (!session?.user?.id) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Unauthorized: invalid user session",
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          const userId = session.user.id;
+
+          // Get all user documents
+          const documents = await getUserDocuments(userId);
+
+          if (documents.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Your knowledge base is empty. You haven't uploaded any documents yet. You can upload documents using the file upload feature in chat.",
+                },
+              ],
+              data: {
+                documents: [],
+                count: 0,
+              },
+            };
+          }
+
+          // Format documents for display (limit the results)
+          const formattedDocs = documents.slice(0, limit).map((doc: any) => ({
+            id: doc.id,
+            fileName: doc.fileName,
+            contentType: doc.contentType,
+            sizeBytes: doc.sizeBytes,
+            totalChunks: doc.totalChunks,
+            uploadedAt: doc.uploadedAt,
+          }));
+
+          // Build readable output
+          const docList = formattedDocs
+            .map(
+              (d: any, i: number) =>
+                `${i + 1}. **${d.fileName}** (${formatFileSize(d.sizeBytes)}, ${d.totalChunks} chunks, ${formatDate(d.uploadedAt)})`,
+            )
+            .join("\n");
+
+          const header = `You have **${documents.length}** document(s) in your knowledge base:\n\n`;
+          const footer =
+            documents.length > limit
+              ? `\n\n_Showing ${limit} of ${documents.length} documents. Upload more documents to expand your knowledge base._`
+              : "";
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: header + docList + footer,
+              },
+            ],
+            data: {
+              documents: formattedDocs,
+              count: documents.length,
+              returnedCount: formattedDocs.length,
+            },
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: "Failed to list knowledge base documents.",
+              },
+            ],
+            data: {
+              error: error instanceof Error ? error.message : "Unknown error",
+            },
+            isError: true,
+          };
+        }
+      },
+    ),
   ];
+}
+
+// Helper functions for formatting
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function formatDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
