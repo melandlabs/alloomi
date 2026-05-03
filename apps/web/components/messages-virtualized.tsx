@@ -1,6 +1,6 @@
 import { PreviewMessage, ThinkingMessage } from "./message";
 import { Greeting } from "./greeting";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Vote } from "@/lib/db/schema";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useMessages } from "@/hooks/use-messages";
@@ -64,6 +64,9 @@ function PureVirtualizedMessages({
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
+
+  // Memoize empty set to avoid creating new Set on every render
+  const emptyVisibleLoadingIds = useMemo(() => new Set<string>(), []);
 
   useEffect(() => {
     return () => {
@@ -173,7 +176,7 @@ function PureVirtualizedMessages({
                 }
                 isHighlighted={highlightedId === message.id}
                 isAgentRunning={isAgentRunning}
-                inVisibleLoadingIds={new Set()}
+                inVisibleLoadingIds={emptyVisibleLoadingIds}
               />
             </div>
           );

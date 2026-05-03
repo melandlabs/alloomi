@@ -26,6 +26,8 @@ interface AgentChatPanelProps {
   chatId?: string | null; // External chatId; if null, creates a new chat
   /** Initial input value (e.g., pre-filled when navigating from skill page /skill-creator) */
   initialInput?: string;
+  /** Refresh token for replacing the current draft with the latest initial input. */
+  prefillToken?: string;
   /** A message to send immediately after mount (e.g., from onboarding "Chat with Alloomi" card), sent only once */
   initialMessageToSend?: string;
 }
@@ -38,6 +40,7 @@ interface AgentChatPanelProps {
 export function AgentChatPanel({
   chatId: externalChatId,
   initialInput,
+  prefillToken,
   initialMessageToSend,
 }: AgentChatPanelProps = {}) {
   const { t } = useTranslation();
@@ -77,6 +80,7 @@ export function AgentChatPanel({
     isVaultOpen,
     setVaultOpen,
     focusedInsights,
+    getIsAgentRunningByChatId,
   } = useChatContext();
 
   // Use global drawer context (same approach as global search to open drawer)
@@ -106,10 +110,27 @@ export function AgentChatPanel({
     router.replace(url, { scroll: false });
   }, [initialInput, pathname, router, searchParams]);
 
+  const lastAppliedPrefillTokenRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!prefillToken || !initialInput?.trim()) return;
+    if (lastAppliedPrefillTokenRef.current === prefillToken) return;
+
+    lastAppliedPrefillTokenRef.current = prefillToken;
+    setInput(initialInput);
+
+    if (typeof window !== "undefined" && chatInputKeyRef.current) {
+      localStorage.setItem(chatInputKeyRef.current, initialInput);
+    }
+  }, [initialInput, prefillToken]);
+
   // Use externally provided chatId, or generate a new one if not provided
   const chatId = useMemo(() => {
-    return contextActiveChatId || externalChatId || generateUUID();
+    return externalChatId || contextActiveChatId || generateUUID();
   }, [contextActiveChatId, externalChatId]);
+
+  // Get isAgentRunning for THIS chat panel's chatId (not the activeChatId)
+  // This ensures the side panel shows correct status even when activeChatId changes
+  const isAgentRunningForChat = getIsAgentRunningByChatId(chatId);
 
   // Per-chat input persistence: track previous chat for saving input on switch
   const prevChatIdForInputRef = useRef<string | null>(null);
@@ -521,7 +542,7 @@ export function AgentChatPanel({
                   onRefresh={handleRefresh}
                   onSuggestionsReady={handleSuggestionsReady}
                   onSuggestionUsed={handleSuggestionUsed}
-                  isAgentRunning={isAgentRunning}
+                  isAgentRunning={isAgentRunningForChat}
                 />
               </div>
             </div>

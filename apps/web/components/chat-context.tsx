@@ -110,6 +110,8 @@ export interface ChatContextValue {
 
   // Get all chat session states (used to display running status of each chat in header)
   getChatSessionStates: () => Map<string, ChatSessionState>;
+  // Get isAgentRunning for a specific chatId (not necessarily the activeChatId)
+  getIsAgentRunningByChatId: (chatId: string) => boolean;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -943,7 +945,7 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
                 toolName: data.name || "unknown",
                 toolInput: data.input,
                 status: "executing",
-                toolUseId: data.id,
+                toolUseId: data.toolUseId || data.id,
               };
 
               parts.push(toolPart);
@@ -1129,6 +1131,26 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
                 }
                 return updated;
               }, chatIdForMessages);
+            } else if (data.type === "reasoning") {
+              // Reasoning content - accumulate incremental reasoning text
+              const newReasoning: string = data.content || data.text || "";
+
+              if (!newReasoning) return; // Skip empty reasoning
+
+              // Find if there's already a reasoning part at the end of the current parts
+              const lastPart = parts[parts.length - 1];
+
+              if (lastPart && lastPart.type === "reasoning") {
+                // Append to existing reasoning part (streaming accumulation)
+                const existingText = (lastPart as any).text || "";
+                (lastPart as any).text = existingText + newReasoning;
+              } else {
+                // Create new reasoning part
+                parts.push({
+                  type: "reasoning" as const,
+                  text: newReasoning,
+                });
+              }
             } else if (data.type === "insightsRefresh") {
               // Insight change notification for optimistic update
               // Create a data-insightsRefresh part
@@ -1238,11 +1260,51 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
                   type: "error",
                   description: "Agent reached maximum turn limit.",
                 });
+                // Add error to message for consistency with error_during_execution
+                const errorPart = {
+                  type: "error" as const,
+                  content: "Agent reached maximum turn limit.",
+                };
+                parts.push(errorPart);
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (
+                    lastIndex >= 0 &&
+                    updated[lastIndex].role === "assistant"
+                  ) {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      parts: [...parts],
+                    } as ChatMessage;
+                  }
+                  return updated;
+                }, chatIdForMessages);
               } else if (data.content === "error_max_budget_usd") {
                 toast({
                   type: "error",
                   description: "Agent reached maximum budget.",
                 });
+                // Add error to message for consistency with error_during_execution
+                const errorPart = {
+                  type: "error" as const,
+                  content: "Agent reached maximum budget.",
+                };
+                parts.push(errorPart);
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (
+                    lastIndex >= 0 &&
+                    updated[lastIndex].role === "assistant"
+                  ) {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      parts: [...parts],
+                    } as ChatMessage;
+                  }
+                  return updated;
+                }, chatIdForMessages);
               } else if (
                 data.content === "error_max_structured_output_retries"
               ) {
@@ -1251,6 +1313,26 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
                   description:
                     "Agent failed to produce valid structured output.",
                 });
+                // Add error to message for consistency
+                const errorPart = {
+                  type: "error" as const,
+                  content: "Agent failed to produce valid structured output.",
+                };
+                parts.push(errorPart);
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIndex = updated.length - 1;
+                  if (
+                    lastIndex >= 0 &&
+                    updated[lastIndex].role === "assistant"
+                  ) {
+                    updated[lastIndex] = {
+                      ...updated[lastIndex],
+                      parts: [...parts],
+                    } as ChatMessage;
+                  }
+                  return updated;
+                }, chatIdForMessages);
               }
             }
 
@@ -1659,6 +1741,14 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     [chatSessionStates],
   );
 
+  // Get isAgentRunning for a specific chatId (not necessarily the activeChatId)
+  const getIsAgentRunningByChatId = useCallback(
+    (chatId: string): boolean => {
+      return getChatSessionState(chatId).isAgentRunning;
+    },
+    [getChatSessionState],
+  );
+
   const currentSessionState = activeChatId
     ? getChatSessionState(activeChatId)
     : { isAgentRunning: false, focusedInsights: [], abortFn: null };
@@ -1969,6 +2059,8 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
       isSending,
       // Get all chat session states
       getChatSessionStates: () => chatSessionStates,
+      // Get isAgentRunning for a specific chatId
+      getIsAgentRunningByChatId,
     };
   }, [
     activeChatId,
@@ -1989,6 +2081,7 @@ export function ChatContextProvider({ children }: { children: ReactNode }) {
     isVaultOpen,
     switchChatId,
     isSending,
+    getIsAgentRunningByChatId,
   ]);
 
   return (
