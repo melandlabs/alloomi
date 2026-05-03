@@ -1,90 +1,62 @@
-Bundled render engine
+# Render Engine
 
-This directory is packaged into the Tauri app bundle. Desktop PPTX preview uses
-these binaries directly and no longer downloads LibreOffice on first open.
+This directory contains the bundled LibreOffice and poppler binaries for high-fidelity PPTX preview rendering.
 
-Current target
+## Directory Structure
 
-- Platform: macOS Apple Silicon
-- Directory: `apps/web/src-tauri/resources/render-engine/darwin-arm64/`
-
-Required layout
-
-```text
-apps/web/src-tauri/resources/render-engine/
-  darwin-arm64/
-    LibreOffice.app
-    poppler/
-      bin/
-        pdftoppm
+```
+render-engine/
+├── darwin-arm64/     # macOS ARM64 (Apple Silicon)
+├── darwin-x64/       # macOS x86_64 (Intel)
+├── linux-x64/        # Linux x86_64
+└── windows-x64/      # Windows x86_64
 ```
 
-Required binaries
+## Required Binaries
 
-- `darwin-arm64/LibreOffice.app/Contents/MacOS/soffice`
-- `darwin-arm64/poppler/bin/pdftoppm`
+For each platform, place the following binaries:
 
-How to obtain LibreOffice
+### macOS (darwin-arm64, darwin-x64)
 
-1. Open the official LibreOffice download page:
-   `https://www.libreoffice.org/download/download-libreoffice/`
-2. Download the macOS Apple Silicon build.
-3. Mount the downloaded `.dmg`.
-4. Copy `LibreOffice.app` into:
-   `apps/web/src-tauri/resources/render-engine/darwin-arm64/`
+1. **LibreOffice.app** - Download from https://www.libreoffice.org/download/download/
+   - Extract the downloaded `.dmg` file
+   - Copy `LibreOffice.app` to `darwin-arm64/` or `darwin-x64/`
 
-Result:
+2. **poppler** (for pdftoppm) - Install via Homebrew:
 
-```text
-apps/web/src-tauri/resources/render-engine/darwin-arm64/LibreOffice.app
-```
+   ```bash
+   brew install poppler
+   ```
 
-How to obtain pdftoppm
+   - The `pdftoppm` binary will be in `/usr/local/bin/` or `/opt/homebrew/bin/`
+   - Copy `pdftoppm` to the platform directory
 
-`pdftoppm` comes from Poppler.
+### Linux (linux-x64)
 
-Option A: copy from Homebrew Poppler
+1. **LibreOffice** - Download from https://www.libreoffice.org/download/download/
+   - Extract and use the `program/soffice` binary
 
-1. Install Poppler locally if needed:
-   `brew install poppler`
-2. Create the target directory:
-   `mkdir -p apps/web/src-tauri/resources/render-engine/darwin-arm64/poppler/bin`
-3. Copy the binary:
-   `cp /opt/homebrew/bin/pdftoppm apps/web/src-tauri/resources/render-engine/darwin-arm64/poppler/bin/`
+2. **poppler** - Install via package manager:
+   ```bash
+   sudo apt install poppler-utils  # Debian/Ubuntu
+   sudo yum install poppler-utils   # RHEL/CentOS
+   ```
 
-Option B: copy from another Poppler build you already trust
+### Windows (windows-x64)
 
-1. Find a working `pdftoppm` binary.
-2. Put it here:
-   `apps/web/src-tauri/resources/render-engine/darwin-arm64/poppler/bin/pdftoppm`
+1. **LibreOffice** - Download from https://www.libreoffice.org/download/download/
+   - Use the `program/soffice.exe` binary
 
-Verify the files
+2. **poppler** - Download from https://github.com/oschwartz10612/poppler-windows/releases
+   - Place `pdftoppm.exe` in the platform directory
 
-Run these checks:
+## Verification
 
-```bash
-test -f apps/web/src-tauri/resources/render-engine/darwin-arm64/LibreOffice.app/Contents/MacOS/soffice && echo "soffice ok"
-test -f apps/web/src-tauri/resources/render-engine/darwin-arm64/poppler/bin/pdftoppm && echo "pdftoppm ok"
-```
+After placing the binaries, the render engine status can be checked via the desktop app's developer tools or logs. The app will automatically detect and use the bundled binaries when available.
 
-How to test in the app
+## Notes
 
-1. Start desktop dev:
-   `pnpm --filter web tauri:dev`
-2. Open a `.pptx` in the desktop app.
-3. Check logs for:
-   `Using bundled render engine`
-
-What is committed
-
-- This folder has a `.gitignore` that ignores the large binaries by default.
-- `README.md` and `.gitignore` stay tracked.
-- The real LibreOffice and Poppler files are meant for local testing unless you
-  explicitly decide to distribute them in your release pipeline.
-
-Notes
-
-- Bundling LibreOffice will increase the app size significantly.
-- The old render-engine manifest and on-demand download flow were removed.
-- Legacy `~/.alloomi/render-engines/office/installed.json` is still read as a
-  fallback, but the intended path is the bundled resource directory.
+- The binaries are optional - the app will fall back to client-side PPTX rendering if the bundled engines are not available
+- Ensure the binaries are executable (chmod +x on Unix systems)
+- The `soffice` binary path should be: `{platform_dir}/soffice` (symlinks are OK)
+- The `pdftoppm` binary path should be: `{platform_dir}/pdftoppm`

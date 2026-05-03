@@ -6,6 +6,8 @@ pub mod constants;
 pub mod menu;
 pub mod node;
 pub mod notify;
+pub mod render_runtime;
+pub mod runtime_components;
 pub mod storage;
 pub mod system;
 pub mod telegram;

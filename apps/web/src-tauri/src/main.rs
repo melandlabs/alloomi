@@ -15,12 +15,32 @@ mod js_scheduler;
 mod menu;
 mod node;
 mod notify;
-mod render_engine;
+mod render_runtime;
+mod runtime_components;
 mod storage;
 mod system;
 mod update;
 
 mod telegram;
+
+#[cfg(not(debug_assertions))]
+fn resolve_resource_file(
+    app: &tauri::AppHandle,
+    relative_path: &str,
+) -> Result<std::path::PathBuf, String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+    let candidates = [
+        resource_dir.join("resources").join(relative_path),
+        resource_dir.join(relative_path),
+    ];
+    candidates
+        .into_iter()
+        .find(|path| path.exists())
+        .ok_or_else(|| format!("Resource not found: {}", relative_path))
+}
 
 /// Polls NEXTJS_STARTED until ready, then navigates to the Next.js app.
 /// Runs on a background thread so setup() returns immediately and the window
@@ -30,10 +50,7 @@ fn wait_and_navigate(app: tauri::AppHandle) {
     // Copy loading HTML from resources to temp dir so WebView can both
     // load it and execute JS to update the status text dynamically.
     let temp_path = std::env::temp_dir().join("alloomi_loading.html");
-    let resource_path = app
-        .path()
-        .resource_dir()
-        .map(|p| p.join("resources").join("loading.html"));
+    let resource_path = resolve_resource_file(&app, "loading.html");
 
     if let Ok(resource_path) = resource_path {
         println!("📄 Resource path: {:?}", resource_path);
@@ -289,7 +306,8 @@ fn main() {
             // Notification
             notify::send_notification,
             // Render engine
-            render_engine::get_render_engine_status_cmd,
+            render_runtime::get_render_engine_status_cmd,
+            render_runtime::ensure_render_engine_download_started_cmd,
         ])
         .setup(|app| {
             // Deliver AppHandle to the background server thread immediately
@@ -348,6 +366,7 @@ fn main() {
             // returns immediately and the WebView renders about:blank right away.
             #[cfg(not(debug_assertions))]
             {
+                render_runtime::ensure_render_engine_download_started();
                 let app = app.handle().clone();
                 std::thread::spawn(move || {
                     wait_and_navigate(app);

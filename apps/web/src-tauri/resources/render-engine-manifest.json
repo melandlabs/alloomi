@@ -1,0 +1,30 @@
+{
+	"version": "2026.04.30.1",
+	"platforms": {
+		"darwin-arm64": {
+			"archiveName": "render-engine-darwin-arm64.tar.gz",
+			"url": "https://github.com/Mine77/allomi-pptx-render-engine/releases/download/render-engine-cdn/render-engine-darwin-arm64.tar.gz",
+			"sha256": "e1b65d9d3bfdaa85b5f642a3537358b7d37bab85ea3dd5973552ae1a988f18f5"
+		},
+		"darwin-x64": {
+			"archiveName": "render-engine-darwin-x64.tar.gz",
+			"url": "https://github.com/Mine77/allomi-pptx-render-engine/releases/download/render-engine-cdn/render-engine-darwin-x64.tar.gz",
+			"sha256": "b517a723c9bfb601c2e93ade4ba13641c0a6ca38e879470c9fc8df366e33e959"
+		},
+		"linux-x64": {
+			"archiveName": "render-engine-linux-x64.tar.gz",
+			"url": "https://github.com/Mine77/allomi-pptx-render-engine/releases/download/render-engine-cdn/render-engine-linux-x64.tar.gz",
+			"sha256": "bccb9171c4a759d50dda6374764d76378278ae1f70c142d268e827670fdec29c"
+		},
+		"windows-x64": {
+			"archiveName": "render-engine-windows-x64.zip",
+			"url": "https://github.com/Mine77/allomi-pptx-render-engine/releases/download/render-engine-cdn/render-engine-windows-x64.zip",
+			"sha256": "ad24046104c190bc768c7545d88f42a1ab799f95c7328b2ff9dc70d045689c86"
+		},
+		"windows-arm64": {
+			"archiveName": "render-engine-windows-arm64.zip",
+			"url": "https://github.com/Mine77/allomi-pptx-render-engine/releases/download/render-engine-cdn/render-engine-windows-arm64.zip",
+			"sha256": "4ab9b15b1987d6ac8a64c1b60678c8597779579c0038be001d84d5e55e7030f7"
+		}
+	}
+}

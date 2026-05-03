@@ -882,69 +882,56 @@ pub fn download_and_install_node(home: &str) -> Option<String> {
     }
 }
 
-/// Get the platform-specific render engine directory name
-fn get_platform_dir() -> String {
-    let os = if cfg!(target_os = "windows") {
-        "windows-x64"
-    } else if cfg!(target_os = "macos") {
-        if cfg!(target_arch = "aarch64") {
-            "darwin-arm64"
-        } else {
-            "darwin-x64"
-        }
-    } else if cfg!(target_os = "linux") {
-        "linux-x64"
-    } else {
-        "unknown"
-    };
-    os.to_string()
-}
-
-/// Get the packaged render engine paths (soffice and pdftoppm)
+/// Get render engine paths (soffice and pdftoppm)
 /// Returns (soffice_path, pdftoppm_path) tuple if found
 fn get_packaged_render_engine_paths(
     resource_dir: &std::path::Path,
 ) -> (Option<String>, Option<String>) {
-    let engine_dir = resource_dir.join("render-engine").join(get_platform_dir());
+    let (downloaded_soffice, downloaded_pdftoppm) =
+        crate::render_runtime::get_installed_render_runtime_paths();
+    if downloaded_soffice.is_some() || downloaded_pdftoppm.is_some() {
+        return (downloaded_soffice, downloaded_pdftoppm);
+    }
+
+    let platform_dir = crate::runtime_components::get_platform_dir();
+    let engine_dir = [
+        resource_dir.join("resources").join("render-engine").join(&platform_dir),
+        resource_dir.join("render-engine").join(&platform_dir),
+    ]
+    .into_iter()
+    .find(|path| path.exists())
+    .unwrap_or_else(|| resource_dir.join("render-engine").join(&platform_dir));
 
     // Find soffice
-    let soffice_path = {
-        let direct = engine_dir.join("soffice");
-        if direct.exists() {
-            Some(direct.to_string_lossy().to_string())
-        } else {
-            #[cfg(target_os = "macos")]
-            {
-                let libreoffice_app = engine_dir
-                    .join("LibreOffice.app")
-                    .join("Contents")
-                    .join("MacOS")
-                    .join("soffice");
-                if libreoffice_app.exists() {
-                    Some(libreoffice_app.to_string_lossy().to_string())
-                } else {
-                    None
-                }
-            }
-            #[cfg(not(target_os = "macos"))]
-            None
-        }
-    };
+    let soffice_path = [
+        engine_dir.join("soffice"),
+        engine_dir
+            .join("LibreOffice.app")
+            .join("Contents")
+            .join("MacOS")
+            .join("soffice"),
+        engine_dir.join("program").join("soffice"),
+        engine_dir.join("program").join("soffice.exe"),
+        engine_dir
+            .join("libreoffice-msi")
+            .join("program")
+            .join("soffice.exe"),
+        engine_dir.join("soffice.exe"),
+    ]
+    .into_iter()
+    .find(|path| path.exists())
+    .map(|path| path.to_string_lossy().to_string());
 
     // Find pdftoppm
-    let pdftoppm_path = {
-        let direct = engine_dir.join("pdftoppm");
-        if direct.exists() {
-            Some(direct.to_string_lossy().to_string())
-        } else {
-            let in_bin = engine_dir.join("bin").join("pdftoppm");
-            if in_bin.exists() {
-                Some(in_bin.to_string_lossy().to_string())
-            } else {
-                None
-            }
-        }
-    };
+    let pdftoppm_path = [
+        engine_dir.join("pdftoppm"),
+        engine_dir.join("bin").join("pdftoppm"),
+        engine_dir.join("pdftoppm.exe"),
+        engine_dir.join("bin").join("pdftoppm.exe"),
+    ]
+    .into_iter()
+    .find(|path| path.exists())
+    .map(|path| path.to_string_lossy().to_string());
 
     (soffice_path, pdftoppm_path)
 }
@@ -1097,11 +1084,11 @@ pub fn try_start_nextjs(
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped());
 
-    // Set render engine paths if available
+    // Set high-fidelity runtime paths if available
     let cmd = if let Some(soffice_bin) = packaged_soffice_bin {
         if let Some(pdftoppm_bin) = packaged_pdftoppm_bin {
-            println!("📂 Using bundled render engine: soffice={}", soffice_bin);
-            println!("📂 Using bundled render engine: pdftoppm={}", pdftoppm_bin);
+            println!("📂 Using render engine: soffice={}", soffice_bin);
+            println!("📂 Using render engine: pdftoppm={}", pdftoppm_bin);
             cmd.env("SOFFICE_BIN", soffice_bin)
                 .env("PDFTOPPM_BIN", pdftoppm_bin)
         } else {
@@ -1281,12 +1268,12 @@ pub fn start_nextjs_server() {
     let work_dir = standalone_dir;
     println!("📂 Working directory: {:?}", work_dir);
     let packaged_render_engine = get_packaged_render_engine_paths(&resource_dir);
-    if let Some((ref soffice_bin, ref pdftoppm_bin)) = packaged_render_engine {
-        println!("📦 Using bundled render engine");
+    if let (Some(ref soffice_bin), Some(ref pdftoppm_bin)) = packaged_render_engine {
+        println!("📦 Using bundled high-fidelity runtime");
         println!("   soffice: {}", soffice_bin);
         println!("   pdftoppm: {}", pdftoppm_bin);
     } else {
-        println!("⚠️  No bundled render engine found in app resources");
+        println!("⚠️  No bundled high-fidelity runtime found in app resources");
     }
 
     let mut env_path = std::env::var("PATH").unwrap_or_default();
@@ -1377,7 +1364,7 @@ pub fn start_nextjs_server() {
             soffice_path, pdftoppm_path
         );
     } else {
-        println!("📂 No bundled render engine found, high-fidelity PPTX preview will use client-side rendering");
+        println!("📂 No render engine found, PPTX preview will use client-side rendering");
     }
 
     println!("📍 Environment variables being passed to Node.js:");
