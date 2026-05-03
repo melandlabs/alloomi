@@ -28,7 +28,7 @@ import { formatAgentStreamErrorForUser } from "./format-error";
  * Conservative limit to stay well below the 200K Claude context window.
  * System prompt + current message + tool results all consume additional tokens.
  */
-export const MAX_CONVERSATION_HISTORY_TOKENS = 100_000;
+export const MAX_CONVERSATION_HISTORY_TOKENS = 40_000;
 
 /**
  * Threshold ratio at which a context usage warning is logged (75% of max).
@@ -89,6 +89,7 @@ function getToolDisplayName(
     modifyInsight: "Modify Insight",
     searchKnowledgeBase: "Search Knowledge Base",
     getFullDocumentContent: "Get Document",
+    listKnowledgeBaseDocuments: "List Knowledge Base",
     searchMemoryPath: "Search Memory",
     getRawMessages: "Get Raw Messages",
     searchRawMessages: "Search Messages",
@@ -115,6 +116,7 @@ function getToolDisplayName(
     modifyInsight: "修改洞察",
     searchKnowledgeBase: "搜索知识库",
     getFullDocumentContent: "读取文档",
+    listKnowledgeBaseDocuments: "列出知识库文档",
     searchMemoryPath: "搜索记忆",
     getRawMessages: "搜索消息",
     searchRawMessages: "搜索原始消息",

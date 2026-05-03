@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runRenderEnginePreflight } from "./render-engine-preflight.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const cwd = path.resolve(__dirname, "..");
@@ -24,10 +25,13 @@ function run(cmd, args, env) {
 async function main() {
   const env = { IS_TAURI: "true", NODE_ENV: "production" };
 
-  console.log("[1/3] Bundling runtime...");
+  console.log("[0/4] Validating render engine downloads...");
+  await runRenderEnginePreflight({ ...process.env, ...env });
+
+  console.log("[1/4] Bundling runtime...");
   await run("pnpm", ["--filter", "web", "bundle:runtime"], env);
 
-  console.log("[2/3] Building Next.js...");
+  console.log("[2/4] Building Next.js...");
   // Use Turbopack in CI (Windows) to avoid webpack glob EPERM errors
   if (process.env.USE_TURBOPACK === "true") {
     await run("pnpm", ["--filter", "web", "build:turbo"], env);
@@ -35,9 +39,10 @@ async function main() {
     await run("pnpm", ["--filter", "web", "build"], env);
   }
 
-  console.log("[3/3] Fixing standalone...");
+  console.log("[3/4] Fixing standalone...");
   await run("node", [path.join(scriptsDir, "fix-standalone-pnpm.js")]);
 
+  console.log("[4/4] Render engine download preflight passed");
   console.log("Done!");
 }
 

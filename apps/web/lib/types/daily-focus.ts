@@ -81,7 +81,7 @@ export const FocusActionSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Reasoning Step (思维链步骤)
+// Reasoning Step
 // ---------------------------------------------------------------------------
 
 export interface FocusReasoningFile {
@@ -131,7 +131,7 @@ export const FocusReasoningStepSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Event (单个聚焦事件)
+// Event (single focus event)
 // ---------------------------------------------------------------------------
 
 export const FOCUS_EVENT_TYPES = [
@@ -144,6 +144,10 @@ export const FOCUS_EVENT_TYPES = [
 
 export type FocusEventType = (typeof FOCUS_EVENT_TYPES)[number];
 
+export const FOCUS_DEADLINE_PRECISIONS = ["day", "minute"] as const;
+
+export type FocusDeadlinePrecision = (typeof FOCUS_DEADLINE_PRECISIONS)[number];
+
 export interface DailyFocusEvent {
   id: string;
   insightId?: string;
@@ -152,6 +156,7 @@ export interface DailyFocusEvent {
   sourceFiles?: FocusReasoningFile[];
   sourceLinks?: FocusSourceLink[];
   deadlineAt?: string;
+  deadlinePrecision?: FocusDeadlinePrecision;
   eventType?: FocusEventType;
   priority: FocusPriority;
   summary: string;
@@ -170,6 +175,7 @@ export const DailyFocusEventSchema = z.object({
   sourceFiles: z.array(FocusReasoningFileSchema).optional(),
   sourceLinks: z.array(FocusSourceLinkSchema).optional(),
   deadlineAt: z.string().optional(),
+  deadlinePrecision: z.enum(FOCUS_DEADLINE_PRECISIONS).optional(),
   eventType: z.enum(FOCUS_EVENT_TYPES).optional(),
   priority: z.enum(FOCUS_PRIORITIES).catch("potential" as const),
   summary: z.string(),
@@ -181,7 +187,7 @@ export const DailyFocusEventSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Snapshot (顶层快照 — 每次执行生成一个)
+// Snapshot (top-level snapshot — generated once per execution)
 // ---------------------------------------------------------------------------
 
 export interface DailyFocusSnapshot {
@@ -232,7 +238,7 @@ const GENERIC_DAILY_FOCUS_SUMMARY_RE =
 export function buildDailyFocusHistorySummary(
   events: DailyFocusEvent[] | null | undefined,
 ): string {
-  if (!events || events.length === 0) return "今日暂无聚焦事项";
+  if (!events || events.length === 0) return "No focus items today";
 
   const urgent = events.filter((event) => event.priority === "urgent");
   const highPriority = events.filter(
@@ -249,20 +255,21 @@ export function buildDailyFocusHistorySummary(
     .filter((topic): topic is string => Boolean(topic))
     .slice(0, 2);
 
-  if (topics.length === 0) return "今日暂无明确重点";
+  if (topics.length === 0) return "No clear focus today";
 
   const prefix =
     urgent.length > 0
       ? urgent.some((event) => event.isDeadlineToday)
-        ? "今日截止"
-        : "需优先处理"
+        ? "Due today"
+        : "Needs priority"
       : highPriority.length > 0
-        ? "今日重点"
-        : "今日关注";
+        ? "Today's focus"
+        : "Today's attention";
   const remaining = Math.max(0, pool.length - topics.length);
-  const suffix = remaining > 0 ? `等${pool.length}项` : "";
+  const suffix =
+    remaining > 0 ? ` and ${pool.length - topics.length} more` : "";
 
-  return truncateDailyFocusSummary(`${prefix}：${topics.join("、")}${suffix}`);
+  return truncateDailyFocusSummary(`${prefix}: ${topics.join(", ")}${suffix}`);
 }
 
 export function isGenericDailyFocusSummary(
@@ -298,7 +305,7 @@ function getDailyFocusEventTopic(event: DailyFocusEvent): string | null {
   if (!raw) return null;
 
   return raw
-    .replace(/^(处理|执行|查看|回复|跟进|确认)[：:\s]+/u, "")
+    .replace(/^(handle|execute|view|reply|follow-up|confirm)[：:\s]+/iu, "")
     .replace(/[。.!?？；;，,].*$/u, "")
     .trim()
     .slice(0, 18);

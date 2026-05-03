@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { execSync } from "node:child_process";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { runRenderEnginePreflight } from "./render-engine-preflight.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const isDarwin = os.platform() === "darwin";
@@ -34,6 +35,9 @@ process.chdir(webDir);
 
 console.log("Web directory:", webDir);
 console.log("Working directory:", process.cwd());
+
+console.log("Validating render engine download URL...");
+await runRenderEnginePreflight();
 
 console.log("Creating standalone placeholder for Cargo build...");
 const mkdir = (p) => {

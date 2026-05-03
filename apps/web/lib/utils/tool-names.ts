@@ -67,6 +67,8 @@ export function getToolDisplayName(
       return t("common.toolNames.searchKnowledgeBase");
     case "getFullDocumentContent":
       return t("common.toolNames.getFullDocumentContent");
+    case "listKnowledgeBaseDocuments":
+      return t("common.toolNames.listKnowledgeBaseDocuments");
     case "searchMemoryPath":
       return t("common.toolNames.searchMemoryPath");
     case "getRawMessages":
@@ -142,6 +144,8 @@ export function getToolRunningText(
       return t("common.runningIndicator.runningSearchKnowledgeBase");
     case "getFullDocumentContent":
       return t("common.runningIndicator.runningGetFullDocumentContent");
+    case "listKnowledgeBaseDocuments":
+      return t("common.runningIndicator.runningListKnowledgeBaseDocuments");
     case "searchMemoryPath":
       return t("common.runningIndicator.runningSearchMemoryPath");
     case "getRawMessages":

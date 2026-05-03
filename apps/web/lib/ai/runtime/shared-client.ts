@@ -52,6 +52,7 @@ function getToolDisplayName(toolName: string): string {
     modifyInsight: "Modify Insight",
     searchKnowledgeBase: "Search Knowledge Base",
     getFullDocumentContent: "Get Document",
+    listKnowledgeBaseDocuments: "List Knowledge Base",
     searchMemoryPath: "Search Memory",
     getRawMessages: "Get Raw Messages",
     searchRawMessages: "Search Messages",

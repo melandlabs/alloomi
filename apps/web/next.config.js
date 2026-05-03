@@ -150,9 +150,10 @@ const nextConfig = {
 
   images: {
     // Disable Next.js image optimization to avoid image loading issues in standalone mode
-    // Set minimum cache TTL
-    minimumCacheTTL: 0,
-    unoptimized: true,
+    // Set minimum cache TTL to 7 days
+    minimumCacheTTL: 604800,
+    // Only disable optimization for Tauri builds
+    unoptimized: process.env.IS_TAURI === "true",
     remotePatterns: [
       {
         hostname: "avatar.vercel.sh",

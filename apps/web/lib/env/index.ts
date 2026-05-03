@@ -143,8 +143,3 @@ function maskUrl(url: string): string {
     return url;
   }
 }
-
-// Auto-print configuration info in development environment (server-side only)
-if (process.env.NODE_ENV !== "production" && typeof window === "undefined") {
-  printEnvironmentInfo();
-}

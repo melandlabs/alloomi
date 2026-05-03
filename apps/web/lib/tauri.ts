@@ -503,9 +503,26 @@ export async function restartServer(): Promise<void> {
 
 // ============ Render Engine ============
 
-/**
- * Desktop render engine installed info
- */
+export interface DesktopRuntimeComponentStatus {
+  available: boolean;
+  install_dir: string | null;
+  installed: boolean;
+  downloading: boolean;
+  reason: string | null;
+  error_message: string | null;
+}
+
+export interface DesktopRenderRuntimeStatus {
+  available: boolean;
+  install_dir: string | null;
+  installed: boolean;
+  downloading: boolean;
+  reason: string | null;
+  error_message: string | null;
+  soffice_binary_path: string | null;
+  pdftoppm_binary_path: string | null;
+}
+
 export interface DesktopRenderEngineInstalled {
   version: string;
   installed_at: string;
@@ -515,33 +532,65 @@ export interface DesktopRenderEngineInstalled {
   python_path?: string;
 }
 
-/**
- * Desktop render engine status
- */
 export interface DesktopRenderEngineStatus {
   available: boolean;
   install_dir: string | null;
   installed: boolean;
+  downloading: boolean;
   reason: string | null;
   error_message: string | null;
 }
 
-/**
- * Get render engine status (Tauri specific)
- * Checks if bundled LibreOffice and pdftoppm are available for high-fidelity PPTX rendering
- */
 export async function getRenderEngineStatus(): Promise<DesktopRenderEngineStatus | null> {
   if (!isTauri()) {
     return null;
   }
+  let status: DesktopRenderRuntimeStatus | null = null;
   try {
-    return await invoke<DesktopRenderEngineStatus>(
+    status = await invoke<DesktopRenderRuntimeStatus>(
       "get_render_engine_status_cmd",
     );
   } catch (error) {
     console.error("Failed to get render engine status:", error);
     return null;
   }
+  if (!status) {
+    return null;
+  }
+  return {
+    available: status.available,
+    install_dir: status.install_dir,
+    installed: status.installed,
+    downloading: status.downloading,
+    reason: status.reason,
+    error_message: status.error_message,
+  };
+}
+
+export async function ensureRenderEngineDownloadStarted(): Promise<DesktopRenderEngineStatus | null> {
+  if (!isTauri()) {
+    return null;
+  }
+  let status: DesktopRenderRuntimeStatus | null = null;
+  try {
+    status = await invoke<DesktopRenderRuntimeStatus>(
+      "ensure_render_engine_download_started_cmd",
+    );
+  } catch (error) {
+    console.error("Failed to start render engine download:", error);
+    return null;
+  }
+  if (!status) {
+    return null;
+  }
+  return {
+    available: status.available,
+    install_dir: status.install_dir,
+    installed: status.installed,
+    downloading: status.downloading,
+    reason: status.reason,
+    error_message: status.error_message,
+  };
 }
 
 // ============ Notification ============

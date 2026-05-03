@@ -430,7 +430,13 @@ export async function streamNativeAgentResponse(
           const { done, value } = await reader.read();
 
           if (done) {
-            onDone?.();
+            // Use .then().catch() to handle async onDone callback and catch any rejection
+            // This prevents unhandledRejection when onDone is async and throws
+            Promise.resolve()
+              .then(() => onDone?.())
+              .catch((e) =>
+                console.error("[AgentRouter] onDone callback error:", e),
+              );
             break;
           }
 
@@ -478,11 +484,21 @@ export async function streamNativeAgentResponse(
             i18nKey: "agent.errors.timeout",
             retryable: false,
           };
-          onError?.(timeoutError);
+          // Use .then().catch() to handle async onError callback and catch any rejection
+          Promise.resolve()
+            .then(() => onError?.(timeoutError))
+            .catch((e) =>
+              console.error("[AgentRouter] onError callback error:", e),
+            );
         } else {
           // User-initiated cancellation - silent
           console.log("[AgentRouter] Request was aborted by user");
-          onDone?.();
+          // Use .then().catch() to handle async onDone callback and catch any rejection
+          Promise.resolve()
+            .then(() => onDone?.())
+            .catch((e) =>
+              console.error("[AgentRouter] onDone callback error:", e),
+            );
         }
         return;
       }
@@ -529,7 +545,12 @@ export async function streamNativeAgentResponse(
       // Add error classification to error object for frontend to use
       (enhancedError as any).errorClassification = errorClassification;
 
-      onError?.(enhancedError);
+      // Use .then().catch() to handle async onError callback and catch any rejection
+      Promise.resolve()
+        .then(() => onError?.(enhancedError))
+        .catch((e) =>
+          console.error("[AgentRouter] onError callback error:", e),
+        );
     }
   })();
 

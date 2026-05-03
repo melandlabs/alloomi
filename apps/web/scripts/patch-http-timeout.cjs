@@ -40,8 +40,4 @@ const TIMEOUT = 600000; // 10min
   const OriginalHttpsServer = https.Server;
   https.Server = (...args) => patchServer(new OriginalHttpsServer(...args));
   https.Server.prototype = OriginalHttpsServer.prototype;
-
-  console.log(
-    "[patch-http-timeout] HTTP/HTTPS server timeouts patched to 600000ms (10min)",
-  );
 })();

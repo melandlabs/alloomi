@@ -368,6 +368,10 @@ export function generateInsightPayload(
   const historySummary =
     item.historyInsight !== undefined ? (item.historyInsight ?? null) : null;
   const normalizedMyTasks = normalizeTaskCollection(item.myTasks, "myTasks");
+  const normalizedWaitingForMe = normalizeTaskCollection(
+    item.waitingForMe,
+    "waitingForMe",
+  );
 
   // Extract user identity from bot metadata for filtering tasks
   // Only keep tasks where the owner/responder matches the actual user identity
@@ -599,6 +603,7 @@ export function generateInsightPayload(
         ? (item.actionRequiredDetails ?? null)
         : null,
     myTasks: myTasksAfterFilter,
+    waitingForMe: normalizedWaitingForMe,
     waitingForOthers: waitingForOthersAfterFilter,
     clarifyNeeded:
       "clarifyNeeded" in item ? (item.clarifyNeeded ?? null) : null,

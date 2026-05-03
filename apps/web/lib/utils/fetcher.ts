@@ -4,12 +4,14 @@ import { formatISO } from "date-fns";
 import type { Session } from "next-auth";
 import { getAuthToken } from "@/lib/auth/token-manager";
 import type { DBMessage } from "@/lib/db/schema";
+import { getUserTimezoneHeaders } from "@/lib/timezone";
 
 /**
  * Basic fetcher for API calls
  */
 export const fetcher = async (url: string) => {
   const response = await fetch(url, {
+    headers: getUserTimezoneHeaders(),
     credentials: "include",
   });
 
@@ -30,6 +32,7 @@ export const fetcherWithCloudAuth: typeof fetcher = async (url) => {
 
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...getUserTimezoneHeaders(),
   };
 
   if (cloudAuthToken) {
@@ -60,6 +63,9 @@ export async function fetchWithAuth(
   const cloudAuthToken = typeof window !== "undefined" ? getAuthToken() : null;
 
   const headers = new Headers(init?.headers);
+  for (const [key, value] of Object.entries(getUserTimezoneHeaders())) {
+    if (!headers.has(key)) headers.set(key, value);
+  }
 
   if (
     init?.body &&
@@ -132,8 +138,9 @@ export function judgeGuest(session: Session) {
 }
 
 /**
- * Get the home path for navigation.
+ * Get the home path based on character tab mode.
+ * In character tab mode, returns "/character", otherwise returns "/".
  */
 export function getHomePath(): string {
-  return "/";
+  return "/character";
 }
