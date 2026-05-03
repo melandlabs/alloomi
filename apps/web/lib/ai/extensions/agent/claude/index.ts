@@ -56,6 +56,7 @@ import {
   PDF_MAX_SIZE_MB,
   PREFER_NATIVE_PDF,
 } from "@/lib/files/config";
+import { filterToolCallText } from "@alloomi/shared";
 import { generateUUID } from "@/lib/utils";
 import { estimateTokens } from "@/lib/ai";
 import {
@@ -1075,7 +1076,32 @@ async function saveFileAttachments(
  * Get instruction for using business tools properly
  * This helps Agent understand when to use business tools vs file operations
  */
-function getBusinessToolsInstruction(): string {
+function getBusinessToolsInstruction(excludeTools?: string[]): string {
+  const excludeSet = new Set(excludeTools ?? []);
+  const createScheduledJobInstruction = excludeSet.has("createScheduledJob")
+    ? ""
+    : `
+7. **createScheduledJob** - Use when user asks for RECURRING or SCHEDULED tasks:
+   - "Do this every few hours..." / "Every few hours..."
+   - "Remind me every morning..." / "Daily reminder..."
+   - "Run this task every week..." / "Weekly task..."
+   - "Check every hour..." / "Hourly check..."
+   - "Send notification periodically..." / "Schedule notification..."
+   - "Every hour, daily, weekly..." / "Recurring schedule..."
+   - "Every X time..." / "Custom interval..."
+
+   **Schedule types:**
+   - cron: Use cron expressions (e.g., '0 * * * *' for every hour, '0 9 * * *' for daily at 9am)
+   - interval: Simple interval in minutes (e.g., minutes: 60 for every hour)
+   - once: One-time execution at specific time
+
+   **CRITICAL: The 'description' field MUST preserve the user's exact original request:**
+   - Keep the platform name (Telegram, Slack, Email, etc.)
+   - Keep the recipient identity (user says 'me', use 'me' NOT 'user')
+   - Keep the specific action/content
+   - Use user's original language and wording
+`;
+
   return `
 === BUSINESS TOOLS GUIDELINE ===
 
@@ -1116,26 +1142,7 @@ When user asks questions about their tasks, schedule, or chat history, ALWAYS us
    - "Remember this" / "Note this"
    - "I want to track this" / "Track this"
    ⚠️ DO NOT use createInsight to update an existing tracking — use modifyInsight instead!
-
-7. **createScheduledJob** - Use when user asks for RECURRING or SCHEDULED tasks:
-   - "Do this every few hours..." / "Every few hours..."
-   - "Remind me every morning..." / "Daily reminder..."
-   - "Run this task every week..." / "Weekly task..."
-   - "Check every hour..." / "Hourly check..."
-   - "Send notification periodically..." / "Schedule notification..."
-   - "Every hour, daily, weekly..." / "Recurring schedule..."
-   - "Every X time..." / "Custom interval..."
-
-   **Schedule types:**
-   - cron: Use cron expressions (e.g., '0 * * * *' for every hour, '0 9 * * *' for daily at 9am)
-   - interval: Simple interval in minutes (e.g., minutes: 60 for every hour)
-   - once: One-time execution at specific time
-
-   **CRITICAL: The 'description' field MUST preserve the user's exact original request:**
-   - Keep the platform name (Telegram, Slack, Email, etc.)
-   - Keep the recipient identity (user says 'me', use 'me' NOT 'user')
-   - Keep the specific action/content
-   - Use user's original language and wording
+${createScheduledJobInstruction}
 
 8. **modifyInsight** - Use when:
    - User wants to **update an existing insight/tracking** (e.g., "update the progress", "add an update", "log a new event")
@@ -1476,22 +1483,8 @@ export class ClaudeAgent extends BaseAgent {
   private buildSettingSources(
     skillsConfig?: SkillsConfig,
   ): ("user" | "project")[] {
-    // If skills are globally disabled, use empty array to disable all filesystem settings
-    if (skillsConfig && !skillsConfig.enabled) {
-      return ["project"];
-    }
-
-    // When custom API is explicitly configured (baseUrl + apiKey), return empty array
-    // This completely disables SDK from reading ~/.claude/settings.json
-    // SDK will only use env config (ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
-    if (this.isUsingCustomApi()) {
-      return ["project"];
-    }
-
-    // Default case: use both 'user' and 'project' to load skills from ~/.claude/skills/
-    // (which we sync from ~/.alloomi/skills/ on agent creation)
-    logger.info("[ClaudeAgent] Using user + project sources for skills");
-    return ["user", "project"];
+    // Default case: only use the project settings
+    return ["project"];
   }
 
   /**
@@ -1673,7 +1666,7 @@ export class ClaudeAgent extends BaseAgent {
     // Format all messages first
     const allFormattedMessages = conversation.map((msg) => {
       const role = msg.role === "user" ? "User" : "Assistant";
-      let messageContent = `${role}: ${msg.content}`;
+      let messageContent = `${role}: ${typeof msg.content === "string" ? filterToolCallText(msg.content) : msg.content}`;
 
       // Include image references if present
       // Note: Images are sent as content blocks to the LLM, so they're already visible
@@ -2045,7 +2038,7 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
       env: envConfig,
       model: this.config.model,
       pathToClaudeCodeExecutable: claudeCodePath,
-      maxTurns: 200, // Allow more agentic turns before stopping
+      maxTurns: 1000, // Allow more agentic turns before stopping
       // Enable includePartialMessages for streaming output (disabled by default, used for Telegram/WhatsApp)
       includePartialMessages: options?.stream ?? false,
       // Enable debug mode (only in development)
@@ -2059,7 +2052,7 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
       // Enable Anthropic prompt caching for system prompt to reduce redundant input token costs
       // cache_control: { type: "ephemeral" } caches the static business tools instruction block
       // with a 5-minute TTL, saving 60-90% of input tokens for repeated turns (#1496)
-      systemPrompt: getBusinessToolsInstruction(),
+      systemPrompt: getBusinessToolsInstruction(options?.excludeTools),
 
       // Add canUseTool callback if permissionMode is not bypassPermissions
       ...(options?.permissionMode &&
@@ -2157,6 +2150,9 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
           options.authToken, // Pass cloud auth token for embeddings API
           options?.onInsightChange,
           options.sessionId, // Pass sessionId as chatId for insight association
+          {
+            excludeTools: options?.excludeTools,
+          },
         );
         // Add business tools to allowed tools
         queryOptions.allowedTools = [
@@ -2179,8 +2175,12 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
           "getRawMessages",
           "searchRawMessages",
           "getFullDocumentContent",
+          "listKnowledgeBaseDocuments",
           "downloadInsightAttachment",
           "time",
+          ...(options?.executionReport?.enabled
+            ? ["submitExecutionReport"]
+            : []),
         ];
       } catch (error) {
         logger.error(
@@ -2227,12 +2227,18 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
 
       // Track whether we've sent text via stream_event to avoid duplication
       let hasStreamedText = false;
+      let queryMessageCount = 0;
 
       for await (const message of query({
         prompt: queryPrompt,
         options: queryOptions,
       })) {
-        if (session.abortController.signal.aborted) break;
+        if (session.abortController.signal.aborted) {
+          console.log(
+            `[Claude ${session.id}] query() abort signal detected, breaking loop`,
+          );
+          break;
+        }
 
         for (const agentMessage of this.processMessage(
           message,
@@ -2256,7 +2262,12 @@ ${formattedMessages}${truncationNotice}\n\n---\n## Current Request\n`;
         if ((message as { type?: string }).type === "assistant") {
           hasStreamedText = false;
         }
+
+        queryMessageCount++;
       }
+      console.log(
+        `[Claude ${session.id}] query() for-await loop completed normally. Total SDK messages: ${queryMessageCount}`,
+      );
     } catch (error) {
       // Log detailed error information to file for debugging
       const errorMessage =
@@ -3005,7 +3016,7 @@ If you need to create any files during planning, use this directory.
       env: envConfig,
       model: this.config.model,
       pathToClaudeCodeExecutable: claudeCodePath,
-      maxTurns: 200, // Allow more agentic turns before stopping
+      maxTurns: 1000, // Allow more agentic turns before stopping
       // Enable includePartialMessages for streaming output
       includePartialMessages: true,
       // Capture stderr for debugging
@@ -3118,6 +3129,9 @@ If you need to create any files during planning, use this directory.
           options.authToken,
           options?.onInsightChange,
           options.sessionId, // Pass sessionId as chatId for insight association
+          {
+            excludeTools: options.excludeTools,
+          },
         );
         // Add business tools to allowed tools
         queryOptions.allowedTools = [
@@ -3140,8 +3154,12 @@ If you need to create any files during planning, use this directory.
           "getRawMessages",
           "searchRawMessages",
           "getFullDocumentContent",
+          "listKnowledgeBaseDocuments",
           "downloadInsightAttachment",
           "time",
+          ...(options.executionReport?.enabled
+            ? ["submitExecutionReport"]
+            : []),
         ];
         logger.info(
           `[Claude ${session.id}] Execute: Business tools MCP server loaded with user session`,
@@ -3332,6 +3350,21 @@ If you need to create any files during planning, use this directory.
             messageId: this.generateMessageId(),
           };
         }
+      }
+
+      // Handle thinking delta (extended thinking)
+      // Note: SDK uses "thinking_delta" type, not "reasoning_delta"
+      if (
+        event.type === "content_block_delta" &&
+        (event.delta as { type?: string; thinking?: string })?.type ===
+          "thinking_delta" &&
+        (event.delta as { thinking?: string }).thinking
+      ) {
+        yield {
+          type: "reasoning",
+          content: (event.delta as { thinking?: string }).thinking,
+          messageId: this.generateMessageId(),
+        };
       }
 
       // content_block_start -- tool_use starts streaming

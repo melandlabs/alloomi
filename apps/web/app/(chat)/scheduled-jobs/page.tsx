@@ -96,9 +96,6 @@ export default function ScheduledJobsPage() {
             <AutomationTabsList
               value={activeTab}
               onValueChange={setActiveTab}
-              tauriEnv={tauriEnv}
-              panelRef={panelRef}
-              agentTabRef={agentTabRef}
             />
           </PageSectionHeader>
 

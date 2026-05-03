@@ -983,6 +983,7 @@ export default function ScheduledJobDetailPage() {
    */
   const handleExecute = useCallback(async () => {
     if (!job) return;
+    if (executing) return;
     setExecuting(true);
     try {
       const response = await fetch(

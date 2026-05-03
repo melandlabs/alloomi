@@ -18,7 +18,7 @@ import {
 } from "../env/constants";
 import { getCloudAuthToken } from "@/lib/auth/token-manager";
 import { db } from "../db/index";
-import { characters } from "../db/schema";
+import { characters, jobExecutions, scheduledJobs } from "../db/schema";
 import { eq } from "drizzle-orm";
 import type { ScheduledJob } from "@/lib/db/schema";
 
@@ -75,7 +75,7 @@ export async function startLocalScheduler() {
 /**
  * Stop the local scheduler
  */
-export function stopLocalScheduler() {
+export async function stopLocalScheduler() {
   if (schedulerInterval) {
     clearInterval(schedulerInterval);
     schedulerInterval = null;
@@ -83,13 +83,79 @@ export function stopLocalScheduler() {
   }
   // Clear running jobs to prevent stuck entries on shutdown
   runningJobs.clear();
+
+  // Update database to mark all running jobs as interrupted
+  const now = new Date();
+  const running = await db
+    .select()
+    .from(jobExecutions)
+    .where(eq(jobExecutions.status, "running"));
+
+  for (const exec of running) {
+    await db
+      .update(jobExecutions)
+      .set({
+        status: "interrupted",
+        completedAt: now,
+        error: "Job was interrupted (application closed)",
+      })
+      .where(eq(jobExecutions.id, exec.id));
+
+    await db
+      .update(scheduledJobs)
+      .set({
+        lastStatus: "error",
+        lastError: "Job was interrupted (application closed)",
+        updatedAt: now,
+      })
+      .where(eq(scheduledJobs.id, exec.jobId));
+  }
+
+  if (running.length > 0) {
+    console.log(
+      `[LocalScheduler] Marked ${running.length} running jobs as interrupted`,
+    );
+  }
 }
 
 // Register cleanup on process exit to prevent jobs from being stuck in runningJobs
 // This handles unexpected crashes or process termination
 if (typeof process !== "undefined" && process.on) {
-  const cleanupHandler = () => {
+  const cleanupHandler = async () => {
     runningJobs.clear();
+
+    // Update database to mark all running jobs as interrupted
+    const now = new Date();
+    const running = await db
+      .select()
+      .from(jobExecutions)
+      .where(eq(jobExecutions.status, "running"));
+
+    for (const exec of running) {
+      await db
+        .update(jobExecutions)
+        .set({
+          status: "interrupted",
+          completedAt: now,
+          error: "Job was interrupted (application closed)",
+        })
+        .where(eq(jobExecutions.id, exec.id));
+
+      await db
+        .update(scheduledJobs)
+        .set({
+          lastStatus: "error",
+          lastError: "Job was interrupted (application closed)",
+          updatedAt: now,
+        })
+        .where(eq(scheduledJobs.id, exec.jobId));
+    }
+
+    if (running.length > 0) {
+      console.log(
+        `[LocalScheduler] Marked ${running.length} running jobs as interrupted`,
+      );
+    }
   };
   process.on("exit", cleanupHandler);
 }
@@ -228,7 +294,7 @@ async function checkAndExecuteDueJobs() {
               });
             } catch (e) {
               console.error(
-                `[LocalScheduler] Failed to complete job execution record:`,
+                "[LocalScheduler] Failed to complete job execution record:",
                 e,
               );
               // Ensure job is removed from running set to prevent permanent stuck state

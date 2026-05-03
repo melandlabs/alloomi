@@ -136,6 +136,13 @@ export async function POST(
         return NextResponse.json({ error: "Job not found" }, { status: 404 });
       }
 
+      if (job.lastStatus === "running") {
+        return NextResponse.json(
+          { error: "Job is already running" },
+          { status: 409 },
+        );
+      }
+
       console.log("[ScheduledJobs] Job details:", {
         id: job.id,
         name: job.name,
@@ -161,6 +168,7 @@ export async function POST(
         executionId: crypto.randomUUID(),
         triggeredBy: "manual" as const,
         ...(characterIdFromJob && { characterId: characterIdFromJob }),
+        timezone: job.timezone,
         modelConfig: {
           baseUrl: AI_PROXY_BASE_URL,
           ...(body.modelConfig || {}),
@@ -278,9 +286,14 @@ export async function POST(
             error: error instanceof Error ? error.message : String(error),
             output: "",
             duration: 0,
-          }).catch((dbError) => {
-            console.error("[ScheduledJobs] Failed to mark as error:", dbError);
-          });
+          })
+            .then(() => {})
+            .catch((dbError) => {
+              console.error(
+                "[ScheduledJobs] Failed to mark as error:",
+                dbError,
+              );
+            });
         });
 
       // Return immediately with execution ID

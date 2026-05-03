@@ -142,6 +142,23 @@ export async function getJob(userId: string, jobId: string) {
   if (typeof job.jobConfig === "string") {
     (job as any).jobConfig = deserializeJson(job.jobConfig);
   }
+
+  // Auto-fix stuck jobs: if status is running but exceeded timeout, mark as error
+  if (job.lastStatus === "running" && job.lastRunAt) {
+    const elapsed = Date.now() - new Date(job.lastRunAt).getTime();
+    if (elapsed > DEFAULT_JOB_TIMEOUT_MS) {
+      await db
+        .update(scheduledJobs)
+        .set({
+          lastStatus: "error",
+          lastError: "Job was stuck in running state, auto-marked as error",
+          updatedAt: new Date(),
+        })
+        .where(eq(scheduledJobs.id, jobId));
+      job.lastStatus = "error";
+    }
+  }
+
   return job;
 }
 
@@ -358,6 +375,7 @@ export async function toggleJob(
 
 /**
  * Get jobs due to run for a specific user
+ * Also auto-recovers stuck jobs (lastStatus=running but nextRunAt in the past)
  */
 export async function getDueJobs(now: Date = new Date(), userId?: string) {
   const conditions = userId
@@ -369,6 +387,48 @@ export async function getDueJobs(now: Date = new Date(), userId?: string) {
     .from(scheduledJobs)
     .where(conditions)
     .orderBy(asc(scheduledJobs.nextRunAt));
+
+  // Auto-recover stuck jobs: those with lastStatus=running but nextRunAt in the past
+  // This handles cases where executeJob completed but failed to update scheduledJobs
+  for (const job of jobs) {
+    if (job.lastStatus === "running" && job.nextRunAt && job.nextRunAt <= now) {
+      console.log(
+        `[getDueJobs] Found stuck job ${job.id} (${job.name}), auto-recovering`,
+      );
+
+      // Compute new nextRunAt
+      let newNextRun: Date | null = null;
+      if (
+        job.scheduleType === "interval-minutes" ||
+        job.scheduleType === "interval"
+      ) {
+        const minutes = job.intervalMinutes || 60;
+        newNextRun = computeNextRun({ type: "interval-minutes", minutes }, now);
+      } else if (job.scheduleType === "interval-hours") {
+        const hours = Math.floor((job.intervalMinutes || 60) / 60);
+        newNextRun = computeNextRun({ type: "interval-hours", hours }, now);
+      } else if (job.scheduleType === "cron" && job.cronExpression) {
+        newNextRun = computeNextRun(
+          {
+            type: "cron",
+            expression: job.cronExpression,
+            timezone: job.timezone,
+          },
+          now,
+        );
+      }
+
+      await db
+        .update(scheduledJobs)
+        .set({
+          lastStatus: "error",
+          lastError:
+            "Job was stuck in running state, auto-recovered by scheduler",
+          nextRunAt: newNextRun,
+        })
+        .where(eq(scheduledJobs.id, job.id));
+    }
+  }
 
   return jobs.filter(
     (job: { nextRunAt: Date | null; lastStatus: string | null }) =>
@@ -433,15 +493,6 @@ export async function completeJobExecution(
   result: JobExecutionResult,
 ) {
   const completedAt = new Date();
-
-  // Log result for debugging
-  console.log("[completeJobExecution] Saving execution result:", {
-    executionId: context.executionId,
-    status: result.status,
-    resultObject: result.result,
-    hasChatId: !!result.result?.chatId,
-    chatId: result.result?.chatId,
-  });
 
   // Step 1: Update execution record
   try {
@@ -692,8 +743,17 @@ export async function cleanupStuckJobs(): Promise<number> {
     return 0;
   }
 
-  // Directly delete these zombie records without modifying scheduled_jobs
+  // First update scheduled_jobs to error status, then delete the zombie execution records
   for (const execution of stuckExecutions) {
+    await db
+      .update(scheduledJobs)
+      .set({
+        lastStatus: "error",
+        lastError: "Job execution was cleaned up as zombie (stuck > 2 hours)",
+        updatedAt: now,
+      })
+      .where(eq(scheduledJobs.id, execution.jobId));
+
     await db.delete(jobExecutions).where(eq(jobExecutions.id, execution.id));
   }
 

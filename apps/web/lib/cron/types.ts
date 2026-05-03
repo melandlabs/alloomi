@@ -97,6 +97,7 @@ export interface ExecuteJobOptions {
   userMessageId?: string;
   assistantMessageId?: string;
   onAgentEvent?: (event: JobAgentStreamEvent) => void | Promise<void>;
+  abortController?: AbortController;
 }
 
 /**

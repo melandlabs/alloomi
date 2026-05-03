@@ -9,11 +9,7 @@ import type {
   JobExecutionResult,
   JobExecutionContext,
 } from "./types";
-import {
-  prepareConversationWindows,
-  triggerCompactionAsync,
-  type CompactionPlatform,
-} from "@/lib/ai";
+import { prepareConversationWindows } from "@/lib/ai";
 import { preprocessCompactionMessages } from "@alloomi/ai/agent";
 import { formatAgentStreamErrorForUser } from "@/lib/ai/runtime/format-error";
 import {
@@ -22,7 +18,6 @@ import {
   getMessageById,
   updateMessageFileMetadata,
   saveChatInsights,
-  replaceMessagesWithCompactionSummary,
 } from "@/lib/db/queries";
 import { db } from "../db/index";
 import {
@@ -33,9 +28,20 @@ import {
   scheduledJobs,
 } from "../db/schema";
 import { desc, eq } from "drizzle-orm";
+import { mkdirSync } from "node:fs";
 import { generateUUID } from "@/lib/utils";
 import { stripMalformedToolCalls } from "@/lib/utils/tool-names";
-import type { ReasoningFile } from "@/lib/types/execution-result";
+import {
+  buildStructuredExecutionReport,
+  parseStructuredOutput,
+  type ExecutionTraceEvent,
+  type ReasoningFile,
+  type StructuredExecutionOutput,
+} from "@/lib/types/execution-result";
+import {
+  reconcileExecutionArtifacts,
+  type ArtifactToolPart,
+} from "./artifact-reconciliation";
 import { getAllFilesAtPathWithSize } from "@/lib/files/workspace/sessions";
 import { platform, homedir } from "node:os";
 import { join } from "node:path";
@@ -45,6 +51,11 @@ import { DEFAULT_AI_MODEL, AI_PROXY_BASE_URL } from "@/lib/env/constants";
 
 const MAX_JOB_HISTORY_TOKENS = 20_000;
 const JOB_HISTORY_LIMIT = 100;
+const SUBMIT_EXECUTION_REPORT_TOOL = "submitExecutionReport";
+
+// Reason passed to AbortController.abort() to distinguish between user stop and client disconnect
+export const REASON_USER_STOPPED = "user_stopped";
+const REASON_CLIENT_DISCONNECT = "client_disconnect";
 
 // Registry for custom job handlers
 export const customJobHandlers: Record<
@@ -87,6 +98,28 @@ function stringifyToolPayload(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function buildSchedulerWorkspaceOverride(
+  messageText: string,
+  sessionDir: string,
+): string {
+  return `[Scheduler Workspace Override]
+The current working directory is already the execution output directory:
+${sessionDir}
+
+This instruction overrides any generic workspace instruction that asks you to recreate or hand-copy the full ~/.alloomi/sessions path.
+
+File output rules for this scheduled execution:
+- Do NOT run mkdir for ~/.alloomi/sessions/...; the runtime has already created the output directory.
+- Do NOT manually reconstruct chatId/executionId paths.
+- Save final deliverables directly in the current working directory using short paths such as "report.md", "output.html", or "analysis.xlsx".
+- Save temporary scripts under "temp/" using short paths such as "temp/script.py".
+- In scripts, use the current working directory as OUTPUT_DIR: os.getcwd() in Python, process.cwd() in Node.js.
+- If a tool absolutely requires an absolute file path, use the current working directory exactly as provided above and append only the filename; do not alter any UUID/path segment.
+
+User task:
+${messageText}`;
 }
 
 function buildToolUseContent(part: Record<string, unknown>): string {
@@ -401,6 +434,17 @@ After calling chatInsight with withDetail=true, if any insights have attachments
     // Use jobId as chatId - all executions of the same job share the same chat
     // This allows the agent to maintain context across executions
     const chatId = context.jobId;
+    const sessionDir = join(
+      homedir(),
+      APP_DIR_NAME,
+      "sessions",
+      chatId,
+      context.executionId,
+    );
+    const agentPrompt = buildSchedulerWorkspaceOverride(
+      messageText,
+      sessionDir,
+    );
 
     // Build model config for agent
     // Use default proxy baseUrl instead of database-stored config.modelConfig.baseUrl
@@ -442,6 +486,32 @@ After calling chatInsight with withDetail=true, if any insights have attachments
 
     const sessionId = chatId; // Use jobId as sessionId
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+    // Get user settings before building prompts so structured output follows
+    // the same language as the user's configured assistant language.
+    const { getUserInsightSettings } = await import("@/lib/db/queries");
+    const userSettings = context.userId
+      ? await getUserInsightSettings(context.userId)
+      : null;
+    const userLanguage = userSettings?.language ?? null;
+    const useEnglishOutput =
+      userLanguage?.toLowerCase().startsWith("en") ?? false;
+    const structuredOutputLanguage = useEnglishOutput
+      ? "English"
+      : "Simplified Chinese";
+    const traceTitles = useEnglishOutput
+      ? {
+          taskReceived: "Task received",
+          executionError: "Execution error",
+          executionFailed: "Execution failed",
+          executionCompleted: "Execution completed",
+        }
+      : {
+          taskReceived: "接收任务",
+          executionError: "执行异常",
+          executionFailed: "执行失败",
+          executionCompleted: "执行完成",
+        };
 
     // Determine platform for system notifications
     const osPlatform = platform();
@@ -595,19 +665,25 @@ ${characterContextSection}`,
     );
 
     let lastTextContent = ""; // Track only the last text for output
+    let submittedStructuredData: StructuredExecutionOutput | undefined;
+    const internalToolUseIds = new Set<string>();
     let hasError = false;
     let errorMessage = "";
+    const executionToolParts: ArtifactToolPart[] = [];
+    const executionToolPartsById = new Map<string, ArtifactToolPart>();
+    const traceEvents: ExecutionTraceEvent[] = [
+      {
+        type: "task_received",
+        title: traceTitles.taskReceived,
+        detail: jobDescription || config.handler || context.jobId,
+        timestamp: new Date().toISOString(),
+      },
+    ];
 
     try {
       // Get job name for chat title
       const { getJob } = await import("@/lib/cron/service");
       const job = await getJob(context.userId, context.jobId);
-
-      // Get user settings (including aiSoulPrompt and language)
-      const { getUserInsightSettings } = await import("@/lib/db/queries");
-      const userSettings = context.userId
-        ? await getUserInsightSettings(context.userId)
-        : null;
 
       // Pull the newest rows first to keep the history query bounded, then
       // restore chronological order before windowing/compaction.
@@ -706,76 +782,6 @@ ${characterContextSection}`,
         ),
       ].sort(compareJobHistoryMessages);
 
-      if (
-        safeCompactionCandidates.length > 10 &&
-        preparedHistory.level &&
-        authToken
-      ) {
-        const preprocessedCandidates = preprocessCompactionMessages(
-          safeCompactionCandidates.map(({ role, content, messageType }) => ({
-            role,
-            type: messageType,
-            content,
-          })),
-        );
-
-        if (preprocessedCandidates.flattened.length > 0) {
-          void triggerCompactionAsync({
-            messages: preprocessedCandidates.flattened.map(
-              ({ role, content }) => ({
-                role,
-                content,
-              }),
-            ),
-            level: preparedHistory.level,
-            platform: "scheduler" as CompactionPlatform,
-            authToken,
-            persistSummary: async (result) => {
-              const candidateTimestamps = safeCompactionCandidates
-                .map((message) => message.timestamp)
-                .filter(
-                  (timestamp): timestamp is number => timestamp !== undefined,
-                );
-              const createdAt =
-                candidateTimestamps.length > 0
-                  ? new Date(Math.max(...candidateTimestamps))
-                  : new Date();
-              const rangeStart =
-                candidateTimestamps.length > 0
-                  ? new Date(Math.min(...candidateTimestamps))
-                      .toISOString()
-                      .slice(0, 10)
-                  : new Date().toISOString().slice(0, 10);
-              const rangeEnd =
-                candidateTimestamps.length > 0
-                  ? new Date(Math.max(...candidateTimestamps))
-                      .toISOString()
-                      .slice(0, 10)
-                  : new Date().toISOString().slice(0, 10);
-
-              await replaceMessagesWithCompactionSummary({
-                chatId,
-                messageIds: [
-                  ...new Set(
-                    safeCompactionCandidates.map(
-                      ({ sourceMessageId }) => sourceMessageId,
-                    ),
-                  ),
-                ],
-                summary: result.summary,
-                createdAt,
-                compactedMessageCount: result.messageCount,
-                compactedRangeStart: rangeStart,
-                compactedRangeEnd: rangeEnd,
-                level: result.level,
-              });
-            },
-          }).catch((error) => {
-            console.error("[JobExecutor] Async compaction failed:", error);
-          });
-        }
-      }
-
       const preprocessedHistory = preprocessCompactionMessages(
         safeImmediateHistory.map(({ role, content, messageType }) => ({
           role,
@@ -784,8 +790,8 @@ ${characterContextSection}`,
         })),
       );
 
-      // Skip historical compaction messages to avoid context overflow
-      // Historical messages are handled asynchronously by triggerCompactionAsync
+      // Historical messages are excluded from the runtime conversation to avoid
+      // context overflow
       const runtimeConversation: Array<{
         role: "user" | "assistant";
         content: string;
@@ -827,8 +833,11 @@ ${characterContextSection}`,
       // Run the agent with timeout
       // Use bypassPermissions mode - same as normal execution
       // Use stream: false for non-streaming mode (reference handleAgentRuntime in shared.ts)
-      const generator = agent.run(messageText, {
+      mkdirSync(sessionDir, { recursive: true });
+      mkdirSync(join(sessionDir, "temp"), { recursive: true });
+      const generator = agent.run(agentPrompt, {
         sessionId,
+        cwd: sessionDir,
         taskId: `${chatId}/${context.executionId}`, // Each execution uses an independent sub-directory to prevent file overwrite
         conversation: runtimeConversation,
         permissionMode: "bypassPermissions", // Full permissions for scheduled tasks
@@ -850,6 +859,13 @@ ${characterContextSection}`,
           : (userSettings?.aiSoulPrompt ?? null),
         language: userSettings?.language ?? null,
         timezone: context.timezone ?? null,
+        executionReport: {
+          enabled: true,
+          onSubmit: (report) => {
+            submittedStructuredData = report as StructuredExecutionOutput;
+          },
+        },
+        abortController: options?.abortController,
       });
 
       // Track messages for real-time saving and final output
@@ -903,12 +919,35 @@ ${characterContextSection}`,
       };
 
       for await (const message of generator) {
+        // Check if execution was aborted
+        if (options?.abortController?.signal?.aborted) {
+          const reason = options.abortController.signal.reason as string;
+          // If abort reason is "client_disconnect" (page refresh/close), don't treat as error
+          if (reason === REASON_CLIENT_DISCONNECT) {
+            break;
+          }
+          hasError = true;
+          errorMessage =
+            reason === REASON_USER_STOPPED
+              ? "Execution stopped by user"
+              : "Execution aborted by user";
+          break;
+        }
+
         // Check timeout
         if (Date.now() - startTime > timeout) {
           console.error("[JobExecutor] Agent execution timeout");
           hasError = true;
           errorMessage = "Agent execution timeout (1200 minutes)";
           break;
+        }
+
+        if (
+          message.type === "tool_result" &&
+          message.toolUseId &&
+          internalToolUseIds.has(message.toolUseId)
+        ) {
+          continue;
         }
 
         // Check tool call count
@@ -933,16 +972,22 @@ ${characterContextSection}`,
           // With stream: false, text messages are complete (not incremental deltas)
           // Use the complete text directly without accumulation
           const textContent = message.content || "";
+          const { cleanText: displayText } = parseStructuredOutput(textContent);
+          const sanitizedText = stripMalformedToolCalls(displayText);
 
           lastTextContent = textContent;
-          await options?.onAgentEvent?.({
-            type: "text",
-            content: textContent,
-            messageId: currentMessageId,
-          });
+          if (sanitizedText) {
+            await options?.onAgentEvent?.({
+              type: "text",
+              content: sanitizedText,
+              messageId: currentMessageId,
+            });
+          }
 
           // Save complete text message
-          currentParts.push({ type: "text", text: textContent });
+          if (sanitizedText) {
+            currentParts.push({ type: "text", text: sanitizedText });
+          }
           await saveCurrentAssistantMessage();
           resetCurrentMessage();
         } else if (message.type === "tool_use") {
@@ -954,13 +999,16 @@ ${characterContextSection}`,
             console.log("[JobExecutor] Skipping tool_use - no message id");
           } else {
             // Add tool call to current parts (same message)
-            currentParts.push({
+            const toolPart = {
               type: "tool-native",
               toolName: message.name || "",
               toolUseId: message.id,
               toolInput: message.input,
               status: "executing",
-            });
+            };
+            currentParts.push(toolPart);
+            executionToolParts.push(toolPart);
+            executionToolPartsById.set(message.id, toolPart);
 
             // Save immediately
             await saveCurrentAssistantMessage();
@@ -983,6 +1031,13 @@ ${characterContextSection}`,
               isError: message.isError,
               messageId: currentMessageId,
             });
+            const trackedToolPart = executionToolPartsById.get(
+              message.toolUseId,
+            );
+            if (trackedToolPart) {
+              trackedToolPart.toolOutput = message.output;
+              trackedToolPart.isError = message.isError;
+            }
             // Find and update the tool-native part in currentParts
             let found = false;
             currentParts = currentParts.map((part) => {
@@ -1086,6 +1141,20 @@ ${characterContextSection}`,
         }
       }
 
+      // If we exited the loop due to abort, ensure hasError is set
+      // This handles the case where the generator ended without throwing an error
+      if (!hasError && options?.abortController?.signal?.aborted) {
+        const reason = options.abortController.signal.reason as string;
+        // If abort reason is "client_disconnect" (page refresh/close), don't treat as error
+        if (reason !== REASON_CLIENT_DISCONNECT) {
+          hasError = true;
+          errorMessage =
+            reason === REASON_USER_STOPPED
+              ? "Execution stopped by user"
+              : "Execution aborted by user";
+        }
+      }
+
       // Save any remaining message
       await saveCurrentAssistantMessage();
 
@@ -1104,23 +1173,45 @@ ${characterContextSection}`,
         }
       }
     } catch (error) {
+      // Check if this is an abort error with client_disconnect reason
+      const isAbortError =
+        error instanceof Error && error.name === "AbortError";
+      const abortReason = isAbortError
+        ? ((error as unknown as { reason?: string }).reason ??
+          options?.abortController?.signal.reason)
+        : null;
+
+      // If abort reason is "client_disconnect" (page refresh/close), return early without error
+      if (isAbortError && abortReason === REASON_CLIENT_DISCONNECT) {
+        console.log("[JobExecutor] Execution aborted due to client disconnect");
+        // Return minimal success result - client disconnected, no meaningful output
+        return {
+          status: "success" as const,
+          duration: 0,
+        };
+      }
+
       console.error("[JobExecutor] Native agent execution failed:", error);
       hasError = true;
       errorMessage = error instanceof Error ? error.message : String(error);
     }
 
-    // Compute session directory path (same logic as agent's getSessionWorkDir with taskId)
-    const sessionDir = join(
-      homedir(),
-      APP_DIR_NAME,
-      "sessions",
-      chatId,
-      context.executionId,
-    );
+    // --- Extract structured output from agent response ---
+    const { data: parsedStructuredData, cleanText } =
+      parseStructuredOutput(lastTextContent);
+    const artifactReconciliation = reconcileExecutionArtifacts({
+      sessionDir,
+      sessionsRoot: join(homedir(), APP_DIR_NAME, "sessions"),
+      executionId: context.executionId,
+      toolParts: executionToolParts,
+      finalText: lastTextContent,
+      structuredData: submittedStructuredData ?? parsedStructuredData,
+    });
+    const structuredData = artifactReconciliation.structuredData;
 
     const sessionFiles: ReasoningFile[] = [];
     try {
-      const result = getAllFilesAtPathWithSize(sessionDir);
+      const result = await getAllFilesAtPathWithSize(chatId, sessionDir);
       for (const file of result.files) {
         if (file.isDirectory) continue;
         sessionFiles.push({
@@ -1134,10 +1225,34 @@ ${characterContextSection}`,
       console.warn("[JobExecutor] Failed to scan execution files:", error);
     }
 
+    const structuredReport = buildStructuredExecutionReport({
+      structuredData,
+      cleanText,
+      rawText: lastTextContent,
+      taskText: messageText,
+      traceEvents,
+      sessionFiles,
+      hasError,
+      errorMessage,
+      language: userLanguage,
+    });
+
+    if (structuredReport.diagnostics?.source === "model") {
+      console.log(
+        "[JobExecutor] Parsed structured output from agent response:",
+        JSON.stringify(structuredReport).slice(0, 200),
+      );
+    } else {
+      console.log(
+        "[JobExecutor] Repaired structured execution report:",
+        JSON.stringify(structuredReport).slice(0, 200),
+      );
+    }
+
     const jobResult: JobExecutionResult = {
       status: (hasError ? "error" : "success") as "error" | "success",
-      // Use lastTextContent (structured-output block stripped) for display
-      output: stripMalformedToolCalls(lastTextContent) || "Task completed",
+      // Use cleanText (structured-output block stripped) for display
+      output: stripMalformedToolCalls(cleanText) || "Task completed",
       error: hasError ? errorMessage : undefined,
       result: {
         chatId,

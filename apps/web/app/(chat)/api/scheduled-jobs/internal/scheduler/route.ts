@@ -103,7 +103,7 @@ export async function POST() {
     }
 
     // Stop the scheduler
-    stopLocalScheduler();
+    await stopLocalScheduler();
     schedulerStarted = false;
     console.log("[SchedulerAPI] Scheduler stopped");
 
