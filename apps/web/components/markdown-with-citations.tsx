@@ -9,6 +9,7 @@ import { CodeBlock } from "./code-block";
 import { CitationBadge } from "./citation-badge";
 import type { Insight } from "@/lib/db/schema";
 import { useTranslation } from "react-i18next";
+import { openUrl } from "@/lib/tauri";
 
 /**
  * Process citation markers in text, convert ^[ID]^ or [number] to clickable badges
@@ -268,6 +269,26 @@ function processTextWithFilePaths(
     }
 
     const filePath = match[0];
+    const matchStart = match.index;
+
+    // Detect if match is in a URL context (preceded by ://)
+    const textBeforeMatch = text.slice(
+      Math.max(0, matchStart - 10),
+      matchStart,
+    );
+    const isInUrlContext = /:\/\//.test(textBeforeMatch);
+
+    // If match is in a URL (e.g., https://...), skip preview badge
+    if (isInUrlContext) {
+      parts.push(
+        <React.Fragment key={`text-${keyCounter++}`}>
+          {filePath}
+        </React.Fragment>,
+      );
+      lastIndex = matchStart + filePath.length;
+      match = pathRegex.exec(text);
+      continue;
+    }
 
     // Check if it's a previewable file type (image, code, Markdown, PDF, etc.)
     const fileName = filePath.split(/[/\\]/).pop() || "";
@@ -467,7 +488,7 @@ const baseComponents: Partial<Components> = {
 
     return (
       <p
-        className="mt-0 mb-0 leading-relaxed text-[14px] text-zinc-950 dark:text-zinc-50 min-w-0"
+        className="!mt-0 !mb-0 leading-relaxed text-[14px] text-zinc-950 dark:text-zinc-50 min-w-0"
         {...props}
       >
         {children}
@@ -724,7 +745,7 @@ function NonMemoizedMarkdownWithCitations({
 
       return (
         <p
-          className="mt-0 mb-0 leading-relaxed text-[14px] text-zinc-950 dark:text-zinc-50 min-w-0"
+          className="!mt-0 !mb-0 leading-relaxed text-[14px] text-zinc-950 dark:text-zinc-50 min-w-0"
           {...props}
         >
           {processedChildren}
@@ -1096,13 +1117,24 @@ function NonMemoizedMarkdownWithCitations({
       if (showPreviewButton && previewFileData) {
         return (
           <>
-            <a
-              href={href}
-              className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
-              {...(props as React.ComponentProps<"a">)}
+            <span
+              role="link"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openUrl(href);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openUrl(href);
+                }
+              }}
+              tabIndex={0}
+              className="text-primary hover:underline cursor-pointer"
             >
               {processedChildren}
-            </a>
+            </span>
             <button
               type="button"
               onClick={(e) => {
@@ -1136,13 +1168,24 @@ function NonMemoizedMarkdownWithCitations({
       }
 
       return (
-        <a
-          href={href}
-          className="text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
-          {...(props as React.ComponentProps<"a">)}
+        <span
+          role="link"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openUrl(href);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openUrl(href);
+            }
+          }}
+          tabIndex={0}
+          className="text-primary hover:underline cursor-pointer"
         >
           {processedChildren}
-        </a>
+        </span>
       );
     };
 

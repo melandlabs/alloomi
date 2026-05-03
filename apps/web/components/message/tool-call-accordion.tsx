@@ -4,10 +4,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { getToolDisplayName } from "@/lib/utils/tool-names";
-import {
-  isQueryIntegrationTool,
-  hasNoBotsInResponse,
-} from "@/lib/utils/integration-error-detector";
 
 export interface ToolCallPart {
   key: string;
@@ -66,70 +62,13 @@ export function ToolCallAccordion({
   // Show executing state when expanding/collapsing
   const isExecuting = externalIsExecuting ?? executingCount > 0;
 
-  // Check if any part in the accordion needs a Connect Account button
-  let connectButtonPlatform: string | null = null;
-  for (const part of parts) {
-    if (
-      isQueryIntegrationTool(part.toolName) &&
-      hasNoBotsInResponse(part.toolOutput)
-    ) {
-      connectButtonPlatform =
-        typeof part.toolInput === "object" && part.toolInput !== null
-          ? ((part.toolInput as Record<string, unknown>).platform as string)
-          : null;
-      break; // Found it, stop
-    }
-  }
-
-  /** "Connect Account" button rendered after all tool calls */
-  const connectButton =
-    connectButtonPlatform !== null ? (
-      <div className="px-3 pb-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            window.dispatchEvent(
-              new CustomEvent("alloomi:request-integration", {
-                detail: { platform: connectButtonPlatform },
-              }),
-            );
-          }}
-          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 22v-5" />
-            <path d="M9 8V2" />
-            <path d="M15 8V2" />
-            <path d="M18 8H6a2 2 0 0 0-2 2v3a6 6 0 0 0 12 0v-3a2 2 0 0 0-2-2Z" />
-          </svg>
-          {t("common.nativeToolCall.connectAccount", "Connect Account")}
-        </button>
-      </div>
-    ) : null;
-
   // Single tool call - no wrapper needed; NativeToolCall has its own rounded border
   if (parts.length === 1) {
     const result = renderToolCall(
       { ...parts[0], isExecuting },
       { hasConnectedAccounts },
     );
-    return (
-      <>
-        {result}
-        {connectButton}
-      </>
-    );
+    return result;
   }
 
   // Get the name of the tool currently executing
@@ -233,9 +172,6 @@ export function ToolCallAccordion({
           })}
         </div>
       )}
-
-      {/* Connect Account button rendered after all tool calls, outside the collapsible area */}
-      {connectButton}
     </div>
   );
 }

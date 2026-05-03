@@ -126,7 +126,11 @@ function renderInlineInstructionBadges(
  */
 function renderInlineInstructionBadgesFromNode(
   children: React.ReactNode,
+  renderInstructionBadges = true,
 ): React.ReactNode {
+  if (!renderInstructionBadges) {
+    return children;
+  }
   if (typeof children === "string") {
     return renderInlineInstructionBadges(children);
   }
@@ -140,6 +144,11 @@ function renderInlineInstructionBadgesFromNode(
     });
   }
   return children;
+}
+
+interface MarkdownProps {
+  children: string;
+  renderInstructionBadges?: boolean;
 }
 
 /**
@@ -187,225 +196,238 @@ function InlineCode({
   );
 }
 
-const components: Partial<Components> = {
-  code: ({ children, className, ...props }) => {
-    // Inline code only — block-level fenced code blocks are handled in `pre`.
-    return (
-      <InlineCode className={className} {...props}>
-        {children}
-      </InlineCode>
-    );
-  },
-  pre: ({ node, children, ...props }) => {
-    // Fenced code block: `pre` wraps a `code` element as its first child.
-    const codeNode = (node as Element | undefined)?.children?.[0] as
-      | Element
-      | undefined;
-    const lang =
-      (codeNode?.properties?.className as string[] | undefined)
-        ?.find((c) => c.startsWith("language-"))
-        ?.replace("language-", "") ?? "";
+function createComponents(
+  renderInstructionBadges: boolean,
+): Partial<Components> {
+  return {
+    code: ({ children, className, ...props }) => {
+      // Inline code only — block-level fenced code blocks are handled in `pre`.
+      return (
+        <InlineCode className={className} {...props}>
+          {children}
+        </InlineCode>
+      );
+    },
+    pre: ({ node, children, ...props }) => {
+      // Fenced code block: `pre` wraps a `code` element as its first child.
+      const codeNode = (node as Element | undefined)?.children?.[0] as
+        | Element
+        | undefined;
+      const lang =
+        (codeNode?.properties?.className as string[] | undefined)
+          ?.find((c) => c.startsWith("language-"))
+          ?.replace("language-", "") ?? "";
 
-    return (
-      <div className="not-prose flex flex-col min-w-0">
-        <pre
-          {...props}
-          className={
-            "text-sm w-full overflow-x-auto dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl dark:text-zinc-50 text-zinc-900"
-          }
-        >
-          <code
-            className="whitespace-pre font-mono min-w-0"
-            data-language={lang}
+      return (
+        <div className="not-prose flex flex-col min-w-0">
+          <pre
+            {...props}
+            className={
+              "text-sm w-full overflow-x-auto dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl dark:text-zinc-50 text-zinc-900"
+            }
           >
-            {children}
-          </code>
-        </pre>
-      </div>
-    );
-  },
-  p: ({ node, children, ...props }) => {
-    // If children contain block-level elements (e.g. a fenced code block
-    // that somehow leaked in), render them unwrapped to avoid invalid HTML.
-    if (hasBlockChild(children)) {
-      return <>{children}</>;
-    }
-    const content = renderInlineInstructionBadgesFromNode(children);
-    return (
-      <p
-        className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-slate-950 dark:text-slate-50 h-full mt-0 mb-1"
-        {...props}
-      >
-        {content}
-      </p>
-    );
-  },
-  ol: ({ node, children, ...props }) => {
-    return (
-      <ol className="list-decimal list-outside ml-4 my-0" {...props}>
-        {children}
-      </ol>
-    );
-  },
-  li: ({ node, children, ...props }) => {
-    const content = renderInlineInstructionBadgesFromNode(children);
-    return (
-      <li className="mt-0 leading-normal" {...props}>
-        {content}
-      </li>
-    );
-  },
-  ul: ({ node, children, ...props }) => {
-    return (
-      <ul className="list-disc list-outside ml-4 my-0" {...props}>
-        {children}
-      </ul>
-    );
-  },
-  strong: ({ node, children, ...props }) => {
-    return (
-      <span className="font-semibold" {...props}>
-        {children}
-      </span>
-    );
-  },
-  a: ({ node, children, href, ...props }) => {
-    const handleClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (href) {
-        openUrl(href);
+            <code
+              className="whitespace-pre font-mono min-w-0"
+              data-language={lang}
+            >
+              {children}
+            </code>
+          </pre>
+        </div>
+      );
+    },
+    p: ({ node, children, ...props }) => {
+      // If children contain block-level elements (e.g. a fenced code block
+      // that somehow leaked in), render them unwrapped to avoid invalid HTML.
+      if (hasBlockChild(children)) {
+        return <>{children}</>;
       }
-    };
-    return (
-      <button
-        className="text-blue-500 hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
-        onClick={handleClick}
-        {...(props as React.ComponentProps<"button">)}
-      >
-        {children}
-      </button>
-    );
-  },
-  h1: ({ node, children, ...props }) => {
-    return (
-      <h1
-        className="text-[20px] font-semibold mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h1>
-    );
-  },
-  h2: ({ node, children, ...props }) => {
-    return (
-      <h2
-        className="text-[14px] font-medium mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h2>
-    );
-  },
-  h3: ({ node, children, ...props }) => {
-    return (
-      <h3
-        className="text-[16px] font-semibold mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h3>
-    );
-  },
-  h4: ({ node, children, ...props }) => {
-    return (
-      <h4
-        className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h4>
-    );
-  },
-  h5: ({ node, children, ...props }) => {
-    return (
-      <h5
-        className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h5>
-    );
-  },
-  h6: ({ node, children, ...props }) => {
-    return (
-      <h6
-        className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
-        {...props}
-      >
-        {children}
-      </h6>
-    );
-  },
-  table: ({ node, children, ...props }) => {
-    return (
-      <div className="my-4 overflow-x-auto min-w-0">
-        <table
-          className="min-w-full border-collapse border border-zinc-200 dark:border-zinc-700 text-sm"
+      const content = renderInlineInstructionBadgesFromNode(
+        children,
+        renderInstructionBadges,
+      );
+      return (
+        <p
+          className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-slate-950 dark:text-slate-50 h-full mt-0 mb-1"
+          {...props}
+        >
+          {content}
+        </p>
+      );
+    },
+    ol: ({ node, children, ...props }) => {
+      return (
+        <ol className="list-decimal list-outside ml-4 my-0" {...props}>
+          {children}
+        </ol>
+      );
+    },
+    li: ({ node, children, ...props }) => {
+      const content = renderInlineInstructionBadgesFromNode(
+        children,
+        renderInstructionBadges,
+      );
+      return (
+        <li className="mt-0 leading-normal" {...props}>
+          {content}
+        </li>
+      );
+    },
+    ul: ({ node, children, ...props }) => {
+      return (
+        <ul className="list-disc list-outside ml-4 my-0" {...props}>
+          {children}
+        </ul>
+      );
+    },
+    strong: ({ node, children, ...props }) => {
+      return (
+        <span className="font-semibold" {...props}>
+          {children}
+        </span>
+      );
+    },
+    a: ({ node, children, href, ...props }) => {
+      const handleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (href) {
+          openUrl(href);
+        }
+      };
+      return (
+        <button
+          className="text-blue-500 hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
+          onClick={handleClick}
+          {...(props as React.ComponentProps<"button">)}
+        >
+          {children}
+        </button>
+      );
+    },
+    h1: ({ node, children, ...props }) => {
+      return (
+        <h1
+          className="text-[20px] font-semibold mt-2 mb-1 leading-tight"
           {...props}
         >
           {children}
-        </table>
-      </div>
-    );
-  },
-  thead: ({ node, children, ...props }) => {
-    return (
-      <thead
-        className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700"
-        {...props}
-      >
-        {children}
-      </thead>
-    );
-  },
-  tbody: ({ node, children, ...props }) => {
-    return <tbody {...props}>{children}</tbody>;
-  },
-  tr: ({ node, children, ...props }) => {
-    return (
-      <tr
-        className="border-b border-zinc-200 dark:border-zinc-700 last:border-b-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
-        {...props}
-      >
-        {children}
-      </tr>
-    );
-  },
-  th: ({ node, children, ...props }) => {
-    return (
-      <th
-        className="px-4 py-2 text-left font-semibold text-zinc-900 dark:text-zinc-50"
-        {...props}
-      >
-        {children}
-      </th>
-    );
-  },
-  td: ({ node, children, ...props }) => {
-    return (
-      <td className="px-4 py-2 text-zinc-700 dark:text-zinc-300" {...props}>
-        {children}
-      </td>
-    );
-  },
-};
+        </h1>
+      );
+    },
+    h2: ({ node, children, ...props }) => {
+      return (
+        <h2
+          className="text-[14px] font-medium mt-2 mb-1 leading-tight"
+          {...props}
+        >
+          {children}
+        </h2>
+      );
+    },
+    h3: ({ node, children, ...props }) => {
+      return (
+        <h3
+          className="text-[16px] font-semibold mt-2 mb-1 leading-tight"
+          {...props}
+        >
+          {children}
+        </h3>
+      );
+    },
+    h4: ({ node, children, ...props }) => {
+      return (
+        <h4
+          className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
+          {...props}
+        >
+          {children}
+        </h4>
+      );
+    },
+    h5: ({ node, children, ...props }) => {
+      return (
+        <h5
+          className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
+          {...props}
+        >
+          {children}
+        </h5>
+      );
+    },
+    h6: ({ node, children, ...props }) => {
+      return (
+        <h6
+          className="text-[15px] font-semibold mt-2 mb-1 leading-tight"
+          {...props}
+        >
+          {children}
+        </h6>
+      );
+    },
+    table: ({ node, children, ...props }) => {
+      return (
+        <div className="my-4 overflow-x-auto min-w-0">
+          <table
+            className="min-w-full border-collapse border border-zinc-200 dark:border-zinc-700 text-sm"
+            {...props}
+          >
+            {children}
+          </table>
+        </div>
+      );
+    },
+    thead: ({ node, children, ...props }) => {
+      return (
+        <thead
+          className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700"
+          {...props}
+        >
+          {children}
+        </thead>
+      );
+    },
+    tbody: ({ node, children, ...props }) => {
+      return <tbody {...props}>{children}</tbody>;
+    },
+    tr: ({ node, children, ...props }) => {
+      return (
+        <tr
+          className="border-b border-zinc-200 dark:border-zinc-700 last:border-b-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+          {...props}
+        >
+          {children}
+        </tr>
+      );
+    },
+    th: ({ node, children, ...props }) => {
+      return (
+        <th
+          className="px-4 py-2 text-left font-semibold text-zinc-900 dark:text-zinc-50"
+          {...props}
+        >
+          {children}
+        </th>
+      );
+    },
+    td: ({ node, children, ...props }) => {
+      return (
+        <td className="px-4 py-2 text-zinc-700 dark:text-zinc-300" {...props}>
+          {children}
+        </td>
+      );
+    },
+  };
+}
 
-const NonMemoizedMarkdown = ({ children }: { children: string }) => {
+const NonMemoizedMarkdown = ({
+  children,
+  renderInstructionBadges = true,
+}: MarkdownProps) => {
   const remarkPlugins = [remarkGfm];
   return (
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
-      components={components}
+      components={createComponents(renderInstructionBadges)}
       className="markdown-wrapper"
     >
       {children}
@@ -415,5 +437,7 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
 
 export const Markdown = memo(
   NonMemoizedMarkdown,
-  (prevProps, nextProps) => prevProps.children === nextProps.children,
+  (prevProps, nextProps) =>
+    prevProps.children === nextProps.children &&
+    prevProps.renderInstructionBadges === nextProps.renderInstructionBadges,
 );

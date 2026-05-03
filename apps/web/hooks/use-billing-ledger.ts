@@ -110,7 +110,7 @@ export function useBillingLedger(options?: {
     isAuthenticated ? url : null,
     fetchBillingLedger,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       dedupingInterval: 30_000,
     },
   );

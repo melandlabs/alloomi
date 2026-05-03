@@ -81,7 +81,12 @@ export function AddSkillDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          className="font-sans"
+        >
           <RemixIcon name="add" size="size-4" className="mr-1.5" />
           {t("personalization.skillsSettings.addSkill", "Add Skill")}
           <RemixIcon name="arrow_down_s" size="size-4" className="ml-1.5" />
@@ -255,8 +260,8 @@ export function SkillsPanel({
   );
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      <ScrollArea className="flex-1">
+    <div className={cn("flex flex-col h-[100%] min-h-0", className)}>
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -301,7 +306,7 @@ export function SkillsPanel({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-0 pb-6 px-6">
               {skills.map((skill) => (
                 <SkillCard
                   key={skill.id}
@@ -420,7 +425,7 @@ function SkillCard({
     >
       {/* ... button: shows on hover, contains Switch and Delete */}
       {isAlloomiSkill && (
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:opacity-100 transition-opacity z-[1]">
+        <div className="absolute top-2 right-2 opacity-100 transition-opacity z-[1]">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

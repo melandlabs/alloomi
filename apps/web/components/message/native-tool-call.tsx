@@ -130,7 +130,7 @@ export function NativeToolCall({
     } else if (
       (toolNameWithoutPrefix === "getRawMessages" ||
         toolNameWithoutPrefix === "searchRawMessages") &&
-      toolInput.keywords
+      Array.isArray(toolInput.keywords)
     ) {
       paramText = toolInput.keywords.join(", ");
     } else if (toolNameWithoutPrefix === "Skill" && toolInput.skill) {

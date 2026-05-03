@@ -11,7 +11,6 @@ import {
 } from "react";
 import useSWR from "swr";
 import { useTranslation } from "react-i18next";
-import TurndownService from "turndown";
 import { cn, fetcher } from "@/lib/utils";
 import { toast } from "sonner";
 import { buildRefMarker } from "@alloomi/shared/ref";
@@ -25,32 +24,11 @@ import { Button, Input } from "@alloomi/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@alloomi/ui";
 import { RemixIcon } from "@/components/remix-icon";
 import { Spinner } from "@/components/spinner";
-
-/**
- * Escape HTML entities to safely embed text into basic HTML.
- *
- * @param value Raw string
- * @returns Escaped string
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-/**
- * Escape HTML attribute value to safely embed into HTML attributes.
- */
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+import {
+  createNovelInstructionTurndown,
+  htmlToMarkdown,
+  markdownToBasicHtml,
+} from "@/lib/editors/novel-instruction-markdown";
 
 type SkillItem = {
   id: string;
@@ -66,237 +44,6 @@ type SourceBadgeInput = {
   label: string;
   kind?: "file" | "folder";
 };
-
-/**
- * Inline renderer for event/skill tokens:
- * - event: [[ref:event:id|title]] (optionally followed by spaces)
- * - skill: /skill-xxx (followed by spaces)
- *
- * This is used to build the tiptap HTML representation from stored markdown.
- */
-function renderInlineBadges(
-  text: string,
-  skillNameById: Record<string, string>,
-): string {
-  const eventRe = /\[\[ref:event:([^\]]*)\]\]\s*/g;
-  const sourceRe = /\[\[ref:(file|folder):([^\]|]+)\|([^\]]+)\]\]\s*/g;
-  // Skill token might lose trailing whitespace when persisted/trimmed.
-  // Also sometimes tokens can be adjacent like `/id1/id2`, so we allow `/`
-  // as a valid delimiter after the skill id.
-  const skillRe = /\/([\w-]+)(?=\s|$|\/)/g;
-
-  const parts: string[] = [];
-  let cursor = 0;
-
-  let eMatch = eventRe.exec(text);
-  let sMatch = skillRe.exec(text);
-  let fMatch = sourceRe.exec(text);
-
-  const pushEscaped = (chunk: string) => {
-    if (!chunk) return;
-    parts.push(escapeHtml(chunk));
-  };
-
-  while (eMatch || sMatch || fMatch) {
-    const eventIndex = eMatch ? eMatch.index : Number.POSITIVE_INFINITY;
-    const skillIndex = sMatch ? sMatch.index : Number.POSITIVE_INFINITY;
-    const sourceIndex = fMatch ? fMatch.index : Number.POSITIVE_INFINITY;
-    const earliest = Math.min(eventIndex, skillIndex, sourceIndex);
-    const nextType =
-      earliest === eventIndex
-        ? "event"
-        : earliest === sourceIndex
-          ? "source"
-          : "skill";
-    const match =
-      nextType === "event" ? eMatch : nextType === "source" ? fMatch : sMatch;
-    if (!match) break;
-
-    if (match.index > cursor) {
-      pushEscaped(text.slice(cursor, match.index));
-    }
-
-    if (nextType === "event") {
-      const full = match[0] ?? "";
-      const label = match[1] ?? "";
-      const [idRaw, ...rest] = label.split("|");
-      const eventId = (idRaw ?? "").trim();
-      const title = (rest.join("|") ?? "").trim() || eventId;
-
-      const marker = full.trimEnd();
-      parts.push(
-        `<span data-badge-kind="event" data-badge-id="${escapeHtmlAttribute(
-          eventId,
-        )}" data-badge-label="${escapeHtmlAttribute(title)}" data-badge-marker="${escapeHtmlAttribute(
-          marker,
-        )}" class="inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] min-w-0 mr-1 overflow-hidden group" contenteditable="false"><i class="ri-radar-line"></i><span class="flex-1 min-w-0 truncate whitespace-nowrap">${escapeHtml(
-          title,
-        )}</span><button type="button" data-badge-remove="true" data-badge-marker="${escapeHtmlAttribute(
-          marker,
-        )}" aria-label="Remove" class="ml-0 inline-flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded-[4px] text-[12px] leading-none text-muted-foreground/70 hover:text-foreground hover:bg-border/70 opacity-0 group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 transition-all">x</button></span>`,
-      );
-    } else if (nextType === "source") {
-      const full = match[0] ?? "";
-      const sourceKind = ((match[1] as string) ?? "file").trim();
-      const sourceId = ((match[2] as string) ?? "").trim();
-      const sourceLabel = ((match[3] as string) ?? sourceId).trim();
-      const marker = full.trimEnd();
-      parts.push(
-        `<span data-badge-kind="${escapeHtmlAttribute(
-          sourceKind,
-        )}" data-badge-id="${escapeHtmlAttribute(
-          sourceId,
-        )}" data-badge-label="${escapeHtmlAttribute(sourceLabel)}" data-badge-marker="${escapeHtmlAttribute(
-          marker,
-        )}" class="inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] min-w-0 mr-1 overflow-hidden group" contenteditable="false"><i class="${sourceKind === "folder" ? "ri-folder-line" : "ri-file-line"}"></i><span class="flex-1 min-w-0 truncate whitespace-nowrap">${escapeHtml(
-          sourceLabel,
-        )}</span><button type="button" data-badge-remove="true" data-badge-marker="${escapeHtmlAttribute(
-          marker,
-        )}" aria-label="Remove" class="ml-0 inline-flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded-[4px] text-[12px] leading-none text-muted-foreground/70 hover:text-foreground hover:bg-border/70 opacity-0 group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 transition-all">x</button></span>`,
-      );
-    } else {
-      const full = match[0] ?? "";
-      const skillId = (match[1] ?? "").trim();
-      const marker = full.trimEnd();
-      const title = skillNameById[skillId];
-      if (!title) {
-        // Unknown `/...` segment: keep as plain text.
-        parts.push(escapeHtml(full));
-      } else {
-        parts.push(
-          `<span data-badge-kind="skill" data-badge-id="${escapeHtmlAttribute(
-            skillId,
-          )}" data-badge-label="${escapeHtmlAttribute(title)}" data-badge-marker="${escapeHtmlAttribute(
-            marker,
-          )}" class="inline-flex items-center justify-start min-h-5 gap-1 rounded-[6px] border border-border/70 bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground max-w-[140px] min-w-0 mr-1 overflow-hidden group" contenteditable="false"><i class="ri-apps-2-ai-line"></i><span class="flex-1 min-w-0 truncate whitespace-nowrap">${escapeHtml(
-            title,
-          )}</span><button type="button" data-badge-remove="true" data-badge-marker="${escapeHtmlAttribute(
-            marker,
-          )}" aria-label="Remove" class="ml-0 inline-flex h-4 w-0 shrink-0 items-center justify-center overflow-hidden rounded-[4px] text-[12px] leading-none text-muted-foreground/70 hover:text-foreground hover:bg-border/70 opacity-0 group-hover:ml-1 group-hover:w-4 group-hover:opacity-100 transition-all">x</button></span>`,
-        );
-      }
-    }
-
-    cursor = match.index + match[0].length;
-    if (nextType === "event") {
-      eMatch = eventRe.exec(text);
-    } else if (nextType === "source") {
-      fMatch = sourceRe.exec(text);
-    } else {
-      sMatch = skillRe.exec(text);
-    }
-  }
-
-  if (cursor < text.length) {
-    pushEscaped(text.slice(cursor));
-  }
-
-  return parts.join("").replace(/\n/g, "<br />");
-}
-
-/**
- * Convert a markdown string into a basic HTML representation.
- * This is intentionally minimal: it supports headings, unordered lists and paragraphs,
- * so the rich editor has a better starting point than raw markdown text.
- *
- * @param markdown Markdown input
- * @returns HTML string for tiptap content
- */
-function markdownToBasicHtml(
-  markdown: string,
-  skillNameById: Record<string, string>,
-): string {
-  if (!markdown.trim()) return "";
-
-  // Parse line by line, avoid missing #/## headings that appear in the middle of double-newline-separated blocks.
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-  const htmlParts: string[] = [];
-
-  const flushParagraph = (buffer: string[]) => {
-    const text = buffer.join("\n").trimEnd();
-    if (!text) return;
-    htmlParts.push(`<p>${renderInlineBadges(text, skillNameById)}</p>`);
-  };
-
-  let paragraphBuffer: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i] ?? "";
-    const line = raw.trimEnd();
-
-    // Empty line => end of paragraph
-    if (line.trim().length === 0) {
-      flushParagraph(paragraphBuffer);
-      paragraphBuffer = [];
-      continue;
-    }
-
-    // Horizontal rule: --- or ***
-    if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
-      flushParagraph(paragraphBuffer);
-      paragraphBuffer = [];
-      htmlParts.push("<hr />");
-      continue;
-    }
-
-    // Heading: #..###### <space>
-    const headingMatch = line.match(/^#{1,6}\s+/);
-    if (headingMatch) {
-      flushParagraph(paragraphBuffer);
-      paragraphBuffer = [];
-
-      const level = Math.min(headingMatch[0].length, 6);
-      const title = line.replace(/^#{1,6}\s+/, "").trim();
-      htmlParts.push(
-        `<h${level}>${renderInlineBadges(title, skillNameById)}</h${level}>`,
-      );
-      continue;
-    }
-
-    // Unordered list: -, *, +
-    if (/^[-*+]\s+/.test(line.trim())) {
-      flushParagraph(paragraphBuffer);
-      paragraphBuffer = [];
-
-      const items: string[] = [];
-      while (i < lines.length && /^[-*+]\s+/.test((lines[i] ?? "").trim())) {
-        const item = (lines[i] ?? "").replace(/^[-*+]\s+/, "").trim();
-        if (item)
-          items.push(`<li>${renderInlineBadges(item, skillNameById)}</li>`);
-        i++;
-      }
-      i--; // for-loop will increment
-      if (items.length > 0) {
-        htmlParts.push(`<ul>${items.join("")}</ul>`);
-      }
-      continue;
-    }
-
-    // Default: accumulate paragraph lines
-    paragraphBuffer.push(line);
-  }
-
-  flushParagraph(paragraphBuffer);
-
-  return htmlParts.length > 0 ? htmlParts.join("\n") : "";
-}
-
-/**
- * Convert HTML from tiptap back into markdown for storage + md rendering.
- *
- * @param html HTML output from editor
- * @returns markdown string
- */
-function htmlToMarkdown(html: string, turndown: TurndownService): string {
-  const raw = turndown.turndown(html ?? "");
-  // Avoid trimming trailing spaces: skill/event token parsing relies on
-  // whitespace after tokens (e.g. `/skill-xxx\\s`).
-  return raw
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{2,}/g, "\n\n")
-    .replace(/^\n+/, "")
-    .replace(/\n+$/, "");
-}
 
 /**
  * Inline badge node used by tiptap for event/skill tokens.
@@ -429,6 +176,18 @@ export type NovelInstructionEditorRef = {
    */
   openSkillPicker: () => void;
   /**
+   * Inserts a skill badge at current cursor position.
+   */
+  insertSkillBadge: (skill: { id: string; name: string }) => void;
+  /**
+   * Inserts an event badge at current cursor position.
+   */
+  insertEventBadge: (event: {
+    id: string;
+    title?: string | null;
+    description?: string | null;
+  }) => void;
+  /**
    * Inserts a file/folder badge at current cursor position.
    */
   insertSourceBadge: (source: SourceBadgeInput) => void;
@@ -465,32 +224,7 @@ export const NovelInstructionEditor = forwardRef<
    */
   const BADGE_RENDER_VERSION = 10;
   // turndown instance is stable to avoid rule re-registration
-  const turndown = useMemo(() => {
-    const svc = new TurndownService({
-      headingStyle: "atx",
-      bulletListMarker: "-",
-      codeBlockStyle: "fenced",
-    });
-
-    // Serialize ref badge nodes back to the original marker tokens.
-    svc.addRule("refBadge", {
-      filter: (node) => {
-        const el = node as HTMLElement;
-        return (
-          el?.nodeName === "SPAN" && !!el.getAttribute("data-badge-marker")
-        );
-      },
-      replacement: (_content, node) => {
-        const el = node as HTMLElement;
-        const marker = el.getAttribute("data-badge-marker") ?? "";
-        // Always append a single space so downstream parsers that expect whitespace
-        // (e.g. `/skill-xxx\s`) can reliably detect tokens.
-        return `${marker} `;
-      },
-    });
-
-    return svc;
-  }, []);
+  const turndown = useMemo(() => createNovelInstructionTurndown(), []);
 
   const lastEmittedMarkdownRef = useRef<string>(value);
   const lastBadgeRenderVersionRef = useRef<number>(BADGE_RENDER_VERSION);
@@ -635,11 +369,36 @@ export const NovelInstructionEditor = forwardRef<
           "prose-h6:text-[15px] prose-h6:my-1",
         ),
       },
+      handlePaste: (_view, event) => {
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) return false;
+
+        const textContent = clipboardData.getData("text/plain");
+        if (!textContent) return false;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const editor = (_view as any).editor;
+        if (!editor) return false;
+
+        // Normalize line endings: \r\n -> \n, limit consecutive newlines to 2
+        const normalized = textContent
+          .replace(/\r\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n");
+        editor.commands.insertContent(normalized);
+        return true;
+      },
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       const markdown = htmlToMarkdown(html, turndown);
       if (markdown === lastEmittedMarkdownRef.current) return;
+      // Only propagate edits that come from real user interaction.
+      // Programmatic setContent/initial mount normalization should not dirty
+      // the parent form or trigger auto-save.
+      if (!editor.isFocused) {
+        lastEmittedMarkdownRef.current = markdown;
+        return;
+      }
       lastEmittedMarkdownRef.current = markdown;
       onChange(markdown);
     },
@@ -866,9 +625,29 @@ export const NovelInstructionEditor = forwardRef<
     () => ({
       openEventPicker,
       openSkillPicker,
+      insertSkillBadge: (skill) => {
+        insertSkillBadge({
+          id: skill.id,
+          name: skill.name,
+          description: "",
+        });
+      },
+      insertEventBadge: (event) => {
+        insertEventBadge({
+          id: event.id,
+          title: event.title ?? event.id,
+          description: event.description ?? "",
+        } as Insight);
+      },
       insertSourceBadge,
     }),
-    [insertSourceBadge, openEventPicker, openSkillPicker],
+    [
+      insertEventBadge,
+      insertSkillBadge,
+      insertSourceBadge,
+      openEventPicker,
+      openSkillPicker,
+    ],
   );
 
   /**
@@ -966,7 +745,10 @@ export const NovelInstructionEditor = forwardRef<
   );
 
   return (
-    <div className={cn("h-full min-h-0 flex flex-col", className)}>
+    <div
+      className={cn("h-full min-h-0 flex flex-col", className)}
+      style={{ height: "100%" }}
+    >
       {showSkillEventButtons && (
         <div className="flex items-center gap-2 mb-2 shrink-0 px-4">
           <Button

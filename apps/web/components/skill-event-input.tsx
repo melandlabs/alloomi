@@ -581,7 +581,7 @@ export function SkillEventInput({
                         <button
                           type="button"
                           className={cx(
-                            "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                            "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
                             "hover:bg-accent hover:text-accent-foreground",
                             isHighlighted &&
                               "bg-accent text-accent-foreground shadow-sm",
@@ -596,10 +596,10 @@ export function SkillEventInput({
                                 : "bg-muted/80 text-muted-foreground",
                             )}
                           >
-                            <RemixIcon name="sparkles" size="size-4" />
+                            <RemixIcon name="apps_2_ai" size="size-4" />
                           </span>
                           <div className="flex-1 min-w-0">
-                            <span className="block truncate font-medium">
+                            <span className="block truncate font-normal">
                               {skill.name}
                             </span>
                             {skill.description && (
@@ -692,7 +692,7 @@ export function SkillEventInput({
                           <button
                             type="button"
                             className={cx(
-                              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
                               "hover:bg-accent hover:text-accent-foreground",
                               isHighlighted &&
                                 "bg-accent text-accent-foreground shadow-sm",
@@ -710,7 +710,7 @@ export function SkillEventInput({
                               <RemixIcon name="calendar-event" size="size-4" />
                             </span>
                             <div className="flex-1 min-w-0">
-                              <span className="block truncate font-medium">
+                              <span className="block truncate font-normal">
                                 {event.title ||
                                   t("chat.untitledEvent", "Untitled event")}
                               </span>

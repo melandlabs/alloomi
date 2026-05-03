@@ -90,7 +90,7 @@ export function useDailyUsage(days = 7) {
     isAuthenticated ? `/api/quota/daily-usage?days=${days}` : null,
     fetchDailyUsage,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       dedupingInterval: 30_000,
     },
   );
