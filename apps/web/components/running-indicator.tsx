@@ -56,6 +56,7 @@ export function RunningIndicator({
       case "chatInsight":
       case "searchKnowledgeBase":
       case "getFullDocumentContent":
+      case "listKnowledgeBaseDocuments":
       case "searchMemoryPath":
         return <RemixIcon name="search" size="size-4" />;
       case "queryContacts":

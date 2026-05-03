@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/components/i18n-provider";
 import { TooltipProvider } from "@alloomi/ui";
@@ -17,6 +18,17 @@ import { MotionConfigProvider } from "@/components/motion-config-provider";
 import { GeddleScript } from "@/components/geddle-script";
 import { AppProviders } from "@/components/app-providers";
 import { ScheduledJobsInit } from "@/components/scheduled-jobs-init";
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+const notoSerifSC = Noto_Serif_SC({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteMetadata.siteUrl),
@@ -83,6 +95,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
+      className={`${notoSansSC.className} ${notoSerifSC.className}`}
       // `next-themes` injects an extra classname to the body element to avoid
       // visual flicker before hydration. Hence the `suppressHydrationWarning`
       // prop is necessary to avoid the React hydration mismatch warning.
@@ -90,16 +103,6 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600&display=swap"
-          rel="stylesheet"
-        />
         <Suspense fallback={null}>
           <GeddleScript />
         </Suspense>

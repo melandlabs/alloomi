@@ -195,6 +195,23 @@
     display: none;
   }
 
+  .hover-scrollbar-x {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hover-scrollbar-x::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .hover-scrollbar-x:hover {
+    scrollbar-width: thin;
+  }
+
+  .hover-scrollbar-x:hover::-webkit-scrollbar {
+    height: 6px;
+  }
+
   .safe-area-inset-top {
     padding-top: env(safe-area-inset-top, 0px);
   }

@@ -35,7 +35,7 @@ export function PageSectionHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 bg-card py-3 px-6 shrink-0",
+        "sticky top-0 z-30 bg-card py-4 px-6 shrink-0",
         hasFooter ? "flex flex-col gap-3" : "flex flex-col",
         className,
       )}
