@@ -2149,6 +2149,7 @@ export const characters = pgTable(
       .default([])
       .notNull(),
     systemNotification: boolean("system_notification").notNull().default(true),
+    systemType: varchar("system_type", { length: 50 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

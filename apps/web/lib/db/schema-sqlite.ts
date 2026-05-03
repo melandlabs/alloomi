@@ -2311,6 +2311,7 @@ export const characters = sqliteTable("characters", {
   systemNotification: integer("system_notification", { mode: "boolean" })
     .notNull()
     .default(sql`1`),
+  systemType: text("system_type"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

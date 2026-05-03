@@ -603,6 +603,13 @@
       "when": 1774050000000,
       "tag": "0095_persist_insight_maintenance_checkpoint",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1774100000000,
+      "tag": "0097_add_character_system_type",
+      "breakpoints": true
     }
   ]
 }
