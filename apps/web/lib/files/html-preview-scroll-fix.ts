@@ -1,5 +1,6 @@
 const PREVIEW_SCROLL_FIX_ATTR = "data-alloomi-preview-scroll-fix";
 const PREVIEW_SNAPSHOT_CLAMP_ATTR = "data-alloomi-preview-snapshot-clamp";
+const PREVIEW_PAGE_FLOW_ATTR = "data-alloomi-preview-page-flow";
 
 /**
  * Inject high-priority styles into HTML for iframe `srcDoc`:
@@ -20,6 +21,34 @@ export function injectHtmlPreviewScrollFix(html: string): string {
   const style = `<style ${PREVIEW_SCROLL_FIX_ATTR}>
   html{height:100%!important;overflow:hidden!important;}
   body{height:100%!important;margin:0!important;box-sizing:border-box!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;}
+</style>`;
+
+  if (/<head[\s>]/i.test(trimmed)) {
+    return trimmed.replace(/<head([^>]*)>/i, `<head$1>${style}`);
+  }
+  if (/<html[\s>]/i.test(trimmed)) {
+    return trimmed.replace(/(<html[^>]*>)/i, `$1<head>${style}</head>`);
+  }
+  if (/<body[\s>]/i.test(trimmed)) {
+    return trimmed.replace(/<body([^>]*)>/i, `<body$1>${style}`);
+  }
+  return `<!DOCTYPE html><html><head>${style}</head><body>${trimmed}</body></html>`;
+}
+
+/**
+ * Inject styles for page-flow iframe rendering:
+ * the iframe grows to the document height and the host page owns scrolling.
+ */
+export function injectHtmlPreviewPageFlow(html: string): string {
+  const trimmed = html.trim();
+  if (!trimmed || trimmed.includes(PREVIEW_PAGE_FLOW_ATTR)) {
+    return html;
+  }
+
+  const style = `<style ${PREVIEW_PAGE_FLOW_ATTR}>
+  html{height:auto!important;min-height:0!important;overflow:visible!important;}
+  body{height:auto!important;min-height:0!important;margin:0!important;box-sizing:border-box!important;overflow:visible!important;}
+  img,video,canvas,svg{max-width:100%;height:auto;}
 </style>`;
 
   if (/<head[\s>]/i.test(trimmed)) {

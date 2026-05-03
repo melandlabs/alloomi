@@ -200,7 +200,10 @@ export async function GET(req: NextRequest) {
     // and compute total size in a single traversal.
     let allFiles = files;
     if (!path) {
-      const result = getAllFilesAtPathWithSize(getTaskSessionDir(taskId));
+      const result = await getAllFilesAtPathWithSize(
+        taskId,
+        getTaskSessionDir(taskId),
+      );
       allFiles = result.files;
       size = result.size;
     }

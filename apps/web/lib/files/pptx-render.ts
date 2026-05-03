@@ -33,7 +33,7 @@ export interface PptxRenderManifest {
   cache_key: string;
   slides: PptxSlideRender[];
   created_at: string;
-  engine: "bundled" | "system" | "fallback";
+  engine: "bundled" | "installed" | "system" | "fallback";
 }
 
 // Get render engine paths from environment or bundled location
@@ -46,6 +46,52 @@ function getRenderEnginePaths(): {
   const pdftoppm_bin = process.env.PDFTOPPM_BIN || null;
 
   return { soffice_bin, pdftoppm_bin };
+}
+
+function getInstalledEnginePathsFromDisk(): {
+  soffice_bin: string | null;
+  pdftoppm_bin: string | null;
+} {
+  const windowsHome =
+    process.env.HOMEDRIVE && process.env.HOMEPATH
+      ? `${process.env.HOMEDRIVE}${process.env.HOMEPATH}`
+      : "";
+  const home = process.env.HOME || process.env.USERPROFILE || windowsHome || "";
+  if (!home) {
+    return { soffice_bin: null, pdftoppm_bin: null };
+  }
+
+  try {
+    const installedJson = join(
+      home,
+      ".alloomi",
+      "render-engines",
+      "office",
+      "installed.json",
+    );
+    if (!existsSync(installedJson)) {
+      return { soffice_bin: null, pdftoppm_bin: null };
+    }
+
+    const content = readFileSync(installedJson, "utf-8");
+    const parsed = JSON.parse(content) as {
+      soffice_path?: string;
+      pdftoppm_path?: string;
+    };
+
+    const soffice_bin =
+      parsed.soffice_path && existsSync(parsed.soffice_path)
+        ? parsed.soffice_path
+        : null;
+    const pdftoppm_bin =
+      parsed.pdftoppm_path && existsSync(parsed.pdftoppm_path)
+        ? parsed.pdftoppm_path
+        : null;
+
+    return { soffice_bin, pdftoppm_bin };
+  } catch {
+    return { soffice_bin: null, pdftoppm_bin: null };
+  }
 }
 
 // Get the platform-specific render engine directory
@@ -140,6 +186,18 @@ function findInPath(name: string): string | null {
       }
     }
   }
+
+  // macOS: Check Homebrew common paths directly
+  if (process.platform === "darwin") {
+    const homebrewPaths = ["/opt/homebrew/bin", "/usr/local/bin"];
+    for (const base of homebrewPaths) {
+      const fullPath = join(base, name);
+      if (existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -150,6 +208,11 @@ export function isRenderEngineAvailable(): boolean {
   // Use env var if set
   if (soffice_bin && pdftoppm_bin) {
     return existsSync(soffice_bin) && existsSync(pdftoppm_bin);
+  }
+
+  const installed = getInstalledEnginePathsFromDisk();
+  if (installed.soffice_bin && installed.pdftoppm_bin) {
+    return true;
   }
 
   // Use bundled binaries
@@ -173,6 +236,8 @@ function getSofficeBin(): string | null {
   if (soffice_bin && existsSync(soffice_bin)) {
     return soffice_bin;
   }
+  const installed = getInstalledEnginePathsFromDisk();
+  if (installed.soffice_bin) return installed.soffice_bin;
   const bundled = findBundledSoffice();
   if (bundled) return bundled;
   return findInPath("soffice");
@@ -184,6 +249,8 @@ function getPdftoppmBin(): string | null {
   if (pdftoppm_bin && existsSync(pdftoppm_bin)) {
     return pdftoppm_bin;
   }
+  const installed = getInstalledEnginePathsFromDisk();
+  if (installed.pdftoppm_bin) return installed.pdftoppm_bin;
   const bundled = findBundledPdftoppm();
   if (bundled) return bundled;
   return findInPath("pdftoppm");
@@ -225,7 +292,7 @@ function ensureDir(dir: string): void {
   }
 }
 
-// Run soffice to convert PPTX to PDF
+// Run soffice to convert PPTX to PDF with retry
 async function convertPptxToPdf(
   soffice_bin: string,
   sourcePath: string,
@@ -235,60 +302,100 @@ async function convertPptxToPdf(
   const baseName = basename(sourcePath, extname(sourcePath));
   const expectedPdf = join(outputDir, `${baseName}.pdf`);
 
-  return new Promise((resolve, reject) => {
-    // soffice doesn't accept -- separator; file path goes directly after --outdir
-    const args = [
-      "--headless",
-      "--convert-to",
-      "pdf",
-      "--outdir",
-      outputDir,
-      sourcePath,
-    ];
+  const runSoffice = async (): Promise<{ stdout: string; stderr: string }> => {
+    return new Promise((resolve, reject) => {
+      const args = [
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        outputDir,
+        sourcePath,
+      ];
 
-    workspaceLogger.info("[pptx-render] Running soffice:", {
-      bin: soffice_bin,
-      args,
+      workspaceLogger.info("[pptx-render] Running soffice:", {
+        bin: soffice_bin,
+        args,
+      });
+
+      execFile(
+        soffice_bin,
+        args,
+        { timeout: 60000 },
+        (error, stdout, stderr) => {
+          if (error) {
+            workspaceLogger.error("[pptx-render] soffice error:", error);
+            workspaceLogger.error("[pptx-render] soffice stderr:", stderr);
+            reject(error);
+            return;
+          }
+          workspaceLogger.info("[pptx-render] soffice stdout:", stdout);
+          if (stderr) {
+            workspaceLogger.info("[pptx-render] soffice stderr:", stderr);
+          }
+          resolve({ stdout, stderr });
+        },
+      );
     });
+  };
 
-    execFile(soffice_bin, args, { timeout: 60000 }, (error, stdout, stderr) => {
-      if (error) {
-        workspaceLogger.error("[pptx-render] soffice error:", error);
-        workspaceLogger.error("[pptx-render] soffice stdout:", stdout);
-        workspaceLogger.error("[pptx-render] soffice stderr:", stderr);
-        reject(new Error(`soffice failed: ${error.message}`));
-        return;
-      }
+  // Ensure output directory exists
+  ensureDir(outputDir);
 
-      workspaceLogger.info("[pptx-render] soffice stdout:", stdout);
+  const maxSofficeRetries = 3;
+  for (let attempt = 1; attempt <= maxSofficeRetries; attempt++) {
+    try {
+      // Run soffice to convert PPTX to PDF
+      workspaceLogger.info(
+        `[pptx-render] soffice attempt ${attempt}:`,
+        soffice_bin,
+      );
+      await runSoffice();
 
       // soffice may return before file is fully written - wait and retry
-      const maxRetries = 5;
+      const maxFileRetries = 5;
       const retryDelay = 500;
 
-      const checkFile = (retries: number): void => {
-        if (existsSync(expectedPdf)) {
-          workspaceLogger.info("[pptx-render] PDF created:", expectedPdf);
-          resolve(expectedPdf);
-        } else if (retries > 0) {
-          workspaceLogger.info(
-            `[pptx-render] Waiting for PDF... (${retries} retries left)`,
-          );
-          setTimeout(() => checkFile(retries - 1), retryDelay);
-        } else {
-          workspaceLogger.error(
-            "[pptx-render] PDF not found at expected path:",
-            expectedPdf,
-          );
-          workspaceLogger.error("[pptx-render] soffice stdout:", stdout);
-          workspaceLogger.error("[pptx-render] soffice stderr:", stderr);
-          reject(new Error("soffice did not produce expected PDF output"));
-        }
+      const checkFile = (retries: number): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          if (existsSync(expectedPdf)) {
+            workspaceLogger.info("[pptx-render] PDF created:", expectedPdf);
+            resolve(expectedPdf);
+          } else if (retries > 0) {
+            workspaceLogger.info(
+              `[pptx-render] Waiting for PDF... (${retries} retries left)`,
+            );
+            setTimeout(
+              () =>
+                checkFile(retries - 1)
+                  .then(resolve)
+                  .catch(reject),
+              retryDelay,
+            );
+          } else {
+            workspaceLogger.error(
+              "[pptx-render] PDF not found at expected path:",
+              expectedPdf,
+            );
+            reject(new Error("soffice did not produce expected PDF output"));
+          }
+        });
       };
 
-      checkFile(maxRetries);
-    });
-  });
+      return await checkFile(maxFileRetries);
+    } catch (error) {
+      workspaceLogger.error(
+        `[pptx-render] soffice attempt ${attempt} failed:`,
+        error,
+      );
+      if (attempt === maxSofficeRetries) {
+        throw error;
+      }
+      // Wait before retry
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  throw new Error("soffice failed after all retries");
 }
 
 // Run pdftoppm to convert PDF to PNG slides
@@ -374,11 +481,17 @@ export async function getOrCreatePptxRenderManifest(
   const soffice_bin = getSofficeBin();
   const pdftoppm_bin = getPdftoppmBin();
 
-  const engine: "bundled" | "system" | "fallback" =
+  const installed = getInstalledEnginePathsFromDisk();
+  const engine: "bundled" | "installed" | "system" | "fallback" =
     soffice_bin && pdftoppm_bin
       ? process.env.SOFFICE_BIN
-        ? "system"
-        : "bundled"
+        ? installed.soffice_bin &&
+          process.env.SOFFICE_BIN === installed.soffice_bin
+          ? "installed"
+          : "system"
+        : installed.soffice_bin && soffice_bin === installed.soffice_bin
+          ? "installed"
+          : "bundled"
       : "fallback";
 
   if (engine === "fallback") {

@@ -14,9 +14,50 @@ import {
   writeFileSync,
 } from "node:fs";
 import { promises as fs } from "node:fs";
+import type { Dirent } from "node:fs";
 import { join, dirname, resolve, sep, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { workspaceLogger } from "@/lib/utils/logger";
+
+/**
+ * Cache for session files to avoid repeated directory traversal.
+ * TTL: 30 seconds
+ */
+interface SessionFilesCache {
+  files: SessionFile[];
+  size: number;
+}
+
+const sessionFilesCache = new Map<
+  string,
+  { data: SessionFilesCache; timestamp: number }
+>();
+const CACHE_TTL_MS = 30_000;
+
+function getCachedSessionFiles(sessionDir: string): SessionFilesCache | null {
+  const cached = sessionFilesCache.get(sessionDir);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+    sessionFilesCache.delete(sessionDir);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedSessionFiles(
+  sessionDir: string,
+  data: SessionFilesCache,
+): void {
+  sessionFilesCache.set(sessionDir, { data, timestamp: Date.now() });
+}
+
+export function invalidateSessionFilesCache(sessionDir?: string): void {
+  if (sessionDir) {
+    sessionFilesCache.delete(sessionDir);
+  } else {
+    sessionFilesCache.clear();
+  }
+}
 
 export const SESSIONS_DIR_NAME = "sessions";
 export const TASKS_DIR_NAME = "tasks";
@@ -292,6 +333,7 @@ export function writeSessionFile(
 
     writeFileSync(fullPath, content, "utf-8");
     workspaceLogger.debug("Written file", fullPath);
+    invalidateSessionFilesCache(getTaskSessionDir(taskId));
     return true;
   } catch (error) {
     workspaceLogger.error("Failed to write file:", error);
@@ -319,6 +361,7 @@ export function deleteSessionFile(taskId: string, filePath: string): boolean {
     }
     unlinkSync(fullPath);
     workspaceLogger.debug("Deleted file", fullPath);
+    invalidateSessionFilesCache(getTaskSessionDir(taskId));
     return true;
   } catch (error) {
     workspaceLogger.error("Failed to delete file:", error);
@@ -546,11 +589,18 @@ const TRAVERSAL_SKIP_DIRS = new Set([
  * Recursively collect all files and total directory size in a single traversal.
  * Combines the logic of getAllFilesAtPath + getSessionSize to avoid duplicate directory walks.
  * Skips known large directories (node_modules, .next, etc.) during traversal.
+ * Uses caching with 30s TTL and parallel stat for improved performance.
  */
-export function getAllFilesAtPathWithSize(sessionDir: string): {
-  files: SessionFile[];
-  size: number;
-} {
+export async function getAllFilesAtPathWithSize(
+  taskId: string,
+  sessionDir: string,
+): Promise<{ files: SessionFile[]; size: number }> {
+  // Check cache first
+  const cached = getCachedSessionFiles(sessionDir);
+  if (cached) {
+    return cached;
+  }
+
   if (!existsSync(sessionDir)) {
     return { files: [], size: 0 };
   }
@@ -558,55 +608,92 @@ export function getAllFilesAtPathWithSize(sessionDir: string): {
   const allFiles: SessionFile[] = [];
   let totalSize = 0;
 
-  function traverse(currentPath: string, relativePath: string) {
-    const entries = readdirSync(currentPath, { withFileTypes: true });
+  async function traverse(
+    currentPath: string,
+    relativePath: string,
+  ): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
 
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isDirectory() && TRAVERSAL_SKIP_DIRS.has(entry.name)) continue;
+    // Parallel stat all entries at current level
+    const fileResults = await Promise.all(
+      entries.map(async (entry) => {
+        const name = String(entry.name);
+        if (name.startsWith(".")) return null;
+        if (entry.isDirectory() && TRAVERSAL_SKIP_DIRS.has(name)) return null;
 
-      const fullPath = join(currentPath, entry.name);
-      const fileRelativePath = relativePath
-        ? join(relativePath, entry.name)
-        : entry.name;
+        const fullPath = join(currentPath, name);
+        const fileRelativePath = relativePath ? join(relativePath, name) : name;
 
-      const stats = statSync(fullPath);
-      const ext = entry.name.includes(".")
-        ? entry.name.split(".").pop()?.toLowerCase()
+        try {
+          const stats = await fs.stat(fullPath);
+          return {
+            name,
+            fullPath,
+            fileRelativePath,
+            stats,
+            isDirectory: entry.isDirectory(),
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    // Process results and queue directories for recursive traversal
+    const dirQueue: { path: string; relative: string }[] = [];
+
+    for (const result of fileResults) {
+      if (!result) continue;
+
+      const { name, fullPath, fileRelativePath, stats, isDirectory } = result;
+      const ext = name.includes(".")
+        ? name.split(".").pop()?.toLowerCase()
         : "";
 
       allFiles.push({
-        name: entry.name,
+        name,
         path: fileRelativePath,
         absolutePath: fullPath,
         size: stats.size,
-        isDirectory: entry.isDirectory(),
+        isDirectory,
         modifiedTime: stats.mtime,
-        type: entry.isDirectory() ? undefined : ext || undefined,
+        type: isDirectory ? undefined : ext || undefined,
       });
 
-      if (entry.isDirectory()) {
-        traverse(fullPath, fileRelativePath);
+      if (isDirectory) {
+        dirQueue.push({ path: fullPath, relative: fileRelativePath });
       } else {
         totalSize += stats.size;
       }
     }
+
+    // Recursively traverse directories in parallel
+    await Promise.all(dirQueue.map((d) => traverse(d.path, d.relative)));
   }
 
   try {
-    traverse(sessionDir, "");
+    await traverse(sessionDir, "");
   } catch (error) {
     workspaceLogger.error("Failed to traverse directory:", error);
   }
 
-  return {
-    files: allFiles.sort((a, b) => {
-      const timeA = a.modifiedTime?.getTime() ?? 0;
-      const timeB = b.modifiedTime?.getTime() ?? 0;
-      return timeB - timeA;
-    }),
-    size: totalSize,
-  };
+  const sortedFiles = allFiles.sort((a, b) => {
+    const timeA = a.modifiedTime?.getTime() ?? 0;
+    const timeB = b.modifiedTime?.getTime() ?? 0;
+    return timeB - timeA;
+  });
+
+  const result = { files: sortedFiles, size: totalSize };
+
+  // Cache the result
+  setCachedSessionFiles(sessionDir, result);
+
+  return result;
 }
 
 /**
