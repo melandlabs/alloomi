@@ -499,18 +499,3 @@ export function hasDragged(
   const getHasDragged = (containerRef.current as any).getHasDragged;
   return getHasDragged ? getHasDragged() : false;
 }
-
-/**
- * Helper function to reset drag state
- *
- * @param containerRef - HorizontalScrollContainer ref
- */
-export function resetDragState(
-  containerRef: React.RefObject<HTMLDivElement>,
-): void {
-  if (!containerRef.current) return;
-  const resetDragState = (containerRef.current as any).resetDragState;
-  if (resetDragState) {
-    resetDragState();
-  }
-}
